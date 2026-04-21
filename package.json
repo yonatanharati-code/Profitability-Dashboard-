@@ -1,0 +1,17 @@
+{
+  "name": "ql-profitability-dashboard-live",
+  "version": "1.0.0",
+  "description": "QL Profitability Dashboard — dynamic version with HubSpot + ClickUp connectors",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "refresh": "node -e \"require('./transform').refreshAll().then(d=>{const fs=require('fs'),path=require('path');fs.mkdirSync(path.join(__dirname,'data'),{recursive:true});fs.writeFileSync(path.join(__dirname,'data','cache.json'),JSON.stringify(d,null,2));console.log('✓ Cached',d.meta.customerCount,'customers,',d.meta.dealCount,'deals,',d.meta.timeEntryCount,'time entries');}).catch(e=>{console.error('Error:',e.message);process.exit(1);})\""
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

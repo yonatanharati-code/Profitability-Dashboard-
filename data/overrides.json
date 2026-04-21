@@ -1,0 +1,5240 @@
+[
+  {
+    "id": "whirlpool-mda-us",
+    "name": "Whirlpool MDA US",
+    "arr": 55000,
+    "rd": "2027-04-23",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Tal Graziani",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 60,
+      "m6": 177,
+      "monthly": {
+        "2025-11": 45,
+        "2025-12": 72,
+        "2026-01": 27,
+        "2026-02": 33
+      },
+      "ytd": 60
+    },
+    "sa": {
+      "m1": 4,
+      "m3": 4,
+      "m6": 50,
+      "monthly": {
+        "2025-10": 18,
+        "2025-11": 13,
+        "2025-12": 15,
+        "2026-03": 4
+      },
+      "ytd": 4
+    },
+    "dev": {
+      "m1": 4,
+      "m3": 11,
+      "m6": 26.9,
+      "monthly": {
+        "2026-02": 7,
+        "2025-11": 4.7,
+        "2025-12": 10.3,
+        "2026-04": 2,
+        "2025-10": 1,
+        "2026-03": 2
+      },
+      "ytd": 11
+    },
+    "bug": {
+      "m1": 1.5,
+      "m3": 1.8,
+      "m6": 12,
+      "monthly": {
+        "2025-12": 6.5,
+        "2026-01": 3.5,
+        "2025-10": 0.2,
+        "2026-03": 0.3,
+        "2026-04": 1.5
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "electrolux",
+    "name": "Electrolux",
+    "arr": 50000,
+    "rd": "2027-05-01",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Lee Kleiman",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 20,
+      "m6": 120,
+      "monthly": {
+        "2025-11": 50,
+        "2025-12": 50,
+        "2026-01": 15,
+        "2026-02": 5
+      },
+      "ytd": 20
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 148,
+      "monthly": {
+        "2025-10": 20,
+        "2025-11": 88,
+        "2025-12": 40
+      },
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 24.3,
+      "monthly": {
+        "2025-11": 20.5,
+        "2025-12": 0.5,
+        "2025-10": 3.3
+      },
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 23.3,
+      "monthly": {
+        "2025-11": 17.3,
+        "2025-10": 6
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "arcelik-turkiye",
+    "name": "arçelik türkiye",
+    "arr": 92000,
+    "rd": "2026-09-01",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 25,
+      "m3": 95,
+      "m6": 203,
+      "monthly": {
+        "2025-11": 50,
+        "2025-12": 30,
+        "2026-01": 40,
+        "2026-02": 50,
+        "2026-03": 25,
+        "2025-10": 8
+      },
+      "ytd": 115
+    },
+    "sa": {
+      "m1": 14,
+      "m3": 78,
+      "m6": 94,
+      "monthly": {
+        "2025-12": 5,
+        "2026-01": 26,
+        "2026-02": 19,
+        "2026-03": 33,
+        "2026-04": 11
+      },
+      "ytd": 89
+    },
+    "dev": {
+      "m1": 5.1,
+      "m3": 49.6,
+      "m6": 49.6,
+      "monthly": {
+        "2026-03": 26.6,
+        "2026-02": 21,
+        "2026-04": 2,
+        "2026-01": 0
+      },
+      "ytd": 49.6
+    },
+    "bug": {
+      "m1": 3,
+      "m3": 4.2,
+      "m6": 12.7,
+      "monthly": {
+        "2026-04": 3,
+        "2025-10": 8.5,
+        "2026-01": 1.2
+      }
+    },
+    "devPaid": 49691,
+    "devPaidManual": 0,
+    "devHoursPurchased": 100
+  },
+  {
+    "id": "andlight",
+    "name": "Andlight",
+    "arr": 151000,
+    "rd": "2026-12-01",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Jonathan Kidushim",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 7,
+      "monthly": {
+        "2025-11": 4,
+        "2025-12": 3
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 1.3,
+      "m3": 2.3,
+      "m6": 2.3,
+      "monthly": {
+        "2026-03": 2.3
+      }
+    },
+    "devPaid": 20545,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "deonlinedrogist-nl",
+    "name": "DeOnlineDrogist.nl",
+    "arr": 46000,
+    "rd": "2027-06-01",
+    "stage": "Pricing Workshop",
+    "cs": {
+      "m1": 3,
+      "m3": 22,
+      "m6": 22,
+      "monthly": {
+        "2026-02": 19,
+        "2026-03": 3
+      },
+      "ytd": 22
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 2,
+      "m3": 2,
+      "m6": 2,
+      "monthly": {
+        "2026-03": 2
+      },
+      "ytd": 2
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaid": 0,
+    "devPipe": 0,
+    "devPaidManual": 0,
+    "devHoursPurchased": 50,
+    "flag": "green",
+    "rank": "Bronze",
+    "owner": "Cecile Blau"
+  },
+  {
+    "id": "alm",
+    "name": "ALM",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "bauhaus-schweiz",
+    "name": "bauhaus schweiz",
+    "arr": 44000,
+    "rd": null,
+    "stage": "Churn",
+    "rank": "Bronze",
+    "owner": "Lee Kleiman",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "excluded": true
+  },
+  {
+    "id": "azrieli-com",
+    "name": "azrieli.com",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "israir-airlines-and-tourism",
+    "name": "israir airlines and tourism",
+    "arr": 660000,
+    "rd": "2027-06-30",
+    "stage": "Live",
+    "rank": "Platinum",
+    "owner": "Yigal Gillis",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 39,
+      "monthly": {
+        "2025-11": 20,
+        "2025-12": 19
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 34,
+      "m3": 95,
+      "m6": 101,
+      "monthly": {
+        "2025-12": 3,
+        "2026-01": 7,
+        "2026-02": 36,
+        "2026-03": 45,
+        "2026-04": 10
+      },
+      "ytd": 98
+    },
+    "dev": {
+      "m1": 6.8,
+      "m3": 34.5,
+      "m6": 91.7,
+      "monthly": {
+        "2026-02": 14,
+        "2026-03": 9.8,
+        "2025-10": 6.5,
+        "2025-11": 30,
+        "2025-12": 12,
+        "2026-01": 19.5
+      },
+      "ytd": 43.3
+    },
+    "bug": {
+      "m1": 25.3,
+      "m3": 88.5,
+      "m6": 258.8,
+      "monthly": {
+        "2026-03": 26.8,
+        "2026-04": 23,
+        "2026-02": 35.6,
+        "2025-10": 40,
+        "2025-11": 73.6,
+        "2025-12": 54.3,
+        "2026-01": 5.7
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "emp-merchandising-handelsgesellschaft-mbh",
+    "name": "EMP - Merchandising Handelsgesellschaft mbH",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "apotek-1",
+    "name": "apotek 1",
+    "arr": 120000,
+    "rd": "2027-02-15",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Jonathan Kidushim",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 6,
+      "m6": 19,
+      "monthly": {
+        "2025-11": 6,
+        "2025-12": 5,
+        "2025-10": 2,
+        "2026-02": 6
+      },
+      "ytd": 6
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 27.8,
+      "monthly": {
+        "2025-11": 23.8,
+        "2025-12": 4
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "endeavor-global-inc",
+    "name": "Endeavor Global, Inc",
+    "arr": 720000,
+    "rd": "2027-04-15",
+    "stage": "Live",
+    "rank": "Platinum",
+    "owner": "Jonathan Kidushim",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 44,
+      "m6": 167,
+      "monthly": {
+        "2025-10": 35,
+        "2025-11": 18,
+        "2025-12": 40,
+        "2026-01": 30,
+        "2026-02": 44
+      },
+      "ytd": 74
+    },
+    "sa": {
+      "m1": 40,
+      "m3": 80,
+      "m6": 210,
+      "monthly": {
+        "2025-11": 50,
+        "2025-12": 40,
+        "2026-01": 40,
+        "2026-02": 40,
+        "2026-03": 40
+      },
+      "ytd": 120
+    },
+    "dev": {
+      "m1": 13.5,
+      "m3": 95.3,
+      "m6": 179.8,
+      "monthly": {
+        "2026-02": 49.5,
+        "2026-03": 27.3,
+        "2025-12": 32.8,
+        "2025-11": 34.5,
+        "2025-10": 17.3,
+        "2026-01": 16,
+        "2026-04": 2.5
+      },
+      "ytd": 95.3
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 80.3,
+      "m6": 192.2,
+      "monthly": {
+        "2025-12": 37.8,
+        "2026-01": 39.8,
+        "2026-03": 5.8,
+        "2025-11": 51.3,
+        "2026-02": 50.2,
+        "2025-10": 7.3
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "internetstores",
+    "name": "Internetstores",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "allegro",
+    "name": "Allegro",
+    "arr": 30000,
+    "rd": null,
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Tal Graziani",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 2,
+      "monthly": {
+        "2025-12": 2
+      },
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 5.3,
+      "m3": 27,
+      "m6": 90.5,
+      "monthly": {
+        "2025-12": 26.3,
+        "2026-02": 12.5,
+        "2026-03": 9,
+        "2025-10": 9.3,
+        "2025-11": 23,
+        "2026-01": 10.5
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "indimade-brands",
+    "name": "indimade brands",
+    "arr": 50000,
+    "rd": "2026-07-01",
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Lee Kleiman",
+    "flag": "yellow",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 25,
+      "m6": 55,
+      "monthly": {
+        "2025-11": 15,
+        "2025-12": 15,
+        "2026-01": 15,
+        "2026-02": 10
+      },
+      "ytd": 25
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0.1,
+      "monthly": {
+        "2025-12": 0.1
+      },
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 16,
+      "m6": 35.3,
+      "monthly": {
+        "2025-10": 0.5,
+        "2025-11": 18.8,
+        "2026-02": 16
+      }
+    },
+    "devPaid": 5000,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "atea-a-s",
+    "name": "ATEA A/S",
+    "arr": 140621,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0.8,
+      "monthly": {
+        "2025-12": 0.8
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "john-lewis",
+    "name": "john lewis",
+    "arr": 933000,
+    "rd": "2026-09-30",
+    "stage": "Live",
+    "rank": "Platinum",
+    "owner": "Adi Aharon Eldad",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 89,
+      "m3": 393.2,
+      "m6": 822.9,
+      "monthly": {
+        "2025-10": 53,
+        "2025-11": 128.8,
+        "2025-12": 167,
+        "2026-01": 154,
+        "2026-02": 157.7,
+        "2026-03": 162.5
+      },
+      "ytd": 474.2
+    },
+    "sa": {
+      "m1": 38,
+      "m3": 158,
+      "m6": 322,
+      "monthly": {
+        "2025-10": 15,
+        "2025-11": 39,
+        "2025-12": 90,
+        "2026-01": 60,
+        "2026-02": 70,
+        "2026-03": 40,
+        "2026-04": 8
+      },
+      "ytd": 178
+    },
+    "dev": {
+      "m1": 26.9,
+      "m3": 103.8,
+      "m6": 196.8,
+      "monthly": {
+        "2025-12": 25.8,
+        "2026-02": 15.6,
+        "2026-04": 10.4,
+        "2026-03": 67.4,
+        "2025-11": 15.5,
+        "2026-01": 30.3,
+        "2025-10": 31.8
+      },
+      "ytd": 123.7
+    },
+    "bug": {
+      "m1": 27.9,
+      "m3": 79.2,
+      "m6": 145.6,
+      "monthly": {
+        "2025-12": 26.4,
+        "2026-03": 44.7,
+        "2026-02": 24,
+        "2025-11": 19.3,
+        "2026-01": 20.8,
+        "2025-10": 10.5
+      }
+    },
+    "devPaid": 163094,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "luckyvitamin",
+    "name": "LuckyVitamin",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "anikaschuhhandels-gmbh-co-kg",
+    "name": "anikaSchuhhandels GmbH & Co. KG",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "office-depot-sweden",
+    "name": "Office Depot Sweden",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "byggmax-group",
+    "name": "Byggmax Group",
+    "arr": 70111,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0.8,
+      "monthly": {
+        "2025-12": 0.8
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "adlibris",
+    "name": "Adlibris",
+    "arr": 55000,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0.8,
+      "monthly": {
+        "2025-12": 0.8
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "davidsens-tommerhandel-a-s",
+    "name": "Davidsens Tommerhandel A/S",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "lakuda-aps",
+    "name": "LAKUDA ApS",
+    "arr": 77183,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0.8,
+      "monthly": {
+        "2025-12": 0.8
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "amara",
+    "name": "Amara",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "sephora-feelunique",
+    "name": "sephora (FeelUnique)",
+    "arr": 31937,
+    "rd": "2027-03-03",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Lee Kleiman",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "bagaren-och-kocken-ab",
+    "name": "Bagaren Och Kocken AB",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "jollyroom",
+    "name": "Jollyroom",
+    "arr": 96254,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "intersport-digital-gmbh",
+    "name": "Intersport Digital GmbH",
+    "arr": 132000,
+    "rd": "2027-03-31",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Jonathan Kidushim",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 8,
+      "m6": 9,
+      "monthly": {
+        "2025-12": 1,
+        "2026-02": 8
+      },
+      "ytd": 8
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 2.7,
+      "m6": 2.7,
+      "monthly": {
+        "2026-01": 2.7
+      },
+      "ytd": 2.7
+    },
+    "bug": {
+      "m1": 1,
+      "m3": 1.3,
+      "m6": 6,
+      "monthly": {
+        "2026-03": 0.3,
+        "2025-12": 0.7,
+        "2026-04": 1,
+        "2025-11": 4
+      }
+    },
+    "devPaid": 2343,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "multi-retail-group-ltd",
+    "name": "MULTI RETAIL GROUP LTD",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": "Yigal Gillis",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "jumbo-markt-ag",
+    "name": "Jumbo Markt AG",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "cykelpartner-dk",
+    "name": "Cykelpartner.dk",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "bug-israel",
+    "name": "BUG Israel",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "fjellsport-no",
+    "name": "Fjellsport.no",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "horze-international-gmbh",
+    "name": "horze international gmbh",
+    "arr": 78000,
+    "rd": "2028-05-01",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Tal Graziani",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 10,
+      "m6": 24,
+      "monthly": {
+        "2025-11": 12,
+        "2025-12": 2,
+        "2026-01": 6,
+        "2026-02": 4
+      },
+      "ytd": 10
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 1.5,
+      "monthly": {
+        "2025-11": 1.5
+      },
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 2.3,
+      "m3": 2.5,
+      "m6": 2.5,
+      "monthly": {
+        "2026-03": 2.5
+      }
+    },
+    "devPaid": 1289,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "party-city",
+    "name": "party city",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "mathem",
+    "name": "Mathem",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "dehner-gmbh-co-kg",
+    "name": "Dehner GmbH & Co. KG",
+    "arr": 71700,
+    "rd": "2026-10-30",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 2,
+      "m3": 10,
+      "m6": 34,
+      "monthly": {
+        "2025-11": 7,
+        "2025-12": 5,
+        "2026-01": 8,
+        "2026-02": 8,
+        "2026-03": 2,
+        "2025-10": 4
+      },
+      "ytd": 18
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 9.5,
+      "monthly": {
+        "2025-10": 9.5
+      },
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 3,
+      "m6": 13.5,
+      "monthly": {
+        "2025-10": 10.5,
+        "2026-01": 1,
+        "2026-02": 2
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "healthandlife",
+    "name": "healthandlife",
+    "arr": 41200,
+    "rd": "2026-06-26",
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 7,
+      "m6": 18,
+      "monthly": {
+        "2025-10": 3,
+        "2025-11": 4,
+        "2025-12": 4,
+        "2026-01": 5,
+        "2026-02": 2
+      },
+      "ytd": 7
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 2,
+      "m6": 2,
+      "monthly": {
+        "2026-02": 0.5,
+        "2026-03": 1.5
+      },
+      "ytd": 2
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "pigu-lt",
+    "name": "pigu.lt",
+    "arr": 160000,
+    "rd": "2027-01-21",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Tal Graziani",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaid": 7731,
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "docmorris",
+    "name": "DocMorris",
+    "arr": 235768,
+    "rd": "2028-01-01",
+    "stage": "Development",
+    "cs": {
+      "m1": 0,
+      "m3": 61,
+      "m6": 111,
+      "monthly": {
+        "2026-03": 1,
+        "2025-11": 25,
+        "2025-12": 25,
+        "2026-01": 25,
+        "2026-02": 35
+      },
+      "ytd": 61
+    },
+    "sa": {
+      "m1": 32,
+      "m3": 82,
+      "m6": 153,
+      "monthly": {
+        "2025-10": 14,
+        "2025-11": 22,
+        "2025-12": 23,
+        "2026-01": 17,
+        "2026-02": 23,
+        "2026-03": 42,
+        "2026-04": 12
+      },
+      "ytd": 94
+    },
+    "dev": {
+      "m1": 22,
+      "m3": 76,
+      "m6": 138,
+      "monthly": {
+        "2026-01": 47.3,
+        "2025-11": 24,
+        "2026-02": 20.7,
+        "2026-03": 21,
+        "2025-10": 11,
+        "2025-12": 2,
+        "2026-04": 12
+      },
+      "ytd": 101
+    },
+    "bug": {
+      "m1": 24.8,
+      "m3": 55.9,
+      "m6": 132.4,
+      "monthly": {
+        "2026-02": 7.2,
+        "2026-01": 21,
+        "2026-03": 45.8,
+        "2025-10": 12.8,
+        "2025-11": 15.5,
+        "2025-12": 30.2
+      }
+    },
+    "devPaid": 92920,
+    "devPipe": 0,
+    "devPaidManual": 0,
+    "devHoursPurchased": 250,
+    "flag": "green",
+    "rank": "Gold",
+    "owner": "Lee Kleiman"
+  },
+  {
+    "id": "kitchentime-ab",
+    "name": "kitchentime ab",
+    "arr": 68276,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "stadt-parfumerie-pieper",
+    "name": "stadt-parfümerie pieper",
+    "arr": 120000,
+    "rd": null,
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Tal Graziani",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "thalia",
+    "name": "thalia",
+    "arr": 141000,
+    "rd": "2026-05-01",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Adi Aharon Eldad",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 9,
+      "m3": 22,
+      "m6": 80,
+      "monthly": {
+        "2026-04": 3,
+        "2025-10": 11,
+        "2025-11": 27,
+        "2025-12": 14,
+        "2026-01": 11,
+        "2026-02": 8,
+        "2026-03": 6
+      },
+      "ytd": 28
+    },
+    "sa": {
+      "m1": 2,
+      "m3": 11,
+      "m6": 17.5,
+      "monthly": {
+        "2025-12": 2,
+        "2026-01": 6,
+        "2026-02": 5,
+        "2026-03": 2,
+        "2026-04": 1,
+        "2025-10": 1.5
+      },
+      "ytd": 14
+    },
+    "dev": {
+      "m1": 9,
+      "m3": 18,
+      "m6": 18,
+      "monthly": {
+        "2026-02": 8.5,
+        "2026-03": 6.5,
+        "2026-04": 3
+      },
+      "ytd": 18
+    },
+    "bug": {
+      "m1": 2,
+      "m3": 2.2,
+      "m6": 2.2,
+      "monthly": {
+        "2026-03": 2.2
+      }
+    },
+    "devPaid": 2971,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "effective-plan",
+    "name": "Effective Plan",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "spotlight-apparel-inc",
+    "name": "Spotlight Apparel Inc",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "gamestop",
+    "name": "gamestop",
+    "arr": 77000,
+    "rd": null,
+    "stage": "Churn",
+    "rank": "Bronze",
+    "owner": "Lee Kleiman",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "cyclepartner-dk",
+    "name": "Cyclepartner DK",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "obi-group-holding",
+    "name": "OBI Group Holding",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "unito-versand",
+    "name": "UNITO Versand",
+    "arr": 38000,
+    "rd": "2026-10-01",
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Cecile Blau",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 4,
+      "m6": 15,
+      "monthly": {
+        "2025-10": 4,
+        "2026-01": 4,
+        "2026-02": 4,
+        "2025-11": 2,
+        "2025-12": 1
+      },
+      "ytd": 8
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0.2,
+      "m6": 0.2,
+      "monthly": {
+        "2026-02": 0.2
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "ikano-group",
+    "name": "Ikano Group",
+    "arr": 105000,
+    "rd": "2027-08-31",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Jonathan Kidushim",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 3,
+      "m3": 6,
+      "m6": 29,
+      "monthly": {
+        "2025-11": 15,
+        "2025-12": 4,
+        "2026-01": 4,
+        "2026-02": 3,
+        "2026-03": 3
+      },
+      "ytd": 10
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "lenovo",
+    "name": "lenovo",
+    "arr": 60000,
+    "rd": "2025-06-01",
+    "stage": "Churn",
+    "rank": "Silver",
+    "owner": "Lee Kleiman",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "petco",
+    "name": "Petco",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "emundia-d-o-o",
+    "name": "EMundia d.o.o.",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "invigor-group",
+    "name": "Invigor group",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "tonerpartner-gmbh",
+    "name": "tonerpartner gmbh",
+    "arr": 130000,
+    "rd": null,
+    "stage": "UAT",
+    "cs": {
+      "m1": 4,
+      "m3": 31.5,
+      "m6": 47.5,
+      "monthly": {
+        "2026-02": 19.5,
+        "2026-03": 4,
+        "2025-11": 9,
+        "2025-12": 7,
+        "2026-01": 8
+      },
+      "ytd": 31.5
+    },
+    "sa": {
+      "m1": 25,
+      "m3": 88,
+      "m6": 157.5,
+      "monthly": {
+        "2025-10": 8,
+        "2025-11": 26,
+        "2025-12": 22.5,
+        "2026-01": 22,
+        "2026-02": 28,
+        "2026-03": 42,
+        "2026-04": 9
+      },
+      "ytd": 101
+    },
+    "dev": {
+      "m1": 19,
+      "m3": 78.5,
+      "m6": 135.3,
+      "monthly": {
+        "2026-03": 30.5,
+        "2026-04": 5.3,
+        "2026-01": 41.3,
+        "2026-02": 22.3,
+        "2025-10": 7.1,
+        "2025-11": 5.4,
+        "2025-12": 23.3
+      },
+      "ytd": 99.4
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 102.6,
+      "m6": 211,
+      "monthly": {
+        "2026-03": 19.5,
+        "2026-01": 42.8,
+        "2026-02": 49.8,
+        "2025-10": 31.6,
+        "2025-11": 9.4,
+        "2025-12": 58
+      }
+    },
+    "devPaid": 87369,
+    "devPipe": 0,
+    "devPaidManual": 0,
+    "devHoursPurchased": 150,
+    "flag": "green",
+    "rank": "Silver",
+    "owner": "Jonathan Kidushim"
+  },
+  {
+    "id": "elkjop-nordic-as-part-of-dixons-carphone-plc",
+    "name": "Elkjop Nordic AS (Part of Dixons Carphone plc)",
+    "arr": 280000,
+    "rd": null,
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Jonathan Kidushim",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 12,
+      "m3": 44.5,
+      "m6": 70.5,
+      "monthly": {
+        "2026-03": 14.5,
+        "2025-12": 14,
+        "2026-01": 4,
+        "2026-02": 30,
+        "2025-10": 8
+      },
+      "ytd": 48.5
+    },
+    "sa": {
+      "m1": 26,
+      "m3": 129,
+      "m6": 245.5,
+      "monthly": {
+        "2025-10": 3,
+        "2025-11": 5.5,
+        "2025-12": 60,
+        "2026-01": 105,
+        "2026-02": 34,
+        "2026-03": 27,
+        "2026-04": 11
+      },
+      "ytd": 177
+    },
+    "dev": {
+      "m1": 2,
+      "m3": 77.2,
+      "m6": 186.7,
+      "monthly": {
+        "2026-01": 111.7,
+        "2026-02": 21.5,
+        "2026-03": 34.5,
+        "2025-12": 5.5,
+        "2026-04": 1,
+        "2025-11": 12.5
+      },
+      "ytd": 168.7
+    },
+    "bug": {
+      "m1": 12,
+      "m3": 82.5,
+      "m6": 140.4,
+      "monthly": {
+        "2026-01": 33,
+        "2026-02": 53,
+        "2026-03": 24,
+        "2025-10": 9.9,
+        "2025-12": 20.5
+      }
+    },
+    "devPaid": 12300,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "ivory",
+    "name": "Ivory",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "lampenwelt-gmbh-webshop",
+    "name": "Lampenwelt GmbH (Webshop)",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "sneakersnstuff",
+    "name": "Sneakersnstuff",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "tenengroup",
+    "name": "TenenGroup",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "kolonial",
+    "name": "Kolonial",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "shop-apotheke",
+    "name": "Shop-apotheke",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "istoreil",
+    "name": "Istoreil",
+    "arr": 57000,
+    "rd": "2026-05-31",
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 6,
+      "m3": 12,
+      "m6": 30,
+      "monthly": {
+        "2025-11": 8,
+        "2025-12": 8,
+        "2026-01": 4,
+        "2026-02": 4,
+        "2026-04": 0,
+        "2026-03": 6
+      },
+      "ytd": 14
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaid": 5000,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "hiper-cohen",
+    "name": "Hiper Cohen",
+    "arr": 50000,
+    "rd": "2027-02-25",
+    "stage": "Pricing Workshop",
+    "rank": "Bronze",
+    "owner": "Tal Graziani",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 63,
+      "monthly": {
+        "2025-10": 24,
+        "2025-11": 14,
+        "2025-12": 13,
+        "2026-01": 12
+      },
+      "ytd": 12
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 7.1,
+      "m6": 9.7,
+      "monthly": {
+        "2026-01": 0.5,
+        "2026-02": 4.6,
+        "2025-11": 2.7,
+        "2026-03": 2
+      },
+      "ytd": 7.1
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 36.6,
+      "monthly": {
+        "2025-10": 3,
+        "2025-11": 16.5,
+        "2025-12": 16.8,
+        "2026-01": 0.3
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "unknown",
+    "name": "??? ?????? ??????",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 44,
+      "m6": 167,
+      "monthly": {
+        "2025-10": 35,
+        "2025-11": 18,
+        "2025-12": 40,
+        "2026-01": 30,
+        "2026-02": 44
+      },
+      "ytd": 74
+    },
+    "sa": {
+      "m1": 40,
+      "m3": 80,
+      "m6": 210,
+      "monthly": {
+        "2025-11": 50,
+        "2025-12": 40,
+        "2026-01": 40,
+        "2026-02": 40,
+        "2026-03": 40
+      },
+      "ytd": 120
+    },
+    "dev": {
+      "m1": 13.5,
+      "m3": 95.3,
+      "m6": 179.8,
+      "monthly": {
+        "2026-02": 49.5,
+        "2026-03": 27.3,
+        "2025-12": 32.8,
+        "2025-11": 34.5,
+        "2025-10": 17.3,
+        "2026-01": 16,
+        "2026-04": 2.5
+      },
+      "ytd": 95.3
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 80.3,
+      "m6": 192.2,
+      "monthly": {
+        "2025-12": 37.8,
+        "2026-01": 39.8,
+        "2026-03": 5.8,
+        "2025-11": 51.3,
+        "2026-02": 50.2,
+        "2025-10": 7.3
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "saxo-com-a-s",
+    "name": "Saxo.com A / S",
+    "arr": 45188,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0.8,
+      "monthly": {
+        "2025-12": 0.8
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "kitchenone",
+    "name": "Kitchenone",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "optimera-monter-no",
+    "name": "Optimera - monter.no",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "my-trendy-phone",
+    "name": "My Trendy Phone",
+    "arr": 65520,
+    "rd": "2024-06-30",
+    "stage": "Churn",
+    "rank": null,
+    "owner": "Yonatan Harati",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "national-tyres-and-autocare",
+    "name": "National Tyres and Autocare",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "sundhed-dk",
+    "name": "sundhed.dk",
+    "arr": 30000,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "zooplus",
+    "name": "zooplus",
+    "arr": 380000,
+    "rd": "2027-01-16",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 10,
+      "m3": 57.8,
+      "m6": 137.8,
+      "monthly": {
+        "2025-11": 40,
+        "2025-12": 40,
+        "2026-01": 20,
+        "2026-02": 24.5,
+        "2026-03": 13.3
+      },
+      "ytd": 57.8
+    },
+    "sa": {
+      "m1": 10,
+      "m3": 20,
+      "m6": 90,
+      "monthly": {
+        "2025-11": 20,
+        "2025-12": 40,
+        "2026-01": 10,
+        "2026-02": 10,
+        "2026-03": 10
+      },
+      "ytd": 30
+    },
+    "dev": {
+      "m1": 33.8,
+      "m3": 42.8,
+      "m6": 71.7,
+      "monthly": {
+        "2026-03": 18.8,
+        "2026-04": 19.8,
+        "2025-11": 28.5,
+        "2026-01": 4.6,
+        "2025-12": 0.2
+      },
+      "ytd": 43.2
+    },
+    "bug": {
+      "m1": 11,
+      "m3": 27.2,
+      "m6": 114.8,
+      "monthly": {
+        "2025-12": 36.8,
+        "2025-11": 20.3,
+        "2026-04": 11,
+        "2025-10": 17.6,
+        "2026-01": 22.3,
+        "2026-02": 6.8
+      }
+    },
+    "devPaid": 62513,
+    "devPaidManual": 0,
+    "devHoursPurchased": 93
+  },
+  {
+    "id": "watski",
+    "name": "Watski",
+    "arr": 40000,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "x-kom",
+    "name": "x-kom",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": "Yonatan Harati",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "zeitfracht-gmbh",
+    "name": "Zeitfracht GmbH",
+    "arr": 59891,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "victory",
+    "name": "Victory",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "xxxldigital-part-of-xxxl-group",
+    "name": "xxxldigital – part of xxxl group",
+    "arr": 353000,
+    "rd": "2027-03-31",
+    "stage": "Live",
+    "rank": "Platinum",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 1,
+      "m3": 42.5,
+      "m6": 105.5,
+      "monthly": {
+        "2025-11": 22,
+        "2025-12": 29,
+        "2026-01": 20,
+        "2026-02": 21.5,
+        "2026-04": 1,
+        "2025-10": 12
+      },
+      "ytd": 42.5
+    },
+    "sa": {
+      "m1": 50,
+      "m3": 100,
+      "m6": 240,
+      "monthly": {
+        "2025-11": 40,
+        "2025-12": 40,
+        "2026-01": 60,
+        "2026-02": 50,
+        "2026-03": 50
+      },
+      "ytd": 160
+    },
+    "dev": {
+      "m1": 25.3,
+      "m3": 118.4,
+      "m6": 252.1,
+      "monthly": {
+        "2025-12": 85.4,
+        "2026-02": 50.2,
+        "2026-03": 49.3,
+        "2026-04": 2,
+        "2025-10": 17.5,
+        "2025-11": 21.7,
+        "2026-01": 26.2
+      },
+      "ytd": 127.7
+    },
+    "bug": {
+      "m1": 43.2,
+      "m3": 96.7,
+      "m6": 267.7,
+      "monthly": {
+        "2025-12": 59.5,
+        "2026-01": 77.8,
+        "2025-11": 37.4,
+        "2026-03": 19,
+        "2026-04": 27.2,
+        "2025-10": 32.3,
+        "2026-02": 14.5
+      }
+    },
+    "devPaid": 8200,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "keter",
+    "name": "Keter",
+    "arr": 90000,
+    "rd": "2026-05-01",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Yonatan Harati",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 10,
+      "m3": 62,
+      "m6": 158,
+      "monthly": {
+        "2025-10": 32,
+        "2025-12": 40,
+        "2025-11": 24,
+        "2026-01": 32,
+        "2026-02": 20,
+        "2026-03": 10
+      },
+      "ytd": 62
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 10.5,
+      "m6": 17,
+      "monthly": {
+        "2026-02": 6.5,
+        "2026-03": 4,
+        "2025-10": 6.5
+      },
+      "ytd": 10.5
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 29.6,
+      "m6": 42.5,
+      "monthly": {
+        "2026-02": 19.8,
+        "2025-12": 12.9,
+        "2026-01": 8.8,
+        "2026-03": 1
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "dorel-juvenile",
+    "name": "dorel juvenile",
+    "arr": 147000,
+    "rd": "2026-07-01",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 16,
+      "m3": 84,
+      "m6": 150,
+      "monthly": {
+        "2025-10": 30,
+        "2025-11": 12,
+        "2025-12": 24,
+        "2026-01": 50,
+        "2026-02": 14,
+        "2026-03": 20
+      },
+      "ytd": 84
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 6,
+      "m6": 9,
+      "monthly": {
+        "2026-01": 9
+      }
+    },
+    "devPaid": 6033,
+    "devPaidManual": 0,
+    "devHoursPurchased": 35
+  },
+  {
+    "id": "the-iconic",
+    "name": "THE ICONIC",
+    "arr": 64000,
+    "rd": "2026-03-30",
+    "stage": "Churn",
+    "rank": "Bronze",
+    "owner": "Lee Kleiman",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 104,
+      "m6": 109,
+      "monthly": {
+        "2025-12": 5,
+        "2026-01": 50,
+        "2026-02": 54
+      },
+      "ytd": 104
+    },
+    "sa": {
+      "m1": 10,
+      "m3": 125,
+      "m6": 145,
+      "monthly": {
+        "2026-01": 40,
+        "2026-02": 55,
+        "2026-03": 50
+      },
+      "ytd": 145
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 83,
+      "m6": 86,
+      "monthly": {
+        "2026-02": 60.5,
+        "2026-03": 22.5,
+        "2026-01": 3
+      },
+      "ytd": 86
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 48.7,
+      "m6": 48.7,
+      "monthly": {
+        "2026-02": 30.7,
+        "2026-03": 18
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "hema",
+    "name": "HEMA",
+    "arr": 169000,
+    "rd": "2027-01-15",
+    "stage": "UAT",
+    "rank": "Silver",
+    "owner": "Yonatan Harati",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 12,
+      "m3": 112,
+      "m6": 188,
+      "monthly": {
+        "2025-10": 32,
+        "2025-11": 44,
+        "2026-01": 40,
+        "2026-02": 60,
+        "2026-03": 12
+      },
+      "ytd": 112
+    },
+    "sa": {
+      "m1": 11,
+      "m3": 57,
+      "m6": 106.5,
+      "monthly": {
+        "2025-12": 17,
+        "2026-01": 22,
+        "2026-02": 35,
+        "2026-03": 7,
+        "2026-04": 7,
+        "2025-10": 11,
+        "2025-11": 7.5
+      },
+      "ytd": 71
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 7.3,
+      "m6": 15.6,
+      "monthly": {
+        "2025-11": 8.3,
+        "2026-03": 7.3
+      },
+      "ytd": 7.3
+    },
+    "bug": {
+      "m1": 4.5,
+      "m3": 8.5,
+      "m6": 40.4,
+      "monthly": {
+        "2025-12": 7.8,
+        "2026-01": 4,
+        "2025-10": 8.8,
+        "2026-04": 4.5,
+        "2025-11": 15.3
+      }
+    },
+    "devPaid": 20748,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "logitech",
+    "name": "Logitech",
+    "arr": 57000,
+    "rd": "2027-05-31",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Lee Kleiman",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 40,
+      "m6": 70,
+      "monthly": {
+        "2025-10": 0,
+        "2025-11": 10,
+        "2025-12": 20,
+        "2026-01": 20,
+        "2026-02": 20
+      },
+      "ytd": 40
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0.1,
+      "m6": 46.3,
+      "monthly": {
+        "2025-12": 46,
+        "2025-11": 0.3,
+        "2026-01": 0.1
+      },
+      "ytd": 0.1
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 5.8,
+      "m6": 6,
+      "monthly": {
+        "2026-01": 5.8,
+        "2025-10": 0.3
+      }
+    },
+    "devPaid": 3484,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "bike24",
+    "name": "BIKE24",
+    "arr": 76000,
+    "rd": "2027-07-31",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Tal Graziani",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 12,
+      "m6": 25,
+      "monthly": {
+        "2025-11": 8,
+        "2025-12": 5,
+        "2026-01": 6,
+        "2026-02": 6
+      },
+      "ytd": 12
+    },
+    "sa": {
+      "m1": 6,
+      "m3": 21,
+      "m6": 29,
+      "monthly": {
+        "2026-01": 3,
+        "2026-02": 7,
+        "2026-03": 8,
+        "2026-04": 3,
+        "2025-10": 2,
+        "2025-11": 3.5,
+        "2025-12": 2.5
+      },
+      "ytd": 21
+    },
+    "dev": {
+      "m1": 4,
+      "m3": 8,
+      "m6": 10.9,
+      "monthly": {
+        "2026-03": 8,
+        "2025-11": 2.8,
+        "2025-12": 0.2
+      },
+      "ytd": 8
+    },
+    "bug": {
+      "m1": 6,
+      "m3": 6,
+      "m6": 31.3,
+      "monthly": {
+        "2026-03": 6,
+        "2025-10": 2.1,
+        "2025-11": 6.5,
+        "2025-12": 16.7
+      }
+    },
+    "devPaid": 7523,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "breuninger",
+    "name": "Breuninger",
+    "arr": 65000,
+    "rd": null,
+    "stage": null,
+    "cs": {
+      "m1": 4,
+      "m3": 4,
+      "m6": 4,
+      "monthly": {
+        "2026-03": 4
+      },
+      "ytd": 4
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaid": 0,
+    "devPipe": 0,
+    "devPaidManual": 0,
+    "devHoursPurchased": 75,
+    "flag": "green",
+    "rank": null,
+    "owner": "Yonatan Harati"
+  },
+  {
+    "id": "wagner-ecommerce-group-gmbh",
+    "name": "Wagner eCommerce Group GmbH",
+    "arr": 82453,
+    "rd": "2027-01-20",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 2,
+      "m3": 6,
+      "m6": 22,
+      "monthly": {
+        "2025-11": 4,
+        "2025-12": 6,
+        "2026-01": 6,
+        "2026-02": 4,
+        "2026-03": 2
+      },
+      "ytd": 12
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "s-oliver",
+    "name": "s.Oliver",
+    "arr": 137000,
+    "rd": "2028-05-14",
+    "stage": "Live",
+    "cs": {
+      "m1": 0,
+      "m3": 32,
+      "m6": 187,
+      "monthly": {
+        "2025-10": 70,
+        "2025-11": 30,
+        "2025-12": 25,
+        "2026-01": 30,
+        "2026-02": 30,
+        "2026-03": 2
+      },
+      "ytd": 62
+    },
+    "sa": {
+      "m1": 11,
+      "m3": 58,
+      "m6": 333,
+      "monthly": {
+        "2025-10": 80,
+        "2025-11": 112,
+        "2025-12": 60,
+        "2026-01": 38,
+        "2026-02": 27,
+        "2026-03": 8,
+        "2026-04": 8
+      },
+      "ytd": 81
+    },
+    "dev": {
+      "m1": 10.5,
+      "m3": 47,
+      "m6": 149.4,
+      "monthly": {
+        "2025-12": 18,
+        "2026-03": 11.5,
+        "2026-04": 3.5,
+        "2026-02": 22,
+        "2025-11": 55.3,
+        "2026-01": 11.6,
+        "2025-10": 27.5
+      },
+      "ytd": 48.6
+    },
+    "bug": {
+      "m1": 24.2,
+      "m3": 55,
+      "m6": 144.2,
+      "monthly": {
+        "2025-12": 44.7,
+        "2026-02": 14,
+        "2026-03": 15.7,
+        "2025-11": 17.7,
+        "2026-01": 8.4,
+        "2026-04": 19.5,
+        "2025-10": 24.2
+      }
+    },
+    "devPaid": 12885,
+    "devPipe": 0,
+    "devPaidManual": 0,
+    "devHoursPurchased": 100,
+    "flag": "green",
+    "rank": "Silver",
+    "owner": "Lee Kleiman"
+  },
+  {
+    "id": "beko-whirlpool-emea",
+    "name": "Beko (Whirlpool EMEA)",
+    "arr": 135000,
+    "rd": "2028-06-08",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Tal Graziani",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 13.5,
+      "m3": 22.6,
+      "m6": 36.6,
+      "monthly": {
+        "2026-04": 10.5,
+        "2025-12": 14,
+        "2026-02": 9,
+        "2026-03": 3,
+        "2026-01": 0.1
+      },
+      "ytd": 22.6
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 20.8,
+      "m6": 35.3,
+      "monthly": {
+        "2026-02": 18.8,
+        "2026-01": 12,
+        "2025-12": 4.5
+      }
+    },
+    "devPaid": 11714,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "cyberport",
+    "name": "Cyberport",
+    "arr": 240000,
+    "rd": "2027-09-30",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 20,
+      "m3": 82,
+      "m6": 112,
+      "monthly": {
+        "2025-11": 6,
+        "2025-12": 24,
+        "2026-01": 30,
+        "2026-02": 32,
+        "2026-03": 20
+      },
+      "ytd": 82
+    },
+    "sa": {
+      "m1": 20,
+      "m3": 40,
+      "m6": 120,
+      "monthly": {
+        "2025-11": 30,
+        "2025-12": 30,
+        "2026-01": 20,
+        "2026-02": 20,
+        "2026-03": 20
+      },
+      "ytd": 60
+    },
+    "dev": {
+      "m1": 3.7,
+      "m3": 18.3,
+      "m6": 41.7,
+      "monthly": {
+        "2026-03": 7.8,
+        "2026-02": 4.3,
+        "2025-11": 17.1,
+        "2026-01": 10.7,
+        "2025-10": 1.7,
+        "2025-12": 0.2
+      },
+      "ytd": 22.8
+    },
+    "bug": {
+      "m1": 5.5,
+      "m3": 14.9,
+      "m6": 85.3,
+      "monthly": {
+        "2026-02": 6,
+        "2026-04": 5.5,
+        "2025-11": 27.3,
+        "2025-10": 32.8,
+        "2025-12": 10.1,
+        "2026-03": 2.9,
+        "2026-01": 0.7
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "verkkokauppa-com-oyj",
+    "name": "verkkokauppa.com oyj",
+    "arr": 100000,
+    "rd": "2027-02-02",
+    "stage": "Live",
+    "rank": "Silver",
+    "owner": "Yonatan Harati",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "gardenstore",
+    "name": "Gardenstore",
+    "arr": 0,
+    "rd": null,
+    "stage": "Churn",
+    "rank": null,
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "one-kings-lane",
+    "name": "One Kings Lane",
+    "arr": 72000,
+    "rd": "2025-07-06",
+    "stage": "Churn",
+    "rank": "Bronze",
+    "owner": "Yonatan Harati",
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaid": 586,
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "partner",
+    "name": "partner",
+    "arr": 41000,
+    "rd": "2026-05-31",
+    "stage": "Live",
+    "cs": {
+      "m1": 0,
+      "m3": 23,
+      "m6": 23,
+      "monthly": {
+        "2026-03": 3,
+        "2026-02": 20
+      },
+      "ytd": 23
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0.8,
+      "m3": 11.3,
+      "m6": 20.2,
+      "monthly": {
+        "2026-01": 11.7,
+        "2026-03": 5.6,
+        "2026-02": 3
+      },
+      "ytd": 20.3
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 9,
+      "m6": 11.2,
+      "monthly": {
+        "2026-01": 6.2,
+        "2026-02": 5
+      }
+    },
+    "devPaid": 0,
+    "devPipe": 0,
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "flag": "yellow",
+    "rank": "Bronze",
+    "owner": "Tal Graziani"
+  },
+  {
+    "id": "interi-r-a-s",
+    "name": "Interiør A/S",
+    "arr": 13000,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "jacob-hotels",
+    "name": "Jacob Hotels - מלונות ג'ייקוב",
+    "arr": 15000,
+    "rd": null,
+    "stage": null,
+    "rank": "Bronze",
+    "owner": null,
+    "flag": "yellow",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "dk-hardware-supply",
+    "name": "DK Hardware Supply",
+    "arr": 60000,
+    "rd": "2026-12-31",
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Lee Kleiman",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 10,
+      "m6": 45,
+      "monthly": {
+        "2025-11": 10,
+        "2025-12": 19,
+        "2026-01": 6,
+        "2026-02": 10
+      },
+      "ytd": 16
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0.5,
+      "m6": 4,
+      "monthly": {
+        "2025-11": 1.9,
+        "2025-12": 1.2,
+        "2025-10": 0.3,
+        "2026-01": 0.7
+      },
+      "ytd": 0.7
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0.5,
+      "m6": 8.3,
+      "monthly": {
+        "2025-12": 6,
+        "2025-11": 1.8,
+        "2026-02": 0.5
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "ducatillon",
+    "name": "ducatillon",
+    "arr": 41000,
+    "rd": "2026-11-01",
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Cecile Blau",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 10,
+      "monthly": {
+        "2025-11": 5,
+        "2025-12": 5
+      },
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0.1,
+      "m3": 5.9,
+      "m6": 5.9,
+      "monthly": {
+        "2026-02": 5.5,
+        "2026-03": 0.3,
+        "2026-04": 0.1
+      },
+      "ytd": 5.9
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaid": 3340,
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "canada-israel-hotels",
+    "name": "Canada Israel Hotels",
+    "arr": 0,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "dan-hotels-israel",
+    "name": "dan hotels israel",
+    "arr": 0,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 7,
+      "monthly": {
+        "2025-11": 7
+      },
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 1.8,
+      "monthly": {
+        "2026-01": 1.8
+      },
+      "ytd": 1.8
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "kishrey",
+    "name": "Kishrey",
+    "arr": 0,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 85.5,
+      "monthly": {
+        "2025-10": 10,
+        "2025-11": 45.5,
+        "2025-12": 30
+      },
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 62.5,
+      "m3": 64.1,
+      "m6": 64.1,
+      "monthly": {
+        "2026-03": 62.3,
+        "2026-04": 1,
+        "2026-02": 0.8
+      },
+      "ytd": 64.1
+    },
+    "bug": {
+      "m1": 2.7,
+      "m3": 2.7,
+      "m6": 2.7,
+      "monthly": {
+        "2026-04": 2.7
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "griggs",
+    "name": "Griggs",
+    "arr": 37500,
+    "rd": null,
+    "stage": "Churn",
+    "rank": "Bronze",
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "universidad-europea",
+    "name": "Universidad Europea",
+    "arr": 40500,
+    "rd": "2026-05-07",
+    "stage": "Development",
+    "rank": "Bronze",
+    "owner": "Cecile Blau",
+    "flag": "yellow",
+    "devPipe": 0,
+    "cs": {
+      "m1": 10,
+      "m3": 50,
+      "m6": 102,
+      "monthly": {
+        "2025-11": 17,
+        "2026-01": 20,
+        "2026-02": 40,
+        "2026-03": 10,
+        "2025-10": 15
+      },
+      "ytd": 70
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 12.3,
+      "monthly": {
+        "2025-11": 10.5,
+        "2025-12": 1.8
+      },
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 4,
+      "m3": 16.5,
+      "m6": 48,
+      "monthly": {
+        "2026-02": 3.1,
+        "2025-12": 31.5,
+        "2026-01": 9.4,
+        "2026-04": 4
+      },
+      "ytd": 16.5
+    },
+    "bug": {
+      "m1": 3,
+      "m3": 44.8,
+      "m6": 51.8,
+      "monthly": {
+        "2026-01": 30,
+        "2026-02": 18.8,
+        "2026-03": 3
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "euronics-berlet-de",
+    "name": "euronics-berlet.de",
+    "arr": 0,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "weski",
+    "name": "WeSki",
+    "arr": 50000,
+    "rd": null,
+    "stage": "Churn",
+    "rank": "Bronze",
+    "owner": null,
+    "flag": "red",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 39,
+      "monthly": {
+        "2025-10": 20,
+        "2025-11": 19
+      },
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 2.2,
+      "monthly": {
+        "2025-10": 1.5,
+        "2025-11": 0.7
+      },
+      "ytd": 0
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 15.5,
+      "monthly": {
+        "2025-10": 10.5,
+        "2025-11": 5
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "excluded": true
+  },
+  {
+    "id": "modern-builders-supply",
+    "name": "Modern Builders Supply",
+    "arr": 77000,
+    "rd": "2027-02-03",
+    "stage": "Pricing Workshop",
+    "rank": "Bronze",
+    "owner": "Cecile Blau",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "whirlpool-sda-latam-kitchenaid",
+    "name": "Whirlpool SDA LATAM (KitchenAid)",
+    "arr": 40000,
+    "rd": "2026-08-01",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Tal Graziani",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 5,
+      "monthly": {
+        "2026-01": 4,
+        "2025-12": 1
+      },
+      "ytd": 4
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 5.5,
+      "monthly": {
+        "2025-11": 5.5
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "whirlpool-sda-australia-kitchenaid",
+    "name": "Whirlpool SDA Australia (KitchenAid)",
+    "arr": 36000,
+    "rd": "2027-03-31",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Tal Graziani",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 13,
+      "m6": 43,
+      "monthly": {
+        "2025-11": 18,
+        "2025-12": 12,
+        "2026-01": 8,
+        "2026-02": 5
+      },
+      "ytd": 13
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 32,
+      "monthly": {
+        "2025-10": 10,
+        "2025-11": 17,
+        "2025-12": 5
+      },
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 28.4,
+      "monthly": {
+        "2025-12": 12.7,
+        "2026-01": 3,
+        "2025-10": 5,
+        "2025-11": 7.7
+      },
+      "ytd": 3
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 31.3,
+      "monthly": {
+        "2025-10": 8,
+        "2025-11": 23,
+        "2025-12": 0.3
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "whirlpool-sda-us-kitchenaid",
+    "name": "Whirlpool SDA US (KitchenAid)",
+    "arr": 39000,
+    "rd": "2026-10-21",
+    "stage": "Live",
+    "rank": "Gold",
+    "owner": "Tal Graziani",
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 2,
+      "m3": 14,
+      "m6": 40,
+      "monthly": {
+        "2025-11": 16,
+        "2025-12": 10,
+        "2026-01": 6,
+        "2026-02": 6,
+        "2026-04": 2
+      },
+      "ytd": 14
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 23,
+      "monthly": {
+        "2025-10": 15,
+        "2025-11": 5,
+        "2025-12": 3
+      },
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 3,
+      "m6": 5.3,
+      "monthly": {
+        "2025-12": 2.3,
+        "2026-02": 3
+      },
+      "ytd": 3
+    },
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  },
+  {
+    "id": "air-haifa",
+    "name": "Air Haifa",
+    "arr": 0,
+    "rd": null,
+    "stage": null,
+    "rank": null,
+    "owner": null,
+    "flag": "green",
+    "devPipe": 0,
+    "cs": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null,
+    "bug": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {}
+    }
+  },
+  {
+    "id": "samsung",
+    "name": "Samsung",
+    "arr": 277200,
+    "devPipe": 0,
+    "rd": "2026-12-31",
+    "stage": "Live",
+    "rank": "Bronze",
+    "owner": "Jonathan Kidushim",
+    "flag": "green",
+    "cs": {
+      "m1": 5,
+      "m3": 41.9,
+      "m6": 158.5,
+      "monthly": {
+        "2026-02": 31.2,
+        "2026-01": 27.1,
+        "2026-03": 9,
+        "2025-11": 41.3,
+        "2025-12": 50
+      },
+      "ytd": 67.3
+    },
+    "sa": {
+      "m1": 0,
+      "m3": 0,
+      "m6": 0,
+      "monthly": {},
+      "ytd": 0
+    },
+    "dev": {
+      "m1": 0.2,
+      "m3": 57.5,
+      "m6": 102.1,
+      "monthly": {
+        "2026-03": 14.8,
+        "2026-01": 21.6,
+        "2026-02": 25.1,
+        "2025-10": 5.3,
+        "2025-11": 23.9,
+        "2025-12": 11.3,
+        "2026-04": 0.2
+      },
+      "ytd": 61.7
+    },
+    "bug": {
+      "m1": 2,
+      "m3": 20.7,
+      "m6": 63.4,
+      "monthly": {
+        "2026-02": 18.6,
+        "2025-10": 20.6,
+        "2025-11": 7.3,
+        "2026-03": 0.2,
+        "2026-04": 2,
+        "2025-12": 14.8
+      }
+    },
+    "devPaidManual": 0,
+    "devHoursPurchased": null
+  }
+]
