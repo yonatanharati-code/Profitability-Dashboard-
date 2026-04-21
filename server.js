@@ -597,10 +597,37 @@ app.get('/api/debug', (req, res) => {
   })).sort((a, b) => (b.cs_6m + b.sa_6m + b.dev_6m + b.bug_6m) - (a.cs_6m + a.sa_6m + a.dev_6m + a.bug_6m));
 
   res.json({
-    info: 'Add ?raw=1 to see the raw cache. SA team matching uses SA_USERNAMES in connectors/clickup.js.',
+    info: 'Visit /api/debug/unmatched to see ClickUp names that had no matching customer.',
     lastRefreshed: cache.lastRefreshed,
     meta: cache.meta,
     customerBreakdown: summary,
+  });
+});
+
+/**
+ * Debug: show the top ClickUp names that didn't match any customer in the last sync.
+ * Use this to find missing aliases (e.g. ClickUp tracks XXXL as "XXXL Group" but
+ * HubSpot has a different name).
+ */
+app.get('/api/debug/unmatched', (req, res) => {
+  const cache = readCache();
+  if (!cache) return res.json({ error: 'No cache yet — run a sync first' });
+
+  const names = cache.meta?.topUnmatchedNames || [];
+  const totalUnmatched = cache.meta?.unmatchedHours || 0;
+
+  // Also show all HubSpot customer names so you can spot near-misses manually
+  const hubspotNames = cache.customers
+    .map((c) => c.name)
+    .sort((a, b) => a.localeCompare(b));
+
+  res.json({
+    info: `${totalUnmatched} time entries had no matching HubSpot customer. Top unmatched ClickUp folder/list/task names shown below. To fix: add the name to CUSTOMER_ALIASES in transform.js.`,
+    lastRefreshed: cache.lastRefreshed,
+    typeCount: cache.meta?.typeCount || {},
+    topUnmatchedClickUpNames: names,
+    hubspotCustomerCount: hubspotNames.length,
+    hubspotCustomers: hubspotNames,
   });
 });
 

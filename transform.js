@@ -235,6 +235,8 @@ async function refreshAll(onProgress = () => {}) {
   let totalEntries = 0;
   const typeCount   = { cs: 0, sa: 0, dev: 0, bug: 0 };
   const userTypeMap = {};
+  // Collect unmatched candidate names for diagnostics (capped at 300)
+  const unmatchedNames = {};
 
   const SKIP_NAMES = new Set(['Sprint Folder', 'Customer Management', 'General Meetings']);
 
@@ -272,7 +274,16 @@ async function refreshAll(onProgress = () => {}) {
               || customers.find((c) => fuzzyMatch(c.name, name));
       if (customer) break;
     }
-    if (!customer) { unmatched++; return; }
+    if (!customer) {
+      unmatched++;
+      // Track what names we saw — helps diagnose missing customers like XXXL
+      for (const n of candidateNames) {
+        if (n && Object.keys(unmatchedNames).length < 300) {
+          unmatchedNames[n] = (unmatchedNames[n] || 0) + 1;
+        }
+      }
+      return;
+    }
 
     // ── Classification ────────────────────────────────────────────────────
     // Look up the user's role by their ClickUp ID. Entries from users not in
@@ -281,10 +292,12 @@ async function refreshAll(onProgress = () => {}) {
     const baseType = userId ? USER_TYPES[userId] : null;
     if (!baseType) { unmatched++; return; }
 
-    // For dev users, check task/list name for bug keywords
+    // Bug detection: applies to dev AND sa users.
+    // SA engineers working on escalations in TechOps should count as bug,
+    // not just devs. CS users are never re-classified as bug.
     const individualTask = entry.task?.name || '';
     const listName       = entry.task_location?.list_name || entry.task?.list?.name || '';
-    const isBug = baseType === 'dev' &&
+    const isBug = (baseType === 'dev' || baseType === 'sa') &&
       (BUG_TASK_RE.test(individualTask) || BUG_LIST_RE.test(listName));
     const type = isBug ? 'bug' : baseType;
 
@@ -297,6 +310,16 @@ async function refreshAll(onProgress = () => {}) {
 
   if (unmatched > 0) {
     console.log(`   ⚠  ${unmatched} time entries had no matching customer (check folder names)`);
+    // Log top unmatched names so we can spot missing aliases
+    const topUnmatched = Object.entries(unmatchedNames)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 30);
+    if (topUnmatched.length) {
+      console.log('   Top unmatched ClickUp names:');
+      for (const [n, cnt] of topUnmatched) {
+        console.log(`      ${String(cnt).padStart(4)}×  "${n}"`);
+      }
+    }
   }
 
   // Log classification breakdown so we can spot SA/Dev/Bug mismatches
@@ -411,6 +434,12 @@ async function refreshAll(onProgress = () => {}) {
       timeEntryCount:  totalEntries,
       unmatchedHours:  unmatched,
       unmatchedDeals:  unmatchedDeals,
+      typeCount,
+      // Top unmatched ClickUp names — sorted by frequency, for alias debugging
+      topUnmatchedNames: Object.entries(unmatchedNames)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 50)
+        .map(([name, count]) => ({ name, count })),
     },
   };
 }
