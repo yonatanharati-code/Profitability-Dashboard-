@@ -108,12 +108,15 @@ async function fetchOneMemberSpace(apiKey, spaceId, startMs, endMs, memberId) {
  * a live progress bar.
  */
 /**
- * Fetch entries for one space with NO assignee filter.
- * With an admin token, ClickUp returns ALL members' entries this way.
+ * Stream entries for one space page-by-page, calling onEntry for each one.
+ * Never accumulates a large array — memory stays flat regardless of total count.
+ * Returns { count, uniqueUsers } for diagnostics.
  */
-async function fetchSpaceAllUsers(apiKey, spaceId, startMs, endMs) {
-  const entries = [];
+async function streamSpaceEntries(apiKey, spaceId, startMs, endMs, onEntry, assigneeId = null) {
   let page = 0;
+  let count = 0;
+  const uniqueUsers = new Set();
+
   while (true) {
     const qs = new URLSearchParams({
       start_date: String(startMs),
@@ -122,70 +125,75 @@ async function fetchSpaceAllUsers(apiKey, spaceId, startMs, endMs) {
       include_location_names: 'true',
       page: String(page),
     });
+    if (assigneeId) qs.set('assignee', String(assigneeId));
+
     const res = await withTimeout(
       cuGet(`/api/v2/team/${TEAM_ID}/time_entries?${qs}`, apiKey),
       25000
     );
     const batch = res.data ?? [];
-    entries.push(...batch);
+    for (const entry of batch) {
+      if (entry.user?.id) uniqueUsers.add(entry.user.id);
+      onEntry(entry);
+      count++;
+    }
     if (batch.length < 100) break;
     page++;
   }
-  return entries;
+  return { count, uniqueUsers };
 }
 
 /**
- * Per-member fallback: fetch one member's entries for one space with a hard timeout.
- */
-async function fetchOneMemberSafe(apiKey, spaceId, startMs, endMs, memberId) {
-  try {
-    return await withTimeout(
-      fetchOneMemberSpace(apiKey, spaceId, startMs, endMs, memberId),
-      20000
-    );
-  } catch (_) {
-    return [];
-  }
-}
-
-/**
- * Fetch all time entries — fast path first, slow path as fallback.
+ * Stream all time entries to a callback — never accumulates a large array.
  *
- * FAST PATH (2 API calls, ~3 seconds):
- *   Fetch each space with no assignee filter. With an admin token, ClickUp
- *   returns all members' entries. Verified by checking that multiple unique
- *   user IDs appear in the results.
+ * FAST PATH (2 API calls): no assignee filter. With an admin token, ClickUp
+ *   returns all members' entries. Verified by checking uniqueUsers > 1.
  *
- * SLOW PATH (per member, ~60 s for large workspaces):
- *   If the fast path only returns 1 unique user (token is restricted),
- *   fall back to fetching each member individually in batches of 5.
+ * SLOW PATH: per-member sequential with 20s per-request hard timeout.
+ *
+ * @param {string}   apiKey
+ * @param {function} onEntry     - called for every raw entry object
+ * @param {function} onProgress  - called with { step, done, total }
  */
-async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
+async function streamAllTimeEntries(apiKey, onEntry, onProgress = () => {}) {
   const now          = Date.now();
   const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
 
-  // ── FAST PATH ───────────────────────────────────────────────────────────────
-  onProgress({ step: 'Fetching all entries (admin mode)…', done: 0, total: 1 });
+  // ── FAST PATH ────────────────────────────────────────────────────────────────
+  onProgress({ step: 'Fetching entries (admin mode)…', done: 0, total: 1 });
   console.log('   Trying admin fast-path (no assignee filter)…');
 
-  const [csFast, techFast] = await Promise.all([
-    fetchSpaceAllUsers(apiKey, SPACES.CUSTOMER_SUCCESS.id, sixMonthsAgo, now),
-    fetchSpaceAllUsers(apiKey, SPACES.TECHOPS.id,          sixMonthsAgo, now),
-  ]);
+  const allUsers = new Set();
+  let fastCount  = 0;
 
-  const fastAll     = [...csFast, ...techFast];
-  const uniqueUsers = new Set(fastAll.map((e) => e.user?.id).filter(Boolean));
-  console.log(`   Fast path: ${fastAll.length} entries from ${uniqueUsers.size} unique users`);
-
-  if (uniqueUsers.size > 1) {
-    // Admin token returned multi-user data — we're done!
-    onProgress({ step: `Got ${fastAll.length} entries from ${uniqueUsers.size} team members!`, done: 1, total: 1 });
-    const seen = new Set();
-    return fastAll.filter((e) => { if (!e.id || seen.has(e.id)) return false; seen.add(e.id); return true; });
+  // Buffer fast-path entries temporarily just long enough to check uniqueUsers
+  const fastBuffer = [];
+  for (const spaceId of [SPACES.CUSTOMER_SUCCESS.id, SPACES.TECHOPS.id]) {
+    const { count, uniqueUsers } = await streamSpaceEntries(
+      apiKey, spaceId, sixMonthsAgo, now,
+      (e) => { fastBuffer.push(e); },
+    );
+    fastCount += count;
+    uniqueUsers.forEach((u) => allUsers.add(u));
   }
 
+  console.log(`   Fast path: ${fastCount} entries from ${allUsers.size} unique users`);
+
+  if (allUsers.size > 1) {
+    // Admin token works — flush buffer through onEntry and we're done
+    const seen = new Set();
+    for (const e of fastBuffer) {
+      if (e.id && !seen.has(e.id)) { seen.add(e.id); onEntry(e); }
+    }
+    onProgress({ step: `Got ${fastCount} entries from ${allUsers.size} members ✓`, done: 1, total: 1 });
+    console.log(`   ✓ Fast path complete`);
+    return;
+  }
+  // Free the buffer immediately
+  fastBuffer.length = 0;
+
   // ── SLOW PATH ────────────────────────────────────────────────────────────────
-  console.log('   Fast path returned 1 user — falling back to per-member fetch…');
+  console.log('   Fast path = 1 user — per-member fallback…');
   onProgress({ step: 'Getting workspace members…', done: 0, total: 0 });
 
   const members   = await fetchAllMembers(apiKey);
@@ -194,32 +202,35 @@ async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
 
   const spaces = [['CS', SPACES.CUSTOMER_SUCCESS.id], ['TechOps', SPACES.TECHOPS.id]];
   const total  = memberIds.length * spaces.length;
-  console.log(`   Slow path: ${memberIds.length} members × 2 spaces = ${total} fetches (batch 5)`);
+  console.log(`   Slow path: ${memberIds.length} members × 2 spaces = ${total}`);
 
-  const seen       = new Set();
-  const allEntries = [];
-  let done = 0;
+  const seen = new Set();
+  let done   = 0;
 
   for (const [label, spaceId] of spaces) {
-    // Process members in batches of 5 with a hard 20s per-request timeout
-    for (let i = 0; i < memberIds.length; i += 5) {
-      const batch = memberIds.slice(i, i + 5);
-      const results = await Promise.all(
-        batch.map((id) => fetchOneMemberSafe(apiKey, spaceId, sixMonthsAgo, now, id))
-      );
-      for (const entries of results) {
-        done++;
-        for (const e of entries) {
-          if (e.id && !seen.has(e.id)) { seen.add(e.id); allEntries.push(e); }
-        }
+    for (const memberId of memberIds) {
+      done++;
+      onProgress({ step: `${label}: ${done}/${total}`, done, total });
+      try {
+        await withTimeout(
+          streamSpaceEntries(apiKey, spaceId, sixMonthsAgo, now, (e) => {
+            if (e.id && !seen.has(e.id)) { seen.add(e.id); onEntry(e); }
+          }, memberId),
+          20000
+        );
+      } catch (err) {
+        console.warn(`   ⚠  ${label} member ${memberId}: ${err.message}`);
       }
-      onProgress({ step: `${label}: ${Math.min(done, total)}/${total}`, done: Math.min(done, total), total });
-      await sleep(300);
+      await sleep(200);
     }
   }
-
-  onProgress({ step: `Processing ${allEntries.length} entries…`, done: total, total });
-  return allEntries;
 }
 
-module.exports = { fetchAllTimeEntries, classifyEntry, SPACES, SA_USERNAMES };
+// Keep old name as alias so nothing else breaks
+async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
+  const entries = [];
+  await streamAllTimeEntries(apiKey, (e) => entries.push(e), onProgress);
+  return entries;
+}
+
+module.exports = { streamAllTimeEntries, fetchAllTimeEntries, classifyEntry, SPACES, SA_USERNAMES };

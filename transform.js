@@ -1,7 +1,7 @@
 'use strict';
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { fetchAllCompanies, fetchDeals, toUSD, VALID_CSMS } = require('./connectors/hubspot');
-const { fetchAllTimeEntries, classifyEntry } = require('./connectors/clickup');
+const { streamAllTimeEntries, classifyEntry } = require('./connectors/clickup');
 
 // ─── String helpers ───────────────────────────────────────────────────────────
 /** Normalise a string: lowercase, strip non-alphanumeric, strip diacritics */
@@ -203,13 +203,7 @@ async function refreshAll(onProgress = () => {}) {
     fetchAllCompanies(hsKey).then((r) => { console.log(`   ✓ ${r.length} companies`); return r; }),
     fetchDeals(hsKey).then((r)         => { console.log(`   ✓ ${r.length} deals`);     return r; }),
   ]);
-  onProgress({ step: 'HubSpot done — fetching ClickUp…' });
-  const timeEntries = await fetchAllTimeEntries(cuKey, onProgress).then((r) => {
-    console.log(`   ✓ ${r.length} time entries`); return r;
-  });
-
   // ── Build customer records from HubSpot companies ───────────────────────────
-  // Fetch includes both Active Customer and Churn — map status into stage
   const customers = companies
     .map((c) => {
       const p = c.properties;
@@ -227,58 +221,54 @@ async function refreshAll(onProgress = () => {}) {
         cs:  emptyHours(),
         sa:  emptyHours(),
         dev: emptyHours(),
-        bug: emptyHours(), // bug-fixes / escalations (split from dev)
+        bug: emptyHours(),
       };
     });
 
-  // Build lookup maps
   const idToName = Object.fromEntries(customers.map((c) => [c.id, c.name]));
-  const nameToCustomer = new Map();
-  for (const c of customers) nameToCustomer.set(c.id, c);
 
-  // ── Aggregate ClickUp time entries ──────────────────────────────────────────
+  // ── Stream ClickUp time entries — process each entry immediately, never
+  //    accumulate the full raw list in memory ──────────────────────────────────
+  onProgress({ step: 'HubSpot done — fetching ClickUp…' });
   const now = Date.now();
   let unmatched = 0;
-
-  // Diagnostic counters
+  let totalEntries = 0;
   const typeCount   = { cs: 0, sa: 0, dev: 0, bug: 0 };
-  const userTypeMap = {};  // username → type (for logging)
+  const userTypeMap = {};
 
-  for (const entry of timeEntries) {
-    // Customer name is stored in the task name in ClickUp
+  await streamAllTimeEntries(cuKey, (entry) => {
+    totalEntries++;
     const taskName =
       entry.task?.name                 ||
       entry.task_location?.folder_name ||
       entry.task?.folder?.name         ||
       '';
-    if (!taskName || taskName === 'Sprint Folder' || taskName === 'Customer Management' || taskName === 'General Meetings') continue;
+    if (!taskName || taskName === 'Sprint Folder' || taskName === 'Customer Management' || taskName === 'General Meetings') return;
 
     const spaceName =
       entry.task_location?.space_name ||
       entry.task?.space?.name         ||
       '';
-
     const username =
       entry.user?.username ||
       entry.user?.email    ||
       '';
-
     const durationMs = parseInt(entry.duration) || 0;
     const startMs    = parseInt(entry.start)    || 0;
-    if (durationMs <= 0 || startMs <= 0) continue;
+    if (durationMs <= 0 || startMs <= 0) return;
 
-    // Find matching customer — alias table first, then fuzzy match
     const customer = matchCustomerByAlias(taskName, customers)
                   || customers.find((c) => fuzzyMatch(c.name, taskName));
-    if (!customer) { unmatched++; continue; }
+    if (!customer) { unmatched++; return; }
 
-    // Pass the individual task name so TechOps entries can be split dev vs bug
     const individualTask = entry.task?.name || '';
     const type = classifyEntry(spaceName, username, individualTask);
     addHours(customer[type], durationMs, startMs, now);
     typeCount[type]++;
     if (username && !userTypeMap[username]) userTypeMap[username] = { type, space: spaceName };
-  }
+  }, onProgress);
+
+  console.log(`   ✓ ${totalEntries} time entries processed (streamed)`);
 
   if (unmatched > 0) {
     console.log(`   ⚠  ${unmatched} time entries had no matching customer (check folder names)`);
