@@ -530,6 +530,55 @@ async function _syncFromApis() {
 /** Live sync progress — polled by the client every 1.5 s */
 app.get('/api/sync-status', (req, res) => res.json(syncState));
 
+/** Debug: show all workspace members and their roles */
+app.get('/api/debug/members', async (req, res) => {
+  const { fetchAllMembers } = require('./connectors/clickup');
+  try {
+    const cuKey = process.env.CLICKUP_API_KEY;
+    if (!cuKey) return res.status(500).json({ error: 'CLICKUP_API_KEY not set' });
+
+    const { cuGetRaw } = require('./connectors/clickup');
+    // fetch raw team data to show all roles
+    const https = require('https');
+    const raw = await new Promise((resolve, reject) => {
+      const req2 = https.request({
+        hostname: 'api.clickup.com',
+        path: '/api/v2/team',
+        method: 'GET',
+        headers: { Authorization: cuKey },
+      }, (r) => {
+        let d = '';
+        r.on('data', c => d += c);
+        r.on('end', () => resolve(JSON.parse(d)));
+      });
+      req2.on('error', reject);
+      req2.end();
+    });
+
+    const ROLE_NAMES = { 1: 'Owner', 2: 'Admin', 3: 'Member', 4: 'Observer', 5: 'Guest' };
+    const teams = raw.teams ?? [];
+    const team  = teams.find(t => String(t.id) === '31065585') ?? teams[0];
+    if (!team) return res.json({ error: 'No team found', raw });
+
+    const members = (team.members ?? []).map(m => ({
+      id:       m.user?.id,
+      username: m.user?.username,
+      email:    m.user?.email,
+      role:     m.user?.role,
+      roleName: ROLE_NAMES[m.user?.role] ?? `Unknown(${m.user?.role})`,
+      willFetch: [1,2,3].includes(m.user?.role),
+    })).sort((a, b) => (a.role ?? 99) - (b.role ?? 99));
+
+    res.json({
+      total:      members.length,
+      willFetch:  members.filter(m => m.willFetch).length,
+      members,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 /**
  * Debug: show how the last sync classified entries — who got mapped to what type.
  * Visit /api/debug in browser after a sync to diagnose SA/Dev/Bug mismatches.
