@@ -75,10 +75,16 @@ function cuGet(path, apiKey) {
  * Fetch all workspace members so we can pull every member's time entries.
  * Without an explicit assignee filter, ClickUp only returns the token owner's
  * entries even when the token has admin permissions.
+ *
+ * GET /api/v2/team returns all authorized workspaces; each workspace object
+ * contains a `members` array with full user records.
  */
 async function fetchAllMembers(apiKey) {
-  const res = await cuGet(`/api/v2/team/${TEAM_ID}/member`, apiKey);
-  return (res.members ?? []).map((m) => m.user).filter(Boolean);
+  const res = await cuGet(`/api/v2/team`, apiKey);
+  const teams = res.teams ?? [];
+  const team  = teams.find((t) => String(t.id) === String(TEAM_ID)) ?? teams[0];
+  if (!team) throw new Error('ClickUp: no team found in /api/v2/team response');
+  return (team.members ?? []).map((m) => m.user).filter(Boolean);
 }
 
 /**
