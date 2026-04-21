@@ -135,11 +135,11 @@ const CUSTOMER_ALIASES = {
   'edg':           'endeavorglobal',    // "EDG" / "EDG TO" → Endeavor Global, Inc
   'xxxl':          'xxxldigital',       // "XXXL" / "XXXL Group" → xxxldigital – part of xxxl group
   'mbs':           'modernbuilders',    // "MBS" abbreviation → Modern Builders Supply
-  'byggmax':       'byggmax',           // Byggmax Group (may be exact match already; belt-and-suspenders)
-  'pigu':          'pigu',              // pigu.lt
+  'byggmax':       'byggmax',           // Byggmax Group
+  'phh':           'pigult',            // ClickUp "PHH Group" → HubSpot "pigu.lt"
+  'feelunique':    'sephora',           // ClickUp "FeelUnique" → HubSpot "sephora (FeelUnique)"
   'verkkokauppa':  'verkkokauppa',      // verkkokauppa.com oyj
-  'euronics':      'euronics',          // euronics-berlet.de (euronics as standalone word)
-  'sephora':       'sephora',           // sephora (FeelUnique)
+  'euronics':      'euronics',          // euronics-berlet.de
 };
 
 /**

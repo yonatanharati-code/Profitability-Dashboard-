@@ -632,66 +632,71 @@ app.get('/api/debug/unmatched', (req, res) => {
 });
 
 /**
- * Debug: fetch 10 raw ClickUp time entries for a given user ID so we can see
- * exactly which fields (task_location, folder_name, list_name, task.name) are
- * populated. Use this to diagnose why a customer like XXXL shows 0 hours.
- * Usage: /api/debug/sample?userId=60870820
+ * Debug: fetch a sample of recent time entries for every user in USER_TYPES
+ * and group them by customer-name candidate. Answers two questions instantly:
+ *   1. Why does XXXL show only dev? → CS/SA users' entries will have different folder/list names
+ *   2. What do bug task names look like? → shows actual task names for TechOps entries
+ *
+ * Usage: /api/debug/clickup-names   (takes ~30s to complete)
  */
-app.get('/api/debug/sample', async (req, res) => {
+app.get('/api/debug/clickup-names', async (req, res) => {
   const cuKey = process.env.CLICKUP_API_KEY;
   if (!cuKey) return res.status(500).json({ error: 'CLICKUP_API_KEY not set' });
 
-  const userId = req.query.userId;
-  if (!userId) return res.status(400).json({ error: 'Pass ?userId=<clickup_user_id>' });
-
+  const { USER_TYPES } = require('./connectors/clickup');
   const https = require('https');
-  const now    = Date.now();
-  const start  = now - 30 * 24 * 60 * 60 * 1000; // last 30 days
+  const now   = Date.now();
+  const start = now - 30 * 24 * 60 * 60 * 1000; // last 30 days
 
-  async function fetchEntries(spaceId) {
-    const qs = new URLSearchParams({
-      start_date: String(start), end_date: String(now),
-      space_id: spaceId, assignee: userId,
-      include_location_names: 'true', page: '0',
+  function cuFetch(path) {
+    return new Promise((resolve) => {
+      const req2 = https.request(
+        { hostname: 'api.clickup.com', path, method: 'GET', headers: { Authorization: cuKey } },
+        (r) => { let d = ''; r.on('data', c => d += c); r.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } }); }
+      );
+      req2.on('error', () => resolve({}));
+      req2.setTimeout(20000, () => { req2.destroy(); resolve({}); });
+      req2.end();
     });
-    return new Promise((resolve, reject) => {
-      const path2 = `/api/v2/team/31065585/time_entries?${qs}`;
-      const req2 = https.request({ hostname: 'api.clickup.com', path: path2, method: 'GET',
-        headers: { Authorization: cuKey } }, (r) => {
-        let d = ''; r.on('data', c => d += c);
-        r.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { resolve({ err: d.slice(0,200) }); } });
+  }
+
+  const results = [];
+
+  for (const [userId, userType] of Object.entries(USER_TYPES)) {
+    for (const [spaceLabel, spaceId] of [['CS', '54974334'], ['TechOps', '66622361']]) {
+      const qs = new URLSearchParams({
+        start_date: String(start), end_date: String(now),
+        space_id: spaceId, assignee: userId,
+        include_location_names: 'true', page: '0',
       });
-      req2.on('error', reject); req2.setTimeout(15000, () => req2.destroy()); req2.end();
-    });
+      const data = await cuFetch(`/api/v2/team/31065585/time_entries?${qs}`);
+      const entries = (data.data || []).slice(0, 5); // first 5 entries per user per space
+      if (!entries.length) continue;
+
+      for (const e of entries) {
+        results.push({
+          userId,
+          userType,
+          space:       spaceLabel,
+          user:        e.user?.username || e.user?.id,
+          folder_name: e.task_location?.folder_name || null,
+          list_name:   e.task_location?.list_name   || null,
+          task_name:   e.task?.name                 || null,
+          duration_h:  Math.round((parseInt(e.duration) || 0) / 3600000 * 10) / 10,
+        });
+      }
+    }
   }
 
-  try {
-    const [cs, techops] = await Promise.all([
-      fetchEntries('54974334'),
-      fetchEntries('66622361'),
-    ]);
-
-    const pick = (e) => ({
-      id:           e.id,
-      duration_h:   Math.round((parseInt(e.duration) || 0) / 3600000 * 10) / 10,
-      user:         e.user?.username || e.user?.email,
-      task_name:    e.task?.name,
-      folder_name:  e.task_location?.folder_name,
-      list_name:    e.task_location?.list_name,
-      space_name:   e.task_location?.space_name,
-      task_folder:  e.task?.folder?.name,
-      task_list:    e.task?.list?.name,
-    });
-
-    res.json({
-      cs_entries:      (cs.data || []).slice(0, 10).map(pick),
-      techops_entries: (techops.data || []).slice(0, 10).map(pick),
-      cs_total:        (cs.data || []).length,
-      techops_total:   (techops.data || []).length,
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  // Group by user+space so it's easy to read
+  const byUser = {};
+  for (const r of results) {
+    const key = `${r.userType} | user:${r.userId} | ${r.space}`;
+    if (!byUser[key]) byUser[key] = [];
+    byUser[key].push({ folder: r.folder_name, list: r.list_name, task: r.task_name, h: r.duration_h });
   }
+
+  res.json({ note: 'Up to 5 recent entries per user per space. Check CS entries for XXXL-related users to see their folder/list names.', entries: byUser });
 });
 
 /** Trigger a live data refresh from HubSpot + ClickUp (non-blocking) */
