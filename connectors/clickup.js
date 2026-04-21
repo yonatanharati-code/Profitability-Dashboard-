@@ -70,11 +70,22 @@ function cuGet(path, apiKey) {
 }
 
 // ─── Time entry fetching ──────────────────────────────────────────────────────
+
 /**
- * Fetch all time entries for a given space within a date window.
+ * Fetch all workspace members so we can pull every member's time entries.
+ * Without an explicit assignee filter, ClickUp only returns the token owner's
+ * entries even when the token has admin permissions.
+ */
+async function fetchAllMembers(apiKey) {
+  const res = await cuGet(`/api/v2/team/${TEAM_ID}/member`, apiKey);
+  return (res.members ?? []).map((m) => m.user).filter(Boolean);
+}
+
+/**
+ * Fetch all time entries for a single member in a given space within a date window.
  * ClickUp returns max 100 per page; we page through all pages.
  */
-async function fetchSpaceEntries(apiKey, spaceId, startMs, endMs) {
+async function fetchMemberSpaceEntries(apiKey, spaceId, startMs, endMs, assigneeId) {
   const entries = [];
   let page = 0;
 
@@ -83,6 +94,7 @@ async function fetchSpaceEntries(apiKey, spaceId, startMs, endMs) {
       start_date: String(startMs),
       end_date: String(endMs),
       space_id: spaceId,
+      assignee: String(assigneeId),
       include_location_names: 'true',
       page: String(page),
     });
@@ -95,7 +107,6 @@ async function fetchSpaceEntries(apiKey, spaceId, startMs, endMs) {
     const batch = res.data ?? [];
     entries.push(...batch);
 
-    // ClickUp paginates by page; if fewer than 100 returned we've reached the end
     if (batch.length < 100) break;
     page++;
   }
@@ -105,18 +116,37 @@ async function fetchSpaceEntries(apiKey, spaceId, startMs, endMs) {
 
 /**
  * Fetch all time entries for the last 6 months from both Customer Success
- * and TechOps spaces, then return them merged.
+ * and TechOps spaces, across ALL workspace members.
+ *
+ * Strategy: get all members first, then fetch each member's entries for each
+ * space in parallel. Deduplicates by entry ID at the end.
  */
 async function fetchAllTimeEntries(apiKey) {
   const now = Date.now();
   const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
 
-  const [csEntries, techEntries] = await Promise.all([
-    fetchSpaceEntries(apiKey, SPACES.CUSTOMER_SUCCESS.id, sixMonthsAgo, now),
-    fetchSpaceEntries(apiKey, SPACES.TECHOPS.id, sixMonthsAgo, now),
-  ]);
+  // Step 1: get all workspace members
+  const members = await fetchAllMembers(apiKey);
+  const memberIds = members.map((m) => m.id).filter(Boolean);
+  console.log(`   Found ${memberIds.length} workspace members — fetching entries for each…`);
 
-  return [...csEntries, ...techEntries];
+  // Step 2: fetch CS + TechOps entries for every member in parallel
+  const promises = [];
+  for (const memberId of memberIds) {
+    promises.push(fetchMemberSpaceEntries(apiKey, SPACES.CUSTOMER_SUCCESS.id, sixMonthsAgo, now, memberId));
+    promises.push(fetchMemberSpaceEntries(apiKey, SPACES.TECHOPS.id,          sixMonthsAgo, now, memberId));
+  }
+
+  const results = await Promise.all(promises);
+  const allEntries = results.flat();
+
+  // Step 3: deduplicate by entry ID (same entry can appear under different assignees)
+  const seen = new Set();
+  return allEntries.filter((e) => {
+    if (!e.id || seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
 }
 
 module.exports = { fetchAllTimeEntries, classifyEntry, SPACES, SA_USERNAMES };
