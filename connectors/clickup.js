@@ -99,11 +99,33 @@ async function fetchOneMemberSpace(apiKey, spaceId, startMs, endMs, memberId) {
  * Calls onProgress({ step, done, total }) after each member so the UI can show
  * a live progress bar.
  */
+/**
+ * Run an array of async task functions with a concurrency limit.
+ * Returns results in the same order as tasks.
+ */
+async function runConcurrent(tasks, concurrency = 8, betweenBatchMs = 250) {
+  const results = new Array(tasks.length);
+  let i = 0;
+  while (i < tasks.length) {
+    const slice = tasks.slice(i, i + concurrency);
+    const sliceResults = await Promise.allSettled(slice.map((t) => t()));
+    sliceResults.forEach((r, j) => {
+      results[i + j] = r.status === 'fulfilled' ? r.value : [];
+    });
+    i += concurrency;
+    if (i < tasks.length) await sleep(betweenBatchMs);
+  }
+  return results;
+}
+
+/**
+ * Fetch all time entries for the last 6 months from CS + TechOps spaces,
+ * for every workspace member — parallel batches of 8 to keep it fast.
+ */
 async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
   const now          = Date.now();
   const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
 
-  // Get all workspace members
   onProgress({ step: 'Getting workspace members…', done: 0, total: 0 });
   const members   = await fetchAllMembers(apiKey);
   const memberIds = members.map((m) => m.id).filter(Boolean);
@@ -114,26 +136,28 @@ async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
     ['TechOps', SPACES.TECHOPS.id],
   ];
   const total = memberIds.length * spaces.length;
-  console.log(`   Fetching entries for ${memberIds.length} members across ${spaces.length} spaces…`);
+  console.log(`   ${memberIds.length} members × ${spaces.length} spaces = ${total} fetches (concurrency 8)`);
 
-  const allEntries = [];
-  const seen       = new Set();
   let done = 0;
+  const seen       = new Set();
+  const allEntries = [];
 
   for (const [spaceLabel, spaceId] of spaces) {
-    let spaceCount = 0;
-    for (const memberId of memberIds) {
+    onProgress({ step: `${spaceLabel}: starting…`, done, total });
+
+    const tasks = memberIds.map((memberId) => async () => {
+      const entries = await fetchOneMemberSpace(apiKey, spaceId, sixMonthsAgo, now, memberId);
       done++;
-      onProgress({ step: `${spaceLabel}: member ${done}/${total}`, done, total });
-      try {
-        const entries = await fetchOneMemberSpace(apiKey, spaceId, sixMonthsAgo, now, memberId);
-        for (const e of entries) {
-          if (e.id && !seen.has(e.id)) { seen.add(e.id); allEntries.push(e); spaceCount++; }
-        }
-      } catch (e) {
-        console.warn(`   ⚠  Could not fetch ${spaceLabel} for member ${memberId}: ${e.message}`);
+      onProgress({ step: `${spaceLabel}: ${done}/${total}`, done, total });
+      return entries;
+    });
+
+    const results = await runConcurrent(tasks, 8, 300);
+    let spaceCount = 0;
+    for (const batch of results) {
+      for (const e of batch) {
+        if (e.id && !seen.has(e.id)) { seen.add(e.id); allEntries.push(e); spaceCount++; }
       }
-      await sleep(150);
     }
     console.log(`   ✓ ${spaceLabel}: ${spaceCount} unique entries`);
   }
