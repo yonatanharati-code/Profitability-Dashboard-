@@ -508,8 +508,9 @@ app.post('/api/refresh', async (req, res) => {
     console.log(`✓  Refresh complete — ${data.meta.customerCount} customers, ${data.meta.dealCount} deals`);
     res.json({ ok: true, ...data.meta, lastRefreshed: data.lastRefreshed });
   } catch (err) {
-    console.error('Refresh failed:', err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    const msg = err?.message || err?.toString() || 'unknown error (no message)';
+    console.error('Refresh failed:', msg);
+    res.status(500).json({ ok: false, error: msg });
   }
 });
 
