@@ -94,7 +94,24 @@ function fuzzyMatch(a, b) {
 // Key   = lowercase word that appears standalone in the ClickUp CSV task/folder name.
 // Value = norm() of the HubSpot company name.
 const CSV_CUSTOMER_ALIASES = {
-  'edg': 'endeavorglobal', // ClickUp "EDG" / "EDG TO" → Endeavor Global, Inc
+  // ClickUp CSV "Customer" field word → norm() prefix of HubSpot company name
+  'edg':          'endeavorglobal',    // "EDG" → Endeavor Global, Inc
+  'phh':          'pigult',            // "PHH Group" → pigu.lt
+  'feelunique':   'sephora',           // "Feelunique" → sephora (FeelUnique)
+  'pieper':       'stadtparfumerie',   // "Pieper" → stadt-parfümerie pieper
+  'apotek':       'apotek',            // "Apotek1" → Apotek 1
+  'hiper':        'hipercohen',        // "Hiper Cohen" → Hiper Cohen
+  'ikano':        'ikano',             // "Ikano" → Ikano
+  'istore':       'istore',            // "iStore" (Israel)
+  'horze':        'horze',             // "Horze"
+  'ducatillon':   'ducatillon',        // "Ducatillon"
+  'andlight':     'andlight',          // "Andlight"
+  'dehner':       'dehner',            // "Dehner"
+  'allegro':      'allegro',           // "Allegro"
+  'breuninger':   'breuninger',        // "Breuninger"
+  'indimade':     'indimade',          // "Indimade"
+  'weski':        'weski',             // "WeSki"
+  'orchidea':     'orchidea',          // "orchidea"
 };
 
 /**
@@ -104,12 +121,17 @@ const CSV_CUSTOMER_ALIASES = {
  * Keys = norm(CSV name), Values = norm(HubSpot name).
  */
 const CSV_NAME_MAP = {
-  'whirlpool':           'whirlpoolmdaus',                  // "Whirlpool" → Whirlpool MDA US
-  'whirlpoolus':         'whirlpoolmdaus',                  // "Whirlpool US" → Whirlpool MDA US
-  'whirlpoolussda':      'whirlpoolsdauskitchenaid',        // "Whirlpool US SDA" → Whirlpool SDA US (KitchenAid)
-  'kitchenaidanz':       'whirlpoolsdaaustraliakitchenaid', // "KitchenAid ANZ" → Whirlpool SDA Australia (KitchenAid)
-  'kitchenaidlamex':     'whirlpoolsdalatamkitchenaid',     // "KitchenAid Lamex" → Whirlpool SDA LATAM (KitchenAid)
-  'kitchenaidaustralia': 'whirlpoolsdaaustraliakitchenaid', // "KitchenAid Australia" → Whirlpool SDA Australia (KitchenAid)
+  // Exact ClickUp Customer field value (normed) → norm() of HubSpot company name
+  'whirlpool':           'whirlpoolmdaus',                  // "Whirlpool"         → Whirlpool MDA US
+  'whirlpoolus':         'whirlpoolmdaus',                  // "Whirlpool US"      → Whirlpool MDA US
+  'whirlpoolmda':        'whirlpoolmdaus',                  // "Whirlpool MDA"     → Whirlpool MDA US
+  'whirlpoolussda':      'whirlpoolsdauskitchenaid',        // "Whirlpool US SDA"  → Whirlpool SDA US (KitchenAid)
+  'whirlpoolusda':       'whirlpoolsdauskitchenaid',        // "Whirlpool US DA"   → Whirlpool SDA US (KitchenAid)
+  'kitchenaidanz':       'whirlpoolsdaaustraliakitchenaid', // "KitchenAid ANZ"    → Whirlpool SDA Australia
+  'kitchenaidlamex':     'whirlpoolsdalatamkitchenaid',     // "KitchenAid Lamex"  → Whirlpool SDA LATAM
+  'kitchenaidaustralia': 'whirlpoolsdaaustraliakitchenaid', // "KitchenAid Australia" → Whirlpool SDA Australia
+  'verkokkaupa':         'verkkokauppacomoyj',              // ClickUp typo → verkkokauppa.com oyj
+  'verkkokauppa':        'verkkokauppacomoyj',              // correct spelling → verkkokauppa.com oyj
 };
 
 /** Return all CSV keys that match a customer, including via alias table. */

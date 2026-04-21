@@ -1,42 +1,33 @@
 'use strict';
 
-// ─── SA team usernames (same as clickup.js) ───────────────────────────────────
-const SA_USERNAMES = ['aleksandra', 'maher', 'ron koval', 'spitzer', 'ami'];
-
-// ─── Bug / escalation detection ───────────────────────────────────────────────
-/** Matches task names that indicate a bug-fix or escalation (not new dev). */
-const BUG_TASK_RE = /\bbug\b|escalat|hotfix|incident|\bwrong\b|incorrect|\bpatch\b/i;
-
 /**
- * Classify a CSV row as cs / sa / dev / bug.
+ * ClickUp "Time Entries" CSV parser — v2
  *
- * @param {string} spaceName  - ClickUp space name
- * @param {string} username   - ClickUp username
- * @param {string} taskName   - individual task name (for keyword detection)
- * @param {string} bugsFound  - value of the '🐞 Bugs Found' custom field
+ * Key improvements over v1:
+ *  • Uses header-row column names instead of hardcoded indices — survives ClickUp
+ *    adding/removing custom columns without breaking.
+ *  • Classifies by User ID → USER_TYPES map (same as the API path) instead of
+ *    fuzzy username matching.  Rows from users not in USER_TYPES are skipped.
+ *  • Bug detection uses Item Type = "Bug" AND/OR keyword regex on task name.
+ *    "No - Performance / Bug" in the Billable label also counts as bug.
  */
-function classifyRow(spaceName, username, taskName, bugsFound, billable, toPriority) {
-  // Normalise space name: strip whitespace and compare case-insensitively
-  // so "Tech Ops", "techops", "TECHOPS" all match regardless of export format.
-  if ((spaceName || '').replace(/\s+/g, '').toLowerCase() === 'techops') {
-    const bf = (bugsFound || '').trim();
 
-    // "Billable" col 47 (human-readable label): "No - Performance / Bug" = bug work
-    const bill = (billable || '').toLowerCase();
-    const billableIsBug = bill.includes('performance') || bill.includes('bug');
+const { USER_TYPES, BUG_TASK_RE, BUG_LIST_RE } = require('./clickup');
 
-    // "⚠️ TO Priority" explicitly set to "Bug" for bug tasks
-    const priorityIsBug = (toPriority || '').trim().toLowerCase() === 'bug';
+// ─── Bug detection helpers ────────────────────────────────────────────────────
+const BUG_BILLABLE_RE  = /performance|\/\s*bug/i;  // "No - Performance / Bug"
 
-    const isBug = (bf !== '' && bf !== '0') || billableIsBug || priorityIsBug || BUG_TASK_RE.test(taskName || '');
-    return isBug ? 'bug' : 'dev';
-  }
-  const u = (username || '').toLowerCase();
-  if (SA_USERNAMES.some((k) => u.includes(k))) return 'sa';
-  return 'cs';
+function isBugEntry(baseType, itemType, billableLabel, taskName, listName) {
+  if (baseType !== 'dev' && baseType !== 'sa') return false;
+  return (
+    (itemType     || '').toLowerCase() === 'bug' ||
+    BUG_BILLABLE_RE.test(billableLabel || '')    ||
+    BUG_TASK_RE.test(taskName || '')             ||
+    BUG_LIST_RE.test(listName || '')
+  );
 }
 
-// ─── CSV parser (handles quoted fields) ──────────────────────────────────────
+// ─── CSV parser (handles quoted fields with embedded commas) ──────────────────
 function parseLine(line) {
   const fields = [];
   let cur = '', inQ = false;
@@ -56,66 +47,13 @@ function parseLine(line) {
   return fields;
 }
 
-/**
- * ClickUp's "Time Entries" CSV export writes date/time text fields (e.g. "Start Text",
- * "Stop Text") WITHOUT surrounding double-quotes.  The value "12/17/2025, 11:13:03 AM IST"
- * gets split at the comma into two fields, shifting every subsequent column index by +1.
- * Five such fields appear before the "Customer" column (cols 7, 9, 22, 24, 38), causing
- * Space Name, Bugs Found, and Customer to be read from the wrong indices.
- *
- * fixDateSplits() merges them back: ["12/17/2025", " 11:13:03 AM IST"] → one field.
- */
-function fixDateSplits(fields) {
-  const dateOnlyRe = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
-  const timePart   = /^\s*\d{1,2}:\d{2}:\d{2}/;
-  const result = [];
-  for (let i = 0; i < fields.length; i++) {
-    if (dateOnlyRe.test(fields[i]) && i + 1 < fields.length && timePart.test(fields[i + 1])) {
-      result.push(fields[i] + ', ' + fields[i + 1].trim());
-      i++;
-    } else {
-      result.push(fields[i]);
-    }
-  }
-  return result;
-}
-
-// ─── Detect CSV format from header ───────────────────────────────────────────
-/**
- * Two ClickUp export formats:
- *
- * FORMAT A — "Time Entries" export (preferred):
- *   col 1:  Username
- *   col 6:  Start       (exact entry start ms)
- *   col 10: Time Tracked (entry duration ms)
- *   col 13: Space Name
- *   col 48: Customer
- *   Detection: header col 2 === "Time Entry ID"
- *
- * FORMAT B — "Tasks" export (fallback):
- *   col 1:  Username
- *   col 4:  Space Name
- *   col 15: Start Date  (task start ms, often empty)
- *   col 27: User Period Time Spent (ms)
- *   col 38: Customer
- *   Detection: header col 2 === "Task Count"
- */
-function detectFormat(headerCols) {
-  const col2 = (headerCols[2] || '').replace(/"/g, '').trim();
-  if (col2 === 'Time Entry ID') return 'A';
-  if (col2 === 'Task Count')    return 'B';
-  return 'A'; // best guess
-}
-
 // ─── Hours bucket helpers ─────────────────────────────────────────────────────
 const MS1 = 30  * 24 * 60 * 60 * 1000;
 const MS3 = 90  * 24 * 60 * 60 * 1000;
 const MS6 = 180 * 24 * 60 * 60 * 1000;
-const MS_MONTH = 30 * 24 * 60 * 60 * 1000;
 
 function emptyBucket() { return { m1: 0, m3: 0, m6: 0, monthly: {} }; }
 
-/** Add hours with an exact known timestamp. */
 function addToBucket(bucket, durationMs, startMs, now) {
   const hours = durationMs / 3_600_000;
   bucket.m6 += hours;
@@ -126,101 +64,115 @@ function addToBucket(bucket, durationMs, startMs, now) {
   bucket.monthly[mk] = (bucket.monthly[mk] || 0) + hours;
 }
 
-/**
- * Distribute hours evenly across 6 months when no timestamp is known.
- * Used only for Format B rows that lack a start date.
- */
-function addDistributedHours(bucket, durationMs, now) {
-  const totalHours = durationMs / 3_600_000;
-  bucket.m6 += totalHours;
-  bucket.m3 += totalHours / 2;
-  bucket.m1 += totalHours / 6;
-  const share = totalHours / 6;
-  for (let i = 0; i < 6; i++) {
-    const d  = new Date(now - i * MS_MONTH);
-    const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    bucket.monthly[mk] = (bucket.monthly[mk] || 0) + share;
-  }
-}
-
 function roundBucket(b) {
   const r = (v) => Math.round(v * 10) / 10;
   b.m1 = r(b.m1); b.m3 = r(b.m3); b.m6 = r(b.m6);
   for (const k of Object.keys(b.monthly)) b.monthly[k] = r(b.monthly[k]);
 }
 
+// ─── Customers to skip (internal/generic ClickUp entries) ────────────────────
+const SKIP_CUSTOMERS = new Set([
+  'all', 'to', 'tech ops', 'techops', 'none', '', 'internal',
+]);
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 /**
- * Parse a ClickUp CSV export (time entries or tasks) and return per-customer
- * hour buckets, correctly distributed by month.
+ * Parse a ClickUp "Time Entries" CSV export and return per-customer hour buckets.
  *
- * Returns: { hours: { [customerName]: {cs,sa,dev} }, parsed, skipped, format }
+ * Returns: { hours: { [customerName]: { cs, sa, dev, bug } }, parsed, skipped, format }
  */
 function parseCsvHours(csvText) {
   const lines  = csvText.split('\n');
   const now    = Date.now();
   const result = {};
-  let parsed = 0, skipped = 0;
+  let parsed = 0, skipped = 0, skippedUser = 0;
 
-  // Detect format from header
-  const headerCols = parseLine(lines[0] || '');
-  const format     = detectFormat(headerCols);
+  if (!lines[0]) return { hours: result, parsed, skipped, format: 'unknown' };
 
-  console.log(`   CSV format detected: ${format === 'A' ? 'Time Entries (exact timestamps)' : 'Tasks (period totals)'}`);
+  // ── Build column index map from header row ────────────────────────────────
+  const headerCols = parseLine(lines[0]);
+  const idx = {};
+  headerCols.forEach((h, i) => { idx[h.trim()] = i; });
+
+  // Required columns
+  const COL = {
+    userId:        idx['User ID']           ?? 0,
+    username:      idx['Username']          ?? 1,
+    start:         idx['Start']             ?? 6,
+    timeTracked:   idx['Time Tracked']      ?? 10,
+    spaceName:     idx['Space Name']        ?? 13,
+    listName:      idx['List Name']         ?? 17,
+    taskName:      idx['Task Name']         ?? 19,
+    bugsFound:     idx['🐞 Bugs Found']     ?? -1,
+    billable:      idx['Billable']          ?? -1,   // task-level "No - Performance / Bug"
+    customer:      idx['Customer']          ?? -1,
+    toPriority:    idx['⚠️ TO Priority']    ?? -1,
+    itemType:      idx['Item Type']         ?? -1,
+  };
+
+  // Detect format
+  const format = headerCols[2]?.replace(/"/g,'').trim() === 'Time Entry ID' ? 'A' : 'B';
+  console.log(`   CSV format: ${format === 'A' ? 'Time Entries (exact timestamps)' : 'Tasks (period totals)'}`);
+  console.log(`   Key columns: User ID=${COL.userId}, Customer=${COL.customer}, ItemType=${COL.itemType}, Start=${COL.start}`);
+
+  if (COL.customer === -1) {
+    console.warn('   ⚠ "Customer" column not found in CSV — falling back to list/task name matching');
+  }
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // fixDateSplits merges unquoted date/time fields that ClickUp exports without quotes,
-    // restoring correct column alignment for Space Name (13), Bugs Found (42), Customer (48).
-    const cols = fixDateSplits(parseLine(line));
+    const cols = parseLine(line);
 
-    let username, spaceName, customer, durationMs, startMs, taskName, bugsFound, billable, toPriority;
+    const userId     = parseInt(cols[COL.userId]) || 0;
+    const startMs    = parseInt(cols[COL.start])  || 0;
+    const durationMs = parseInt(cols[COL.timeTracked]) || 0;
 
-    if (format === 'A') {
-      // ── Format A: Time Entries ──
-      username   = cols[1]  || '';
-      startMs    = parseInt(cols[6])  || 0;   // exact entry start
-      durationMs = parseInt(cols[10]) || 0;   // this entry's duration
-      spaceName  = cols[13] || '';
-      taskName   = cols[19] || '';            // individual task name (bug detection)
-      bugsFound  = cols[42] || '';            // 🐞 Bugs Found custom field
-      billable   = cols[47] || '';            // Billable (col 47, human-readable: "No - Performance / Bug")
-      customer   = cols[48] || '';            // Customer (col 48 in Format A, after date/time fix)
-      toPriority = cols[50] || '';            // ⚠️ TO Priority ("Bug" = bug task)
-    } else {
-      // ── Format B: Tasks ──
-      username   = cols[1]  || '';
-      spaceName  = cols[4]  || '';
-      taskName   = cols[11] || '';            // Task Name
-      startMs    = parseInt(cols[15]) || 0;   // task start date (often empty)
-      durationMs = parseInt(cols[27]) || 0;   // period time spent
-      bugsFound  = cols[32] || '';            // 🐞 Bugs Found custom field
-      customer   = cols[38] || '';
-      billable   = '';                        // Format B doesn't have Billable label column
-      toPriority = '';
-    }
+    if (durationMs <= 0) { skipped++; continue; }
 
-    if (!customer || durationMs <= 0) { skipped++; continue; }
+    // Filter to last 6 months
+    if (startMs > 0 && startMs < now - MS6) { skipped++; continue; }
 
-    const type = classifyRow(spaceName, username, taskName, bugsFound, billable, toPriority);
+    // Classify by user ID
+    const baseType = USER_TYPES[userId];
+    if (!baseType) { skippedUser++; continue; }
+
+    // Get customer name from the dedicated Customer custom field
+    const customer = COL.customer >= 0
+      ? (cols[COL.customer] || '').trim()
+      : (cols[COL.listName] || cols[COL.taskName] || '').trim(); // fallback
+
+    if (!customer || SKIP_CUSTOMERS.has(customer.toLowerCase())) { skipped++; continue; }
+
+    // Bug detection
+    const itemType     = COL.itemType  >= 0 ? (cols[COL.itemType]  || '') : '';
+    const billable     = COL.billable  >= 0 ? (cols[COL.billable]  || '') : '';
+    const taskName     = (cols[COL.taskName] || '');
+    const listName     = (cols[COL.listName] || '');
+    const toPriority   = COL.toPriority >= 0 ? (cols[COL.toPriority] || '') : '';
+
+    // "Bugs Found" (🐞) counts bugs found during QA — NOT whether the task is a bug fix.
+    // Bug detection: Item Type = Bug, OR Billable label = "No - Performance / Bug",
+    // OR TO Priority explicitly = "Bug", OR task/list name keyword match.
+    const isBug = isBugEntry(baseType, itemType, billable, taskName, listName) ||
+                  (toPriority || '').toLowerCase() === 'bug';
+
+    const type = isBug ? 'bug' : baseType;
+
     if (!result[customer]) {
-      result[customer] = { cs: emptyBucket(), sa: emptyBucket(), dev: emptyBucket(), bug: emptyBucket() };
+      result[customer] = {
+        cs: emptyBucket(), sa: emptyBucket(), dev: emptyBucket(), bug: emptyBucket(),
+      };
     }
 
-    if (startMs > 0 && startMs >= now - MS6) {
-      // Known timestamp within 6-month window
+    if (startMs > 0) {
       addToBucket(result[customer][type], durationMs, startMs, now);
-      parsed++;
-    } else if (startMs > 0 && startMs < now - MS6) {
-      // Too old — skip
-      skipped++;
     } else {
-      // No timestamp (Format B without start date) — distribute evenly
-      addDistributedHours(result[customer][type], durationMs, now);
-      parsed++;
+      // No timestamp — add to m6 only (Format B fallback)
+      result[customer][type].m6 += durationMs / 3_600_000;
     }
+    parsed++;
   }
 
   // Round all buckets
@@ -228,10 +180,11 @@ function parseCsvHours(csvText) {
     roundBucket(buckets.cs);
     roundBucket(buckets.sa);
     roundBucket(buckets.dev);
-    if (buckets.bug) roundBucket(buckets.bug);
+    roundBucket(buckets.bug);
   }
 
+  console.log(`   CSV parsed: ${parsed} rows, ${skipped} skipped (outside range/no customer), ${skippedUser} skipped (user not in USER_TYPES)`);
   return { hours: result, parsed, skipped, format };
 }
 
-module.exports = { parseCsvHours, classifyRow };
+module.exports = { parseCsvHours };
