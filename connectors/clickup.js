@@ -9,17 +9,29 @@ const SPACES = {
 };
 
 // SA team members — usernames that classify as SA even in Customer Success space
-const SA_USERNAMES = ['aleksandra', 'maher', 'ron koval', 'spitzer', 'ami '];
+const SA_USERNAMES = ['aleksandra', 'maher', 'ron koval', 'spitzer', 'ami'];
 
 // ─── Classification ───────────────────────────────────────────────────────────
+// Match bug/escalation keywords in task titles
 const BUG_TASK_RE = /\bbug\b|escalat|hotfix|incident|\bwrong\b|incorrect|\bpatch\b/i;
+// Match bug/escalation keywords in LIST names (e.g. a list called "Bugs" or "Escalations")
+const BUG_LIST_RE = /\bbug|escalat|hotfix|incident|\bfix\b|patch/i;
 
-function classifyEntry(spaceName, username, taskName) {
+/**
+ * Classify a time entry as cs / sa / dev / bug.
+ *
+ * @param {string} spaceName  ClickUp space name
+ * @param {string} username   ClickUp username or email
+ * @param {string} taskName   Individual task title (used for bug keyword detection)
+ * @param {string} listName   ClickUp list name — lists named "Bugs"/"Escalations" → bug
+ */
+function classifyEntry(spaceName, username, taskName, listName) {
   if ((spaceName || '').replace(/\s+/g, '').toLowerCase() === 'techops') {
-    return BUG_TASK_RE.test(taskName || '') ? 'bug' : 'dev';
+    const isBug = BUG_TASK_RE.test(taskName || '') || BUG_LIST_RE.test(listName || '');
+    return isBug ? 'bug' : 'dev';
   }
   const u = (username || '').toLowerCase();
-  if (SA_USERNAMES.some((k) => u.includes(k))) return 'sa';
+  if (SA_USERNAMES.some((k) => u.includes(k.trim()))) return 'sa';
   return 'cs';
 }
 

@@ -236,14 +236,10 @@ async function refreshAll(onProgress = () => {}) {
   const typeCount   = { cs: 0, sa: 0, dev: 0, bug: 0 };
   const userTypeMap = {};
 
+  const SKIP_NAMES = new Set(['Sprint Folder', 'Customer Management', 'General Meetings']);
+
   await streamAllTimeEntries(cuKey, (entry) => {
     totalEntries++;
-    const taskName =
-      entry.task?.name                 ||
-      entry.task_location?.folder_name ||
-      entry.task?.folder?.name         ||
-      '';
-    if (!taskName || taskName === 'Sprint Folder' || taskName === 'Customer Management' || taskName === 'General Meetings') return;
 
     const spaceName =
       entry.task_location?.space_name ||
@@ -257,12 +253,34 @@ async function refreshAll(onProgress = () => {}) {
     const startMs    = parseInt(entry.start)    || 0;
     if (durationMs <= 0 || startMs <= 0) return;
 
-    const customer = matchCustomerByAlias(taskName, customers)
-                  || customers.find((c) => fuzzyMatch(c.name, taskName));
+    // ── Customer matching ──────────────────────────────────────────────────
+    // In CS space the task name often IS the customer name.
+    // In TechOps the task name is a ticket title; the customer lives in
+    // folder_name (e.g. "Samsung") or list_name.
+    // Try every available name field and use the first that matches.
+    const candidateNames = [
+      entry.task_location?.folder_name,
+      entry.task_location?.list_name,
+      entry.task?.name,
+      entry.task?.folder?.name,
+      entry.task?.list?.name,
+    ].filter((n) => n && !SKIP_NAMES.has(n));
+
+    let customer = null;
+    for (const name of candidateNames) {
+      customer = matchCustomerByAlias(name, customers)
+              || customers.find((c) => fuzzyMatch(c.name, name));
+      if (customer) break;
+    }
     if (!customer) { unmatched++; return; }
 
+    // ── Classification ────────────────────────────────────────────────────
+    // Pass the list name too — TechOps lists called "Bugs"/"Escalations"
+    // should count as bug even if the task title doesn't contain a keyword.
     const individualTask = entry.task?.name || '';
-    const type = classifyEntry(spaceName, username, individualTask);
+    const listName       = entry.task_location?.list_name || entry.task?.list?.name || '';
+    const type = classifyEntry(spaceName, username, individualTask, listName);
+
     addHours(customer[type], durationMs, startMs, now);
     typeCount[type]++;
     if (username && !userTypeMap[username]) userTypeMap[username] = { type, space: spaceName };
