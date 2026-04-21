@@ -119,43 +119,109 @@ function roundHours(bucket) {
   }
 }
 
-// ─── ClickUp task-name → customer aliases ─────────────────────────────────────
+// ─── ClickUp list name → customer extraction ──────────────────────────────────
 /**
- * Maps a standalone word found in a ClickUp task/folder name to the normalised
- * HubSpot company name.  Use this when ClickUp tracks a customer under an
- * abbreviation or codename that fuzzy-matching can't bridge.
+ * TechOps lists follow the pattern "💻 CustomerName - TO" (or "💻 CustomerName TO").
+ * Strip the emoji prefix and " - TO" suffix to get the raw customer name.
+ * This is used as the first candidate — much more reliable than fuzzy-matching
+ * the full decorated list name.
  *
- * Key   = lowercase word as it appears in the ClickUp name (after splitting on
- *         spaces / hyphens / underscores) — must match as a whole word, not a
- *         substring, to avoid false positives.
- * Value = norm() of the corresponding HubSpot company name.
+ * Examples:
+ *   "💻 XXXL - TO"              → "XXXL"
+ *   "💻 John Lewis - TO"        → "John Lewis"
+ *   "💻 PHH Group - TO"         → "PHH Group"
+ *   "💻 Whirlpool US SDA - TO"  → "Whirlpool US SDA"
+ *   "💻 Hema- TO"               → "Hema"
+ *   "💻 Doc Morris TO"          → "Doc Morris"
+ *   "💻 Universidad_Europea-TO" → "Universidad Europea"
  */
-const CUSTOMER_ALIASES = {
-  // ClickUp word  →  norm() prefix of HubSpot company name
-  'edg':           'endeavorglobal',    // "EDG" / "EDG TO" → Endeavor Global, Inc
-  'xxxl':          'xxxldigital',       // "XXXL" / "XXXL Group" → xxxldigital – part of xxxl group
-  'mbs':           'modernbuilders',    // "MBS" abbreviation → Modern Builders Supply
-  'byggmax':       'byggmax',           // Byggmax Group
-  'phh':           'pigult',            // ClickUp "PHH Group" → HubSpot "pigu.lt"
-  'feelunique':    'sephora',           // ClickUp "FeelUnique" → HubSpot "sephora (FeelUnique)"
-  'verkkokauppa':  'verkkokauppa',      // verkkokauppa.com oyj
-  'euronics':      'euronics',          // euronics-berlet.de
+function extractFromListName(listName) {
+  if (!listName) return null;
+  let s = listName.trim();
+  // Strip leading emoji / non-alphanumeric chars
+  s = s.replace(/^[^\w\s(]+\s*/u, '').trim();
+  // Strip trailing " - TO", "- TO", " TO" (case-insensitive)
+  s = s.replace(/\s*[-–]?\s*TO\s*$/i, '').trim();
+  // Replace underscores with spaces
+  s = s.replace(/_/g, ' ').trim();
+  return s || null;
+}
+
+// ─── Direct norm → HubSpot name map for names that don't fuzzy-match ──────────
+// Key   = norm(extracted ClickUp customer name)
+// Value = norm() prefix of the HubSpot company name
+const CLICKUP_NAME_MAP = {
+  // Whirlpool variants — multiple HubSpot entities, can't rely on fuzzy
+  'whirlpoolusda':          'whirlpoolsdauskitchenaid',   // "Whirlpool US SDA"
+  'whirlpoolussda':         'whirlpoolsdauskitchenaid',   // "Whirlpool US SDA" (alt)
+  'whirlpoolus':            'whirlpoolmdaus',              // "Whirlpool US"
+  'whirlpoolmda':           'whirlpoolmdaus',              // "Whirlpool MDA"
+  'kitchenaidanz':          'whirlpoolsdaaustraliakitchenaid',
+  'kitchenaidaustralia':    'whirlpoolsdaaustraliakitchenaid',
+  'kitchenaidlamex':        'whirlpoolsdalatamkitchenaid',
+  // ClickUp abbreviations / name mismatches
+  'phh':                    'pigult',           // "PHH Group" → pigu.lt
+  'phhgroup':               'pigult',
+  'xxxl':                   'xxxldigital',      // "XXXL" → xxxldigital – part of xxxl group
+  'edg':                    'endeavorglobal',   // "EDG" → Endeavor Global
+  'feelunique':             'sephora',          // "FeelUnique" → sephora (FeelUnique)
+  'pieper':                 'stadtparfumerie',  // "Pieper" → stadt-parfümerie pieper
+  'mbs':                    'modernbuilders',   // "MBS"
+  'verkokkaupa':            'verkkokauppacomoyj', // typo in ClickUp
+  'verkkokauppa':           'verkkokauppacomoyj',
+  'kishreyteufa':           'kishrey',          // Hebrew name in ClickUp
+  'apotek1':                'apotek',
+  'docmorris':              'docmorris',        // normalises correctly but belt-and-suspenders
+  'universitadeuropea':     'universidadeuropea',
 };
 
 /**
- * Try to match a ClickUp task name to a customer via CUSTOMER_ALIASES before
- * falling back to fuzzy matching.
+ * Look up a customer by normalized name using CLICKUP_NAME_MAP first,
+ * then CUSTOMER_ALIASES word-level matching, then fuzzy matching.
  */
-function matchCustomerByAlias(taskName, customers) {
-  const words = (taskName || '').toLowerCase().split(/[\s\-_]+/);
+function findCustomerByName(candidateName, customers) {
+  if (!candidateName) return null;
+  const cn = norm(candidateName);
+
+  // 1. Direct map — catches Whirlpool variants and other tricky names
+  const directTarget = CLICKUP_NAME_MAP[cn];
+  if (directTarget) {
+    const found = customers.find((c) => {
+      const hn = norm(c.name);
+      return hn && (hn === directTarget || hn.startsWith(directTarget) || directTarget.startsWith(hn));
+    });
+    if (found) return found;
+  }
+
+  // 2. Word-level alias — catches single-word abbreviations anywhere in the name
+  const words = candidateName.toLowerCase().split(/[\s\-_]+/);
   for (const [aliasWord, targetNorm] of Object.entries(CUSTOMER_ALIASES)) {
     if (words.includes(aliasWord)) {
-      const found = customers.find((c) => { const cn = norm(c.name); return cn && (cn === targetNorm || cn.startsWith(targetNorm) || targetNorm.startsWith(cn)); });
+      const found = customers.find((c) => {
+        const hn = norm(c.name);
+        return hn && (hn === targetNorm || hn.startsWith(targetNorm) || targetNorm.startsWith(hn));
+      });
       if (found) return found;
     }
   }
-  return null;
+
+  // 3. Fuzzy match
+  return customers.find((c) => fuzzyMatch(c.name, candidateName)) || null;
 }
+
+// ─── Word-level aliases (single keyword → HubSpot name prefix) ───────────────
+const CUSTOMER_ALIASES = {
+  'edg':           'endeavorglobal',
+  'xxxl':          'xxxldigital',
+  'phh':           'pigult',
+  'mbs':           'modernbuilders',
+  'feelunique':    'sephora',
+  'verkkokauppa':  'verkkokauppacomoyj',
+  'euronics':      'euronics',
+  'byggmax':       'byggmax',
+  'pieper':        'stadtparfumerie',
+  'apotek':        'apotek',
+};
 
 // ─── Deal → customer matching ─────────────────────────────────────────────────
 /**
@@ -270,22 +336,25 @@ async function refreshAll(onProgress = () => {}) {
     if (durationMs <= 0 || startMs <= 0) return;
 
     // ── Customer matching ──────────────────────────────────────────────────
-    // In CS space the task name often IS the customer name.
-    // In TechOps the task name is a ticket title; the customer lives in
-    // folder_name (e.g. "Samsung") or list_name.
-    // Try every available name field and use the first that matches.
+    // Strategy (in priority order):
+    // 1. Extract clean name from TechOps list pattern "💻 CustomerName - TO"
+    // 2. folder_name (CS space: often the customer name directly)
+    // 3. list_name raw, task name
+    // Each candidate is checked via CLICKUP_NAME_MAP → word-alias → fuzzy match.
+    const rawListName = entry.task_location?.list_name || entry.task?.list?.name || '';
+    const extractedName = extractFromListName(rawListName);
+
     const candidateNames = [
-      entry.task_location?.folder_name,
-      entry.task_location?.list_name,
-      entry.task?.name,
+      extractedName,                          // "XXXL" from "💻 XXXL - TO"
+      entry.task_location?.folder_name,       // CS space: customer folder
+      entry.task_location?.list_name,         // raw list name (fallback)
       entry.task?.folder?.name,
-      entry.task?.list?.name,
+      entry.task?.name,                       // task title (last resort)
     ].filter((n) => n && !SKIP_NAMES.has(n));
 
     let customer = null;
     for (const name of candidateNames) {
-      customer = matchCustomerByAlias(name, customers)
-              || customers.find((c) => fuzzyMatch(c.name, name));
+      customer = findCustomerByName(name, customers);
       if (customer) break;
     }
     if (!customer) {
