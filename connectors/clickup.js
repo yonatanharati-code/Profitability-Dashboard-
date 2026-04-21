@@ -82,8 +82,16 @@ async function fetchAllMembers(apiKey) {
   const teams = res.teams ?? [];
   const team  = teams.find((t) => String(t.id) === String(TEAM_ID)) ?? teams[0];
   if (!team) throw new Error(`ClickUp: no team found. Response keys: ${Object.keys(res).join(', ')}`);
-  const users = (team.members ?? []).map((m) => m.user).filter(Boolean);
-  console.log(`   Members found: ${users.map((u) => u.username || u.email || u.id).join(', ')}`);
+
+  // ClickUp roles: 1=Owner, 2=Admin, 3=Member, 4=Observer, 5=Guest
+  // Only fetch time entries for actual employees — excludes hundreds of guest/observer accounts
+  const ACTIVE_ROLES = new Set([1, 2, 3]);
+  const allMembers    = team.members ?? [];
+  const activeMembers = allMembers.filter((m) => ACTIVE_ROLES.has(m.role));
+  const users         = activeMembers.map((m) => m.user).filter(Boolean);
+
+  console.log(`   Members: ${allMembers.length} total → ${users.length} active (Owner/Admin/Member) → guests/observers excluded`);
+  console.log(`   Active: ${users.map((u) => u.username || u.email || u.id).join(', ')}`);
   return users;
 }
 
@@ -214,26 +222,30 @@ async function streamAllTimeEntries(apiKey, onEntry, onProgress = () => {}) {
 
   const spaces = [['CS', SPACES.CUSTOMER_SUCCESS.id], ['TechOps', SPACES.TECHOPS.id]];
   const total  = memberIds.length * spaces.length;
-  console.log(`   Slow path: ${memberIds.length} members × 2 spaces = ${total}`);
+  console.log(`   Slow path: ${memberIds.length} members × 2 spaces = ${total} (concurrency 10)`);
 
   const seen = new Set();
   let done   = 0;
 
   for (const [label, spaceId] of spaces) {
-    for (const memberId of memberIds) {
-      done++;
-      onProgress({ step: `${label}: ${done}/${total}`, done, total });
-      try {
-        await withTimeout(
-          streamSpaceEntries(apiKey, spaceId, sixMonthsAgo, now, (e) => {
-            if (e.id && !seen.has(e.id)) { seen.add(e.id); onEntry(e); }
-          }, memberId),
-          20000
-        );
-      } catch (err) {
-        console.warn(`   ⚠  ${label} member ${memberId}: ${err.message}`);
-      }
-      await sleep(200);
+    // Process members in parallel batches of 10
+    for (let i = 0; i < memberIds.length; i += 10) {
+      const batch = memberIds.slice(i, i + 10);
+      await Promise.all(batch.map(async (memberId) => {
+        try {
+          await withTimeout(
+            streamSpaceEntries(apiKey, spaceId, sixMonthsAgo, now, (e) => {
+              if (e.id && !seen.has(e.id)) { seen.add(e.id); onEntry(e); }
+            }, memberId),
+            10000
+          );
+        } catch (err) {
+          console.warn(`   ⚠  ${label} member ${memberId}: ${err.message}`);
+        }
+        done++;
+        onProgress({ step: `${label}: ${done}/${total}`, done, total });
+      }));
+      await sleep(100); // brief pause between batches
     }
   }
 }
