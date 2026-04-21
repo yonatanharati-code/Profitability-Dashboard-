@@ -165,6 +165,7 @@ async function streamSpaceEntries(apiKey, spaceId, startMs, endMs, onEntry, assi
       end_date:   String(endMs),
       space_id:   spaceId,
       include_location_names: 'true',
+      include_task_tags: 'true',    // include task.tags for bug keyword detection
       page: String(page),
     });
     if (assigneeId) qs.set('assignee', String(assigneeId));

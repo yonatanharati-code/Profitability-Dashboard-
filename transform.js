@@ -3,6 +3,10 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { fetchAllCompanies, fetchDeals, toUSD, VALID_CSMS } = require('./connectors/hubspot');
 const { streamAllTimeEntries, USER_TYPES, BUG_TASK_RE, BUG_LIST_RE } = require('./connectors/clickup');
 
+// ─── Bug detection helpers ────────────────────────────────────────────────────
+// Matches "No - Performance / Bug" in ClickUp's Billable custom field
+const BUG_BILLABLE_RE = /performance|\/\s*bug/i;
+
 // ─── String helpers ───────────────────────────────────────────────────────────
 /** Normalise a string: lowercase, strip non-alphanumeric, strip diacritics */
 function norm(s) {
@@ -163,6 +167,7 @@ const CLICKUP_NAME_MAP = {
   'phh':                    'pigult',           // "PHH Group" → pigu.lt
   'phhgroup':               'pigult',
   'xxxl':                   'xxxldigital',      // "XXXL" → xxxldigital – part of xxxl group
+  'xxxlutz':                'xxxldigital',      // "XXXLutz" — CS/SA task name for XXXL
   'edg':                    'endeavorglobal',   // "EDG" → Endeavor Global
   'feelunique':             'sephora',          // "FeelUnique" → sephora (FeelUnique)
   'pieper':                 'stadtparfumerie',  // "Pieper" → stadt-parfümerie pieper
@@ -173,6 +178,8 @@ const CLICKUP_NAME_MAP = {
   'apotek1':                'apotek',
   'docmorris':              'docmorris',        // normalises correctly but belt-and-suspenders
   'universitadeuropea':     'universidadeuropea',
+  'phoenixpharmaswitzerland': 'healthandlife',  // "Phoenix Pharma Switzerland"
+  'orchid':                 'orchidea',         // "Orchid" → Orchidea
 };
 
 /**
@@ -213,6 +220,7 @@ function findCustomerByName(candidateName, customers) {
 const CUSTOMER_ALIASES = {
   'edg':           'endeavorglobal',
   'xxxl':          'xxxldigital',
+  'xxxlutz':       'xxxldigital',    // "XXXLutz" — how CS/SA log XXXL time
   'phh':           'pigult',
   'mbs':           'modernbuilders',
   'feelunique':    'sephora',
@@ -221,6 +229,7 @@ const CUSTOMER_ALIASES = {
   'byggmax':       'byggmax',
   'pieper':        'stadtparfumerie',
   'apotek':        'apotek',
+  'orchid':        'orchidea',
 };
 
 // ─── Deal → customer matching ─────────────────────────────────────────────────
@@ -318,7 +327,11 @@ async function refreshAll(onProgress = () => {}) {
   // Collect unmatched candidate names for diagnostics (capped at 300)
   const unmatchedNames = {};
 
-  const SKIP_NAMES = new Set(['Sprint Folder', 'Customer Management', 'General Meetings']);
+  const SKIP_NAMES = new Set([
+    'Sprint Folder', 'Customer Management', 'General Meetings',
+    'TechOps', 'Tech Ops', 'Internal', 'None', 'All',
+    '💼 Customer Management',
+  ]);
 
   await streamAllTimeEntries(cuKey, (entry) => {
     totalEntries++;
@@ -378,10 +391,40 @@ async function refreshAll(onProgress = () => {}) {
     // Bug detection: applies to dev AND sa users.
     // SA engineers working on escalations in TechOps should count as bug,
     // not just devs. CS users are never re-classified as bug.
+    //
+    // Mirrors CSV logic (csv-hours.js isBugEntry):
+    //  1. task.custom_type === 'bug'  — ClickUp "Item Type" task type
+    //  2. Billable custom field = "No - Performance / Bug"
+    //  3. TO Priority custom field = "Bug"
+    //  4. task name keyword regex (BUG_TASK_RE)
+    //  5. list name keyword regex (BUG_LIST_RE)
+    //  6. entry tags contain bug/escalation keyword
     const individualTask = entry.task?.name || '';
     const listName       = entry.task_location?.list_name || entry.task?.list?.name || '';
-    const isBug = (baseType === 'dev' || baseType === 'sa') &&
-      (BUG_TASK_RE.test(individualTask) || BUG_LIST_RE.test(listName));
+
+    // (1) ClickUp task type / item_type  (returned as task.custom_type or task.item_type)
+    const itemType = (entry.task?.custom_type || entry.task?.item_type || '').toString().toLowerCase();
+
+    // (2) & (3) Custom fields on the task — ClickUp returns these in task.custom_fields[]
+    //     when the time-entry was fetched with include_location_names=true.
+    //     Field names: "Billable" and "⚠️ TO Priority"
+    const taskCFs      = entry.task?.custom_fields || [];
+    const billableCF   = taskCFs.find((cf) => /^billable$/i.test(cf.name || ''));
+    const billableVal  = (billableCF?.value ?? billableCF?.type_config?.default ?? '').toString();
+    const toPriCF      = taskCFs.find((cf) => /to\s*priority/i.test(cf.name || ''));
+    const toPriVal     = (toPriCF?.value ?? '').toString().toLowerCase();
+
+    // (6) Entry-level tags (time entry can carry tags like "bug", "escalation")
+    const entryTagStr  = (entry.tags || []).map((t) => t.name || t).join(' ');
+
+    const isBug = (baseType === 'dev' || baseType === 'sa') && (
+      itemType === 'bug'                    ||  // (1) item type
+      BUG_BILLABLE_RE.test(billableVal)    ||  // (2) "No - Performance / Bug"
+      toPriVal === 'bug'                   ||  // (3) TO Priority = Bug
+      BUG_TASK_RE.test(individualTask)     ||  // (4) task name keyword
+      BUG_LIST_RE.test(listName)           ||  // (5) list name keyword
+      /bug|escalat/i.test(entryTagStr)         // (6) entry tags
+    );
     const type = isBug ? 'bug' : baseType;
 
     addHours(customer[type], durationMs, startMs, now);

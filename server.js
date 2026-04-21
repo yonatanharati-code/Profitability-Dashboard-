@@ -122,16 +122,21 @@ const CSV_CUSTOMER_ALIASES = {
  */
 const CSV_NAME_MAP = {
   // Exact ClickUp Customer field value (normed) → norm() of HubSpot company name
-  'whirlpool':           'whirlpoolmdaus',                  // "Whirlpool"         → Whirlpool MDA US
-  'whirlpoolus':         'whirlpoolmdaus',                  // "Whirlpool US"      → Whirlpool MDA US
-  'whirlpoolmda':        'whirlpoolmdaus',                  // "Whirlpool MDA"     → Whirlpool MDA US
-  'whirlpoolussda':      'whirlpoolsdauskitchenaid',        // "Whirlpool US SDA"  → Whirlpool SDA US (KitchenAid)
-  'whirlpoolusda':       'whirlpoolsdauskitchenaid',        // "Whirlpool US DA"   → Whirlpool SDA US (KitchenAid)
-  'kitchenaidanz':       'whirlpoolsdaaustraliakitchenaid', // "KitchenAid ANZ"    → Whirlpool SDA Australia
-  'kitchenaidlamex':     'whirlpoolsdalatamkitchenaid',     // "KitchenAid Lamex"  → Whirlpool SDA LATAM
-  'kitchenaidaustralia': 'whirlpoolsdaaustraliakitchenaid', // "KitchenAid Australia" → Whirlpool SDA Australia
-  'verkokkaupa':         'verkkokauppacomoyj',              // ClickUp typo → verkkokauppa.com oyj
-  'verkkokauppa':        'verkkokauppacomoyj',              // correct spelling → verkkokauppa.com oyj
+  'whirlpool':                  'whirlpoolmdaus',                  // "Whirlpool"         → Whirlpool MDA US
+  'whirlpoolus':                'whirlpoolmdaus',                  // "Whirlpool US"      → Whirlpool MDA US
+  'whirlpoolmda':               'whirlpoolmdaus',                  // "Whirlpool MDA"     → Whirlpool MDA US
+  'whirlpoolussda':             'whirlpoolsdauskitchenaid',        // "Whirlpool US SDA"  → Whirlpool SDA US (KitchenAid)
+  'whirlpoolusda':              'whirlpoolsdauskitchenaid',        // "Whirlpool US DA"   → Whirlpool SDA US (KitchenAid)
+  'kitchenaidanz':              'whirlpoolsdaaustraliakitchenaid', // "KitchenAid ANZ"    → Whirlpool SDA Australia
+  'kitchenaidlamex':            'whirlpoolsdalatamkitchenaid',     // "KitchenAid Lamex"  → Whirlpool SDA LATAM
+  'kitchenaidaustralia':        'whirlpoolsdaaustraliakitchenaid', // "KitchenAid Australia" → Whirlpool SDA Australia
+  'verkokkaupa':                'verkkokauppacomoyj',              // ClickUp typo → verkkokauppa.com oyj
+  'verkkokauppa':               'verkkokauppacomoyj',              // correct spelling → verkkokauppa.com oyj
+  'xxxlutz':                    'xxxldigital',                     // "XXXLutz" — CS/SA task name for XXXL
+  'xxxl':                       'xxxldigital',                     // "XXXL" → xxxldigital
+  'phoenixpharmaswitzerland':   'healthandlife',                   // "Phoenix Pharma Switzerland"
+  'phhgroup':                   'pigult',                          // "PHH Group" → pigu.lt
+  'phh':                        'pigult',                          // "PHH" → pigu.lt
 };
 
 /** Return all CSV keys that match a customer, including via alias table. */
@@ -729,6 +734,13 @@ app.post('/api/refresh', (req, res) => {
   syncState = { running: true, step: 'Connecting…', done: 0, total: 0, error: null };
   res.json({ ok: true, started: true }); // respond immediately so client can start polling
 
+  // API sync is the source of truth for hours — delete any uploaded CSV so the two
+  // sources never add together and double-count hours.
+  if (fs.existsSync(CSV_HOURS_FILE)) {
+    fs.unlinkSync(CSV_HOURS_FILE);
+    console.log('   🗑  Cleared uploaded CSV hours (API sync takes precedence)');
+  }
+
   console.log('\n⟳  Refresh triggered via API…');
   // Run the heavy work in the background
   (async () => {
@@ -758,6 +770,21 @@ app.post('/api/import-hours', (req, res) => {
     console.log(`\n📂  Importing hours CSV: ${filename} (${(csv.length / 1024).toFixed(1)} KB)`);
     const { hours, parsed, skipped } = parseCsvHours(csv);
     const customers = Object.keys(hours);
+
+    // CSV upload is now the sole source of hours — zero out any API-synced hours in
+    // the cache so the two sources never add together and double-count.
+    const cache = readCache();
+    if (cache) {
+      const emptyBkt = () => ({ m1: 0, m3: 0, m6: 0, monthly: {} });
+      cache.customers.forEach((c) => {
+        c.cs  = emptyBkt();
+        c.sa  = emptyBkt();
+        c.dev = emptyBkt();
+        c.bug = emptyBkt();
+      });
+      fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
+      console.log('   🗑  Zeroed API hours in cache (CSV takes precedence)');
+    }
 
     const payload = {
       hours,

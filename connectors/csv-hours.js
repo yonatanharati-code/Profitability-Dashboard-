@@ -73,6 +73,7 @@ function roundBucket(b) {
 // ─── Customers to skip (internal/generic ClickUp entries) ────────────────────
 const SKIP_CUSTOMERS = new Set([
   'all', 'to', 'tech ops', 'techops', 'none', '', 'internal',
+  'general meetings', 'sprint folder', 'customer management',
 ]);
 
 // ─── Main export ──────────────────────────────────────────────────────────────
