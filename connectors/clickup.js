@@ -87,7 +87,7 @@ async function fetchAllMembers(apiKey) {
   // Only fetch time entries for actual employees — excludes hundreds of guest/observer accounts
   const ACTIVE_ROLES = new Set([1, 2, 3]);
   const allMembers    = team.members ?? [];
-  const activeMembers = allMembers.filter((m) => ACTIVE_ROLES.has(m.role));
+  const activeMembers = allMembers.filter((m) => ACTIVE_ROLES.has(m.user?.role));
   const users         = activeMembers.map((m) => m.user).filter(Boolean);
 
   console.log(`   Members: ${allMembers.length} total → ${users.length} active (Owner/Admin/Member) → guests/observers excluded`);
