@@ -56,6 +56,14 @@ function cuGet(path, apiKey) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Wrap any promise with a hard timeout so it never hangs forever */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
 // ─── Members ──────────────────────────────────────────────────────────────────
 async function fetchAllMembers(apiKey) {
   const res = await cuGet(`/api/v2/team`, apiKey);
@@ -100,66 +108,114 @@ async function fetchOneMemberSpace(apiKey, spaceId, startMs, endMs, memberId) {
  * a live progress bar.
  */
 /**
- * Run an array of async task functions with a concurrency limit.
- * Returns results in the same order as tasks.
+ * Fetch entries for one space with NO assignee filter.
+ * With an admin token, ClickUp returns ALL members' entries this way.
  */
-async function runConcurrent(tasks, concurrency = 8, betweenBatchMs = 250) {
-  const results = new Array(tasks.length);
-  let i = 0;
-  while (i < tasks.length) {
-    const slice = tasks.slice(i, i + concurrency);
-    const sliceResults = await Promise.allSettled(slice.map((t) => t()));
-    sliceResults.forEach((r, j) => {
-      results[i + j] = r.status === 'fulfilled' ? r.value : [];
+async function fetchSpaceAllUsers(apiKey, spaceId, startMs, endMs) {
+  const entries = [];
+  let page = 0;
+  while (true) {
+    const qs = new URLSearchParams({
+      start_date: String(startMs),
+      end_date:   String(endMs),
+      space_id:   spaceId,
+      include_location_names: 'true',
+      page: String(page),
     });
-    i += concurrency;
-    if (i < tasks.length) await sleep(betweenBatchMs);
+    const res = await withTimeout(
+      cuGet(`/api/v2/team/${TEAM_ID}/time_entries?${qs}`, apiKey),
+      25000
+    );
+    const batch = res.data ?? [];
+    entries.push(...batch);
+    if (batch.length < 100) break;
+    page++;
   }
-  return results;
+  return entries;
 }
 
 /**
- * Fetch all time entries for the last 6 months from CS + TechOps spaces,
- * for every workspace member — parallel batches of 8 to keep it fast.
+ * Per-member fallback: fetch one member's entries for one space with a hard timeout.
+ */
+async function fetchOneMemberSafe(apiKey, spaceId, startMs, endMs, memberId) {
+  try {
+    return await withTimeout(
+      fetchOneMemberSpace(apiKey, spaceId, startMs, endMs, memberId),
+      20000
+    );
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Fetch all time entries — fast path first, slow path as fallback.
+ *
+ * FAST PATH (2 API calls, ~3 seconds):
+ *   Fetch each space with no assignee filter. With an admin token, ClickUp
+ *   returns all members' entries. Verified by checking that multiple unique
+ *   user IDs appear in the results.
+ *
+ * SLOW PATH (per member, ~60 s for large workspaces):
+ *   If the fast path only returns 1 unique user (token is restricted),
+ *   fall back to fetching each member individually in batches of 5.
  */
 async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
   const now          = Date.now();
   const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
 
+  // ── FAST PATH ───────────────────────────────────────────────────────────────
+  onProgress({ step: 'Fetching all entries (admin mode)…', done: 0, total: 1 });
+  console.log('   Trying admin fast-path (no assignee filter)…');
+
+  const [csFast, techFast] = await Promise.all([
+    fetchSpaceAllUsers(apiKey, SPACES.CUSTOMER_SUCCESS.id, sixMonthsAgo, now),
+    fetchSpaceAllUsers(apiKey, SPACES.TECHOPS.id,          sixMonthsAgo, now),
+  ]);
+
+  const fastAll     = [...csFast, ...techFast];
+  const uniqueUsers = new Set(fastAll.map((e) => e.user?.id).filter(Boolean));
+  console.log(`   Fast path: ${fastAll.length} entries from ${uniqueUsers.size} unique users`);
+
+  if (uniqueUsers.size > 1) {
+    // Admin token returned multi-user data — we're done!
+    onProgress({ step: `Got ${fastAll.length} entries from ${uniqueUsers.size} team members!`, done: 1, total: 1 });
+    const seen = new Set();
+    return fastAll.filter((e) => { if (!e.id || seen.has(e.id)) return false; seen.add(e.id); return true; });
+  }
+
+  // ── SLOW PATH ────────────────────────────────────────────────────────────────
+  console.log('   Fast path returned 1 user — falling back to per-member fetch…');
   onProgress({ step: 'Getting workspace members…', done: 0, total: 0 });
+
   const members   = await fetchAllMembers(apiKey);
   const memberIds = members.map((m) => m.id).filter(Boolean);
-  if (memberIds.length === 0) throw new Error('ClickUp: team has 0 members — check API key permissions');
+  if (memberIds.length === 0) throw new Error('ClickUp: team has 0 members');
 
-  const spaces = [
-    ['CS',      SPACES.CUSTOMER_SUCCESS.id],
-    ['TechOps', SPACES.TECHOPS.id],
-  ];
-  const total = memberIds.length * spaces.length;
-  console.log(`   ${memberIds.length} members × ${spaces.length} spaces = ${total} fetches (concurrency 8)`);
+  const spaces = [['CS', SPACES.CUSTOMER_SUCCESS.id], ['TechOps', SPACES.TECHOPS.id]];
+  const total  = memberIds.length * spaces.length;
+  console.log(`   Slow path: ${memberIds.length} members × 2 spaces = ${total} fetches (batch 5)`);
 
-  let done = 0;
   const seen       = new Set();
   const allEntries = [];
+  let done = 0;
 
-  for (const [spaceLabel, spaceId] of spaces) {
-    onProgress({ step: `${spaceLabel}: starting…`, done, total });
-
-    const tasks = memberIds.map((memberId) => async () => {
-      const entries = await fetchOneMemberSpace(apiKey, spaceId, sixMonthsAgo, now, memberId);
-      done++;
-      onProgress({ step: `${spaceLabel}: ${done}/${total}`, done, total });
-      return entries;
-    });
-
-    const results = await runConcurrent(tasks, 8, 300);
-    let spaceCount = 0;
-    for (const batch of results) {
-      for (const e of batch) {
-        if (e.id && !seen.has(e.id)) { seen.add(e.id); allEntries.push(e); spaceCount++; }
+  for (const [label, spaceId] of spaces) {
+    // Process members in batches of 5 with a hard 20s per-request timeout
+    for (let i = 0; i < memberIds.length; i += 5) {
+      const batch = memberIds.slice(i, i + 5);
+      const results = await Promise.all(
+        batch.map((id) => fetchOneMemberSafe(apiKey, spaceId, sixMonthsAgo, now, id))
+      );
+      for (const entries of results) {
+        done++;
+        for (const e of entries) {
+          if (e.id && !seen.has(e.id)) { seen.add(e.id); allEntries.push(e); }
+        }
       }
+      onProgress({ step: `${label}: ${Math.min(done, total)}/${total}`, done: Math.min(done, total), total });
+      await sleep(300);
     }
-    console.log(`   ✓ ${spaceLabel}: ${spaceCount} unique entries`);
   }
 
   onProgress({ step: `Processing ${allEntries.length} entries…`, done: total, total });
