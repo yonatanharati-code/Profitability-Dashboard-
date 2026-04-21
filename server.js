@@ -530,6 +530,31 @@ async function _syncFromApis() {
 /** Live sync progress — polled by the client every 1.5 s */
 app.get('/api/sync-status', (req, res) => res.json(syncState));
 
+/**
+ * Debug: show how the last sync classified entries — who got mapped to what type.
+ * Visit /api/debug in browser after a sync to diagnose SA/Dev/Bug mismatches.
+ */
+app.get('/api/debug', (req, res) => {
+  const cache = readCache();
+  if (!cache) return res.json({ error: 'No cache yet — run a sync first' });
+
+  // Summarise hours per customer per type
+  const summary = cache.customers.map((c) => ({
+    name:   c.name,
+    cs_6m:  c.cs?.m6  ?? 0,
+    sa_6m:  c.sa?.m6  ?? 0,
+    dev_6m: c.dev?.m6 ?? 0,
+    bug_6m: c.bug?.m6 ?? 0,
+  })).sort((a, b) => (b.cs_6m + b.sa_6m + b.dev_6m + b.bug_6m) - (a.cs_6m + a.sa_6m + a.dev_6m + a.bug_6m));
+
+  res.json({
+    info: 'Add ?raw=1 to see the raw cache. SA team matching uses SA_USERNAMES in connectors/clickup.js.',
+    lastRefreshed: cache.lastRefreshed,
+    meta: cache.meta,
+    customerBreakdown: summary,
+  });
+});
+
 /** Trigger a live data refresh from HubSpot + ClickUp (non-blocking) */
 app.post('/api/refresh', (req, res) => {
   if (syncState.running) {

@@ -240,6 +240,10 @@ async function refreshAll(onProgress = () => {}) {
   const now = Date.now();
   let unmatched = 0;
 
+  // Diagnostic counters
+  const typeCount   = { cs: 0, sa: 0, dev: 0, bug: 0 };
+  const userTypeMap = {};  // username → type (for logging)
+
   for (const entry of timeEntries) {
     // Customer name is stored in the task name in ClickUp
     const taskName =
@@ -272,11 +276,23 @@ async function refreshAll(onProgress = () => {}) {
     const individualTask = entry.task?.name || '';
     const type = classifyEntry(spaceName, username, individualTask);
     addHours(customer[type], durationMs, startMs, now);
+    typeCount[type]++;
+    if (username && !userTypeMap[username]) userTypeMap[username] = { type, space: spaceName };
   }
 
   if (unmatched > 0) {
     console.log(`   ⚠  ${unmatched} time entries had no matching customer (check folder names)`);
   }
+
+  // Log classification breakdown so we can spot SA/Dev/Bug mismatches
+  console.log(`\n   ── Entry classification breakdown ──`);
+  console.log(`   CS: ${typeCount.cs}  SA: ${typeCount.sa}  Dev: ${typeCount.dev}  Bug: ${typeCount.bug}`);
+  console.log(`   ── Users found (username → type) ──`);
+  const sortedUsers = Object.entries(userTypeMap).sort(([,a],[,b]) => a.type.localeCompare(b.type));
+  for (const [u, { type, space }] of sortedUsers) {
+    console.log(`   ${type.padEnd(4)} | ${space.padEnd(20)} | ${u}`);
+  }
+  console.log(`   ── End classification ──\n`);
 
   // Round all hours
   customers.forEach((c) => {
