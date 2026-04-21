@@ -96,40 +96,49 @@ async function fetchOneMemberSpace(apiKey, spaceId, startMs, endMs, memberId) {
 /**
  * Fetch all time entries for the last 6 months from CS + TechOps spaces,
  * for every workspace member (sequential with small delay to avoid rate limits).
+ * Calls onProgress({ step, done, total }) after each member so the UI can show
+ * a live progress bar.
  */
-async function fetchAllTimeEntries(apiKey) {
+async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
   const now          = Date.now();
   const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
 
   // Get all workspace members
+  onProgress({ step: 'Getting workspace members…', done: 0, total: 0 });
   const members   = await fetchAllMembers(apiKey);
   const memberIds = members.map((m) => m.id).filter(Boolean);
   if (memberIds.length === 0) throw new Error('ClickUp: team has 0 members — check API key permissions');
-  console.log(`   Fetching entries for ${memberIds.length} members across 2 spaces…`);
+
+  const spaces = [
+    ['CS',      SPACES.CUSTOMER_SUCCESS.id],
+    ['TechOps', SPACES.TECHOPS.id],
+  ];
+  const total = memberIds.length * spaces.length;
+  console.log(`   Fetching entries for ${memberIds.length} members across ${spaces.length} spaces…`);
 
   const allEntries = [];
   const seen       = new Set();
+  let done = 0;
 
-  for (const [spaceLabel, spaceId] of [
-    ['CS',       SPACES.CUSTOMER_SUCCESS.id],
-    ['TechOps',  SPACES.TECHOPS.id],
-  ]) {
+  for (const [spaceLabel, spaceId] of spaces) {
     let spaceCount = 0;
     for (const memberId of memberIds) {
+      done++;
+      onProgress({ step: `${spaceLabel}: member ${done}/${total}`, done, total });
       try {
         const entries = await fetchOneMemberSpace(apiKey, spaceId, sixMonthsAgo, now, memberId);
         for (const e of entries) {
           if (e.id && !seen.has(e.id)) { seen.add(e.id); allEntries.push(e); spaceCount++; }
         }
       } catch (e) {
-        // Log and skip — don't let one member failure abort the whole sync
-        console.warn(`   ⚠  Could not fetch ${spaceLabel} entries for member ${memberId}: ${e.message}`);
+        console.warn(`   ⚠  Could not fetch ${spaceLabel} for member ${memberId}: ${e.message}`);
       }
-      await sleep(150); // 150ms between calls to stay under rate limits
+      await sleep(150);
     }
     console.log(`   ✓ ${spaceLabel}: ${spaceCount} unique entries`);
   }
 
+  onProgress({ step: `Processing ${allEntries.length} entries…`, done: total, total });
   return allEntries;
 }
 

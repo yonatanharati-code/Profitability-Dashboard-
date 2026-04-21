@@ -190,19 +190,23 @@ function matchDealToCustomer(dealName, customerIds, idToName) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-async function refreshAll() {
+async function refreshAll(onProgress = () => {}) {
   const hsKey = process.env.HUBSPOT_API_KEY;
   const cuKey = process.env.CLICKUP_API_KEY;
   if (!hsKey) throw new Error('HUBSPOT_API_KEY is not set in .env');
   if (!cuKey) throw new Error('CLICKUP_API_KEY is not set in .env');
 
   // ── Parallel fetch ──────────────────────────────────────────────────────────
+  onProgress({ step: 'Fetching HubSpot data…' });
   console.log('⟳  Fetching HubSpot companies + deals and ClickUp time entries...');
-  const [companies, rawDeals, timeEntries] = await Promise.all([
+  const [companies, rawDeals] = await Promise.all([
     fetchAllCompanies(hsKey).then((r) => { console.log(`   ✓ ${r.length} companies`); return r; }),
     fetchDeals(hsKey).then((r)         => { console.log(`   ✓ ${r.length} deals`);     return r; }),
-    fetchAllTimeEntries(cuKey).then((r) => { console.log(`   ✓ ${r.length} time entries`); return r; }),
   ]);
+  onProgress({ step: 'HubSpot done — fetching ClickUp…' });
+  const timeEntries = await fetchAllTimeEntries(cuKey, onProgress).then((r) => {
+    console.log(`   ✓ ${r.length} time entries`); return r;
+  });
 
   // ── Build customer records from HubSpot companies ───────────────────────────
   // Fetch includes both Active Customer and Churn — map status into stage

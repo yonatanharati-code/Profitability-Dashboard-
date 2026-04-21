@@ -10,6 +10,9 @@ const { parseCsvHours } = require('./connectors/csv-hours');
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
+// ─── Sync progress state (updated live during /api/refresh) ─────────────────
+let syncState = { running: false, step: 'idle', done: 0, total: 0, error: null };
+
 // ─── HubSpot portal info (fetched once on startup) ──────────────────────────
 let HS_PORTAL_ID     = process.env.HS_PORTAL_ID     || 0;
 let HS_PORTAL_DOMAIN = process.env.HS_PORTAL_DOMAIN || '';
@@ -375,17 +378,30 @@ async function _syncFromApis() {
   const btn = document.getElementById('apiSyncBtn');
   if (!btn) return;
   const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = '⟳ Syncing…';
+  btn.disabled = true; btn.textContent = '⟳ Starting…';
+  let pollTimer = null;
+  function startPolling() {
+    pollTimer = setInterval(async () => {
+      try {
+        const s = await fetch('/api/sync-status').then(r => r.json());
+        if (s.running) {
+          const pct = s.total > 0 ? ' ' + Math.round(s.done / s.total * 100) + '%' : '';
+          btn.textContent = '⟳ ' + s.step + pct;
+        } else if (s.step === 'complete') {
+          clearInterval(pollTimer);
+          btn.textContent = '✓ Done — reloading…';
+          setTimeout(() => location.reload(), 800);
+        } else if (s.error) {
+          clearInterval(pollTimer);
+          alert('Sync failed: ' + s.error);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      } catch (_) {}
+    }, 1500);
+  }
   try {
-    const r = await fetch('/api/refresh', { method: 'POST' });
-    const j = await r.json();
-    if (j.ok) {
-      btn.textContent = '✓ Done — reloading…';
-      setTimeout(() => location.reload(), 800);
-    } else {
-      alert('Sync failed: ' + (j.error || 'unknown error'));
-      btn.textContent = orig; btn.disabled = false;
-    }
+    await fetch('/api/refresh', { method: 'POST' });
+    startPolling();
   } catch (e) {
     alert('Sync error: ' + e.message);
     btn.textContent = orig; btn.disabled = false;
@@ -470,17 +486,30 @@ async function _syncFromApis() {
   const btn = document.getElementById('apiSyncBtn');
   if (!btn) return;
   const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = '⟳ Syncing… (this takes ~60s)';
+  btn.disabled = true; btn.textContent = '⟳ Starting…';
+  let pollTimer = null;
+  function startPolling() {
+    pollTimer = setInterval(async () => {
+      try {
+        const s = await fetch('/api/sync-status').then(r => r.json());
+        if (s.running) {
+          const pct = s.total > 0 ? ' ' + Math.round(s.done / s.total * 100) + '%' : '';
+          btn.textContent = '\\u27F3 ' + s.step + pct;
+        } else if (s.step === 'complete') {
+          clearInterval(pollTimer);
+          btn.textContent = '\\u2713 Done \\u2014 reloading\\u2026';
+          setTimeout(() => location.reload(), 800);
+        } else if (s.error) {
+          clearInterval(pollTimer);
+          alert('Sync failed: ' + s.error);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      } catch (_) {}
+    }, 1500);
+  }
   try {
-    const r = await fetch('/api/refresh', { method: 'POST' });
-    const j = await r.json();
-    if (j.ok) {
-      btn.textContent = '✓ Done — reloading…';
-      setTimeout(() => location.reload(), 800);
-    } else {
-      alert('Sync failed: ' + (j.error || 'unknown error'));
-      btn.textContent = orig; btn.disabled = false;
-    }
+    await fetch('/api/refresh', { method: 'POST' });
+    startPolling();
   } catch (e) {
     alert('Sync error: ' + e.message);
     btn.textContent = orig; btn.disabled = false;
@@ -498,20 +527,32 @@ async function _syncFromApis() {
   }
 });
 
-/** Trigger a live data refresh from HubSpot + ClickUp */
-app.post('/api/refresh', async (req, res) => {
-  console.log('\n⟳  Refresh triggered via API…');
-  try {
-    const data = await refreshAll();
-    fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
-    console.log(`✓  Refresh complete — ${data.meta.customerCount} customers, ${data.meta.dealCount} deals`);
-    res.json({ ok: true, ...data.meta, lastRefreshed: data.lastRefreshed });
-  } catch (err) {
-    const msg = err?.message || err?.toString() || 'unknown error (no message)';
-    console.error('Refresh failed:', msg);
-    res.status(500).json({ ok: false, error: msg });
+/** Live sync progress — polled by the client every 1.5 s */
+app.get('/api/sync-status', (req, res) => res.json(syncState));
+
+/** Trigger a live data refresh from HubSpot + ClickUp (non-blocking) */
+app.post('/api/refresh', (req, res) => {
+  if (syncState.running) {
+    return res.json({ ok: true, alreadyRunning: true });
   }
+  syncState = { running: true, step: 'Connecting…', done: 0, total: 0, error: null };
+  res.json({ ok: true, started: true }); // respond immediately so client can start polling
+
+  console.log('\n⟳  Refresh triggered via API…');
+  // Run the heavy work in the background
+  (async () => {
+    try {
+      const data = await refreshAll((update) => { Object.assign(syncState, update); });
+      fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
+      fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
+      console.log(`✓  Refresh complete — ${data.meta.customerCount} customers, ${data.meta.dealCount} deals`);
+      syncState = { running: false, step: 'complete', done: 0, total: 0, error: null, meta: data.meta };
+    } catch (err) {
+      const msg = err?.message || err?.toString() || 'unknown error';
+      console.error('Refresh failed:', msg);
+      syncState = { running: false, step: 'error', done: 0, total: 0, error: msg };
+    }
+  })();
 });
 
 /** Import hours from a ClickUp CSV export */
