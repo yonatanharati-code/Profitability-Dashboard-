@@ -452,7 +452,19 @@ app.get('/', (req, res) => {
     let html     = fs.readFileSync(DASHBOARD_HTML, 'utf8');
     const cache  = readCache();
     const csvHrs = readCsvHours();
-    if (cache) html = injectData(html, cache, csvHrs);
+    if (cache) {
+      html = injectData(html, cache, csvHrs);
+    } else {
+      // No cache yet — still inject the Sync button so user can trigger first sync
+      const IMPORT_BTN = '>📤 Import ClickUp CSV</button>';
+      if (html.includes(IMPORT_BTN)) {
+        html = html.replace(IMPORT_BTN, IMPORT_BTN +
+          `\n  <button class="import-btn" id="apiSyncBtn" onclick="_syncFromApis()"
+    style="background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.3);color:#818cf8;margin-left:6px;">
+    ⟳ Sync HubSpot + ClickUp
+  </button>`);
+      }
+    }
     res.setHeader('Content-Type', 'text/html');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
