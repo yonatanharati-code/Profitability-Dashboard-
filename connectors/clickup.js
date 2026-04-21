@@ -246,22 +246,23 @@ async function streamAllTimeEntries(apiKey, onEntry, onProgress = () => {}) {
 
   const spaces = [['CS', SPACES.CUSTOMER_SUCCESS.id], ['TechOps', SPACES.TECHOPS.id]];
   const total  = memberIds.length * spaces.length;
-  console.log(`   Slow path: ${memberIds.length} members × 2 spaces = ${total} (concurrency 10)`);
+  console.log(`   Slow path: ${memberIds.length} members × 2 spaces = ${total} (concurrency 5)`);
 
   const seen = new Set();
   let done   = 0;
 
   for (const [label, spaceId] of spaces) {
-    // Process members in parallel batches of 10
-    for (let i = 0; i < memberIds.length; i += 10) {
-      const batch = memberIds.slice(i, i + 10);
+    // Process members in parallel batches of 5 (reduced to avoid rate-limits)
+    // 25s per-member timeout — long enough for users with multiple pages of entries
+    for (let i = 0; i < memberIds.length; i += 5) {
+      const batch = memberIds.slice(i, i + 5);
       await Promise.all(batch.map(async (memberId) => {
         try {
           await withTimeout(
             streamSpaceEntries(apiKey, spaceId, sixMonthsAgo, now, (e) => {
               if (e.id && !seen.has(e.id)) { seen.add(e.id); onEntry(e); }
             }, memberId),
-            10000
+            25000
           );
         } catch (err) {
           console.warn(`   ⚠  ${label} member ${memberId}: ${err.message}`);
@@ -269,7 +270,7 @@ async function streamAllTimeEntries(apiKey, onEntry, onProgress = () => {}) {
         done++;
         onProgress({ step: `${label}: ${done}/${total}`, done, total });
       }));
-      await sleep(100); // brief pause between batches
+      await sleep(200); // brief pause between batches to avoid ClickUp rate limits
     }
   }
 }

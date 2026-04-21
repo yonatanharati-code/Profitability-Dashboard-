@@ -20,9 +20,15 @@ function fuzzyMatch(a, b) {
   if (!na || na.length < 2) return false;
   if (na === nb) return true;
   if (na.startsWith(nb) || nb.startsWith(na)) return true;
-  // Substring match only when the shorter name is ≥75% of the longer one.
-  // This prevents short generics like "partner" matching "tonerpartner".
-  const ratio = Math.min(na.length, nb.length) / Math.max(na.length, nb.length);
+  // Substring match:
+  // • If the shorter name is ≥6 chars AND appears inside the longer one, match.
+  //   (e.g. "sephora" inside "sephorafeelunique" → match)
+  //   The 6-char floor prevents short generics ("shop", "store") from matching.
+  // • Legacy 75% ratio check kept as a secondary guard.
+  const shorter = na.length <= nb.length ? na : nb;
+  const longer  = na.length <= nb.length ? nb : na;
+  if (shorter.length >= 6 && longer.includes(shorter)) return true;
+  const ratio = shorter.length / longer.length;
   if (ratio >= 0.75) {
     if (na.length >= 4 && nb.includes(na)) return true;
     if (nb.length >= 4 && na.includes(nb)) return true;
@@ -125,7 +131,15 @@ function roundHours(bucket) {
  * Value = norm() of the corresponding HubSpot company name.
  */
 const CUSTOMER_ALIASES = {
-  'edg': 'endeavorglobal', // ClickUp "EDG" / "EDG TO" → Endeavor Global, Inc
+  // ClickUp word  →  norm() prefix of HubSpot company name
+  'edg':           'endeavorglobal',    // "EDG" / "EDG TO" → Endeavor Global, Inc
+  'xxxl':          'xxxldigital',       // "XXXL" / "XXXL Group" → xxxldigital – part of xxxl group
+  'mbs':           'modernbuilders',    // "MBS" abbreviation → Modern Builders Supply
+  'byggmax':       'byggmax',           // Byggmax Group (may be exact match already; belt-and-suspenders)
+  'pigu':          'pigu',              // pigu.lt
+  'verkkokauppa':  'verkkokauppa',      // verkkokauppa.com oyj
+  'euronics':      'euronics',          // euronics-berlet.de (euronics as standalone word)
+  'sephora':       'sephora',           // sephora (FeelUnique)
 };
 
 /**
