@@ -383,7 +383,7 @@ async function refreshAll(onProgress = () => {}) {
     meta: {
       customerCount:   customers.length,
       dealCount:       rawDeals.length,
-      timeEntryCount:  timeEntries.length,
+      timeEntryCount:  totalEntries,
       unmatchedHours:  unmatched,
       unmatchedDeals:  unmatchedDeals,
     },
