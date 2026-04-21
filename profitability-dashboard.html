@@ -509,6 +509,7 @@ tr.selected-row{background:var(--teal-50) !important;}
             </div>
           </div>
           <div id="trendPills" style="display:flex;flex-wrap:wrap;gap:5px;padding:0 16px 10px;min-height:0;"></div>
+          <div class="month-toggles" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 16px 10px;"></div>
           <div class="card-body" style="padding-top:0;">
             <div class="chart-wrap md"><canvas id="cOvMonthly"></canvas></div>
           </div>
@@ -582,7 +583,8 @@ tr.selected-row{background:var(--teal-50) !important;}
               <div class="card-sub">All customers · Oct 25 – Apr 26</div>
             </div>
           </div>
-          <div class="card-body">
+          <div class="month-toggles" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 16px 10px;"></div>
+          <div class="card-body" style="padding-top:0;">
             <div class="chart-wrap md"><canvas id="cMonthlyStack"></canvas></div>
           </div>
         </div>
@@ -609,6 +611,34 @@ tr.selected-row{background:var(--teal-50) !important;}
               <div class="chart-wrap sm"><canvas id="cStageDonut"></canvas></div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hours Invested vs Billed -->
+    <div class="section">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Hours Invested vs Billed</div>
+          <div class="section-desc" id="investedSubtitle">Month-over-month: Dev+Bug hours invested vs dev-deal billed equivalent (÷ €120/h) + dev revenue closed</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="position:relative;">
+            <input id="investedCustSearch" type="text" placeholder="Search customers…"
+              style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);width:160px;font-family:inherit;"
+              oninput="window.filterInvestedDropdown(this.value)"
+              onfocus="window.showInvestedDropdown()"
+              autocomplete="off">
+            <div id="investedDropdown" style="display:none;position:absolute;top:100%;left:0;width:240px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-lg);z-index:100;max-height:260px;overflow-y:auto;margin-top:4px;"></div>
+          </div>
+          <button id="investedClearBtn" onclick="window.clearInvestedCustomers()" style="display:none;padding:4px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface-subtle);color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap;">✕ Reset</button>
+        </div>
+      </div>
+      <div id="investedPills" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+      <div class="month-toggles" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;"></div>
+      <div class="card">
+        <div class="card-body">
+          <div class="chart-wrap xl"><canvas id="cInvestedVsBilled"></canvas></div>
         </div>
       </div>
     </div>
@@ -663,6 +693,21 @@ tr.selected-row{background:var(--teal-50) !important;}
           <div class="card-body">
             <div class="chart-wrap md"><canvas id="cNoReturn"></canvas></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CSM Owner Summary -->
+    <div class="section">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Profitability by CSM Owner</div>
+          <div class="section-desc">Per-owner breakdown — ARR, hours, labor cost, net P&amp;L, and dev recapture</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0;overflow:auto;">
+          <div id="csmOwnerTable"></div>
         </div>
       </div>
     </div>
@@ -1371,6 +1416,40 @@ const TREND_COLORS = ['#219EBC','#95D600','#B45309','#7F56D9','#B42318'];
 const MAX_TREND_CUSTS = 5;
 let trendSelectedIds = []; // [] = show all (stacked by division)
 
+// ── Month exclusion (shared by monthly trend + invested chart) ────────────────
+const ALL_MONTHS  = ['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04'];
+const ALL_MLABELS = ['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26'];
+let excludedMonthKeys = []; // month keys to hide (e.g. '2026-04')
+
+function renderMonthToggles(){
+  const html = ALL_MONTHS.map((mk, i) => {
+    const excluded = excludedMonthKeys.includes(mk);
+    return `<button onclick="window.toggleMonth('${mk}')" style="
+      padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;
+      border:1px solid ${excluded ? 'var(--border)' : 'var(--border-strong)'};
+      background:${excluded ? 'var(--surface-subtle)' : 'var(--surface-hover)'};
+      color:${excluded ? 'var(--text-tertiary)' : 'var(--text-secondary)'};
+      text-decoration:${excluded ? 'line-through' : 'none'};
+      font-family:inherit;transition:all .12s;
+    ">${ALL_MLABELS[i]}</button>`;
+  }).join('');
+  document.querySelectorAll('.month-toggles').forEach(el => el.innerHTML = html);
+}
+function renderMonthTogglesInvested(){ renderMonthToggles(); }
+
+window.toggleMonth = function(mk){
+  if (excludedMonthKeys.includes(mk)){
+    excludedMonthKeys = excludedMonthKeys.filter(x => x !== mk);
+  } else {
+    excludedMonthKeys.push(mk);
+  }
+  renderMonthToggles();
+  // Refresh whichever monthly charts are currently rendered
+  if (charts.ovMonthly)       { charts.ovMonthly.destroy();       delete charts.ovMonthly;       chartOvMonthly(); }
+  if (charts.monthlyStack)    { charts.monthlyStack.destroy();    delete charts.monthlyStack;    chartMonthlyStack(); }
+  if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; chartInvestedVsBilled(); }
+};
+
 function trendCustPool(){ return AD().sort((a,b)=>a.name.localeCompare(b.name)); }
 
 function renderTrendPills(){
@@ -1478,8 +1557,10 @@ window.filterTrendDropdown = function(val){
 
 // Overview: monthly stacked bar (with optional per-customer mode)
 function chartOvMonthly(){
-  const months=['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04'];
-  const labels=['Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'];
+  // Respect month exclusions
+  const monthIdxs = ALL_MONTHS.map((mk,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const months = monthIdxs.map(i=>ALL_MONTHS[i]);
+  const labels = monthIdxs.map(i=>ALL_MLABELS[i]);
   const opts = baseOpts();
   opts.scales.x.stacked = true; opts.scales.y.stacked = true;
   opts.scales.y.ticks.callback = v => v+'h';
@@ -1625,15 +1706,42 @@ function chartTop20(){
   const opts=baseOpts();
   opts.scales.x.stacked=true; opts.scales.y.stacked=true;
   opts.scales.y.ticks.callback=v=>v+'h';
-  opts.plugins.tooltip.callbacks={label:c=>c.dataset.label+': '+Math.round(c.raw)+'h'};
+  opts.scales.y1 = {
+    type:'linear', position:'right',
+    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback:v=>'$'+fmtK(v) },
+    grid:{ display:false }, border:{ display:false },
+    title:{ display:true, text:'ARR', color:'#8B5CF6', font:{family:'Poppins',size:10.5} }
+  };
+  opts.plugins.legend = { display:true, position:'top', labels:{ color:col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:12 }};
+  opts.plugins.tooltip.callbacks = {
+    title: ctx => items[ctx[0].dataIndex].c.name,
+    label: ctx => {
+      if (ctx.dataset.yAxisID==='y1') return ' ARR: ' + fmt$(ctx.raw);
+      return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.raw) + 'h';
+    },
+    afterBody: ctx => {
+      const item = items[ctx[0].dataIndex];
+      const arr = item.c.arr || 0;
+      if (!arr || !item.total) return [];
+      const arrPerHr = Math.round(arr / item.total);
+      return ['', ' ARR/h: $' + arrPerHr + '/h invested'];
+    }
+  };
   charts.top20 = new Chart(document.getElementById('cTop20'),{
     type:'bar', data:{
       labels:items.map(x=>x.c.name.length>14?x.c.name.slice(0,13)+'…':x.c.name),
       datasets:[
-        {label:'CS', data:items.map(x=>x.cs), backgroundColor:'#95D600', borderRadius:2, maxBarThickness:26},
-        {label:'SA', data:items.map(x=>x.sa), backgroundColor:'#219EBC', borderRadius:2, maxBarThickness:26},
-        {label:'Dev', data:items.map(x=>x.dev), backgroundColor:'#08173C', borderRadius:2, maxBarThickness:26},
-        {label:'Bug/Esc', data:items.map(x=>x.bug), backgroundColor:'#E4A8A0', borderRadius:2, maxBarThickness:26},
+        {label:'CS',      data:items.map(x=>x.cs),  backgroundColor:'#95D600', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
+        {label:'SA',      data:items.map(x=>x.sa),  backgroundColor:'#219EBC', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
+        {label:'Dev',     data:items.map(x=>x.dev), backgroundColor:'#08173C', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
+        {label:'Bug/Esc', data:items.map(x=>x.bug), backgroundColor:'#E4A8A0', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
+        {
+          label:'ARR', data:items.map(x=>x.c.arr||0),
+          type:'line', yAxisID:'y1',
+          borderColor:'#8B5CF6', backgroundColor:'#8B5CF622',
+          pointRadius:4, pointHoverRadius:6,
+          borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false,
+        },
       ]
     }, options:opts
   });
@@ -1682,8 +1790,9 @@ function chartStageDonut(){
 
 // Effort: monthly stacked (full)
 function chartMonthlyStack(){
-  const months=['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04'];
-  const labels=['Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'];
+  const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const months = monthIdxs.map(i=>ALL_MONTHS[i]);
+  const labels  = monthIdxs.map(i=>ALL_MLABELS[i]);
   const sum = l => months.map(m => AD().reduce((s,c)=>s+(c[l]?.monthly?.[m]||0),0));
   const opts = baseOpts();
   opts.scales.x.stacked = true; opts.scales.y.stacked = true;
@@ -1850,6 +1959,372 @@ function chartNoReturn(){
       ]
     },
     options: opts
+  });
+}
+
+// ── CSM Owner profitability table ─────────────────────────
+let csmSortKey = 'arr', csmSortDir = 'desc';
+
+function renderCsmTable(){
+  const ad = AD();
+  // Group customers by owner
+  const groups = {};
+  for (const c of ad){
+    const owner = c.owner || '(Unassigned)';
+    if (!groups[owner]) groups[owner] = [];
+    groups[owner].push(c);
+  }
+
+  const r = state.rates;
+  let rows = Object.entries(groups).map(([owner, custs]) => {
+    const count      = custs.length;
+    const totalArr   = custs.reduce((s,c) => s + (c.arr||0), 0);
+    const totalHrs   = custs.reduce((s,c) => s + totalEffort(c), 0);
+    const totalCost  = custs.reduce((s,c) => s + laborCost(c), 0);
+    const totalNetPL = custs.reduce((s,c) => s + netPL(c), 0);
+    // Dev recapture: billed dev / dev labor cost
+    const totalDevCost = custs.reduce((s,c) => {
+      if (hasContractDev(c)) return s;
+      return s + g(c,'dev')*r.dev + gBug(c)*r.bug;
+    }, 0);
+    const totalDevBilled = custs.reduce((s,c) => s + (c.devDealsAmt||0), 0);
+    const devRecapturePct = totalDevCost > 0 ? (totalDevBilled / totalDevCost)*100 : null;
+    const arrEffAvg = totalArr > 0 ? (totalCost / totalArr)*100 : null;
+    return { owner, count, totalArr, totalHrs, totalCost, totalNetPL, devRecapturePct, arrEffAvg };
+  });
+
+  // Sort
+  rows.sort((a,b) => {
+    const av = a[csmSortKey] ?? -Infinity;
+    const bv = b[csmSortKey] ?? -Infinity;
+    return csmSortDir === 'asc' ? av - bv : bv - av;
+  });
+  if (csmSortKey === 'owner'){
+    rows.sort((a,b) => {
+      const cmp = a.owner.localeCompare(b.owner);
+      return csmSortDir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  const sortIcon = (k) => csmSortKey===k ? (csmSortDir==='asc'?'↑':'↓') : '<span style="opacity:.3">↕</span>';
+  const ths = [
+    ['owner','CSM / Owner'], ['count','Customers'], ['totalArr','Total ARR'],
+    ['totalHrs','Hours ('+winLabel()+')'], ['totalCost','Labor Cost'],
+    ['totalNetPL','Net P&L'], ['arrEffAvg','ARR Eff %'], ['devRecapturePct','Dev Recapture %']
+  ].map(([k,label]) => `<th data-csmk="${k}" onclick="window.sortCsmTable('${k}')" style="padding:9px 14px;font-size:11px;font-weight:600;text-align:${k==='owner'||k==='count'?'left':'right'};cursor:pointer;white-space:nowrap;user-select:none;color:var(--text-secondary);border-bottom:1px solid var(--border);">${label} ${sortIcon(k)}</th>`).join('');
+
+  const rowsHtml = rows.map(row => {
+    const plClr = row.totalNetPL >= 0 ? 'var(--ok)' : 'var(--bad)';
+    const effClr = row.arrEffAvg == null ? '' : row.arrEffAvg < state.benchPct ? 'color:var(--ok)' : row.arrEffAvg < state.benchPct*2 ? 'color:var(--warn)' : 'color:var(--bad)';
+    const recClr = row.devRecapturePct == null ? '' : row.devRecapturePct >= 100 ? 'color:var(--ok)' : row.devRecapturePct >= 50 ? 'color:var(--warn)' : 'color:var(--bad)';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:9px 14px;font-weight:500;font-size:12.5px;">${escapeHtml(row.owner)}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:12.5px;">${row.count}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:12.5px;">${fmt$(row.totalArr)}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:12.5px;">${Math.round(row.totalHrs)}h</td>
+      <td style="padding:9px 14px;text-align:right;font-size:12.5px;">${fmt$(Math.round(row.totalCost))}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:12.5px;font-weight:600;color:${plClr};">${row.totalNetPL>=0?'+':''}${fmt$(Math.round(row.totalNetPL))}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:12.5px;${effClr};">${row.arrEffAvg!=null?Math.round(row.arrEffAvg)+'%':'—'}</td>
+      <td style="padding:9px 14px;text-align:right;font-size:12.5px;${recClr};">${row.devRecapturePct!=null?Math.round(row.devRecapturePct)+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const el = document.getElementById('csmOwnerTable');
+  if (!el) return;
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr style="background:var(--surface-subtle);">${ths}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>`;
+}
+
+window.sortCsmTable = function(k){
+  if (csmSortKey === k) { csmSortDir = csmSortDir==='asc'?'desc':'asc'; }
+  else { csmSortKey = k; csmSortDir = k==='owner'?'asc':'desc'; }
+  renderCsmTable();
+};
+
+// ── Invested vs Billed Hours chart ────────────────────────
+let investedFilterIds = []; // [] = top 20 by invested hours
+
+const MAX_INVESTED_CUSTS = 20;
+const INVESTED_COLORS = ['#219EBC','#95D600','#F59E0B','#8B5CF6','#EC4899','#10B981','#F97316','#3B82F6','#EF4444','#14B8A6'];
+
+function investedPool(){ return AD().sort((a,b)=>a.name.localeCompare(b.name)); }
+
+function renderInvestedPills(){
+  const container = document.getElementById('investedPills');
+  const clearBtn  = document.getElementById('investedClearBtn');
+  const subtitle  = document.getElementById('investedSubtitle');
+  if (!container) return;
+  if (investedFilterIds.length === 0){
+    container.innerHTML = '';
+    container.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (subtitle) subtitle.textContent = 'Month-over-month: Dev+Bug hours invested vs dev-deal billed equivalent (÷ €120/h) + dev revenue closed';
+    return;
+  }
+  container.style.display = 'flex';
+  if (clearBtn) clearBtn.style.display = '';
+  if (subtitle) subtitle.textContent = 'Month-over-month · Dev+Bug hours vs dev billed · ' + investedFilterIds.length + ' selected customer' + (investedFilterIds.length>1?'s':'');
+  container.innerHTML = investedFilterIds.map((id, i) => {
+    const c = DATA.find(x => String(x.id) === String(id));
+    const name = c ? c.name : id;
+    const color = INVESTED_COLORS[i % INVESTED_COLORS.length];
+    return `<span class="trend-pill" style="background:${color}18;border-color:${color};color:${color};">
+      ${escapeHtml(name.length>20?name.slice(0,19)+'…':name)}
+      <button onclick="window.removeInvestedCust('${id}')" title="Remove">✕</button>
+    </span>`;
+  }).join('');
+}
+
+window.removeInvestedCust = function(id){
+  investedFilterIds = investedFilterIds.filter(x => String(x) !== String(id));
+  renderInvestedPills();
+  if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; }
+  chartInvestedVsBilled();
+};
+
+window.clearInvestedCustomers = function(){
+  investedFilterIds = [];
+  const inp = document.getElementById('investedCustSearch');
+  if (inp) inp.value = '';
+  renderInvestedPills();
+  if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; }
+  chartInvestedVsBilled();
+};
+
+window.addInvestedCust = function(id){
+  const sid = String(id);
+  if (investedFilterIds.includes(sid)){
+    investedFilterIds = investedFilterIds.filter(x=>x!==sid);
+  } else if (investedFilterIds.length < MAX_INVESTED_CUSTS){
+    investedFilterIds.push(sid);
+  }
+  renderInvestedPills();
+  buildInvestedDropdown('');
+  if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; }
+  chartInvestedVsBilled();
+};
+
+function buildInvestedDropdown(filter){
+  const dd = document.getElementById('investedDropdown');
+  if (!dd) return;
+  const pool = investedPool().filter(c =>
+    !filter || c.name.toLowerCase().includes(filter.toLowerCase())
+  ).slice(0, 40);
+  if (pool.length === 0){
+    dd.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--text-tertiary);">No customers found</div>';
+    return;
+  }
+  dd.innerHTML = pool.map(c => {
+    const sid = String(c.id);
+    const sel = investedFilterIds.includes(sid);
+    const disabled = !sel && investedFilterIds.length >= MAX_INVESTED_CUSTS;
+    const idx = investedFilterIds.indexOf(sid);
+    const color = sel ? INVESTED_COLORS[idx % INVESTED_COLORS.length] : 'var(--text-tertiary)';
+    return `<div class="trend-dd-item${sel?' selected':''}${disabled?' disabled':''}" onclick="window.addInvestedCust('${sid}')">
+      <span>${escapeHtml(c.name)}</span>
+      <span style="font-size:10px;color:${color};font-weight:700;">${sel?'✓ added':disabled?'max 20':''}</span>
+    </div>`;
+  }).join('');
+}
+
+window.showInvestedDropdown = function(){
+  const dd = document.getElementById('investedDropdown');
+  if (!dd) return;
+  buildInvestedDropdown(document.getElementById('investedCustSearch')?.value || '');
+  dd.style.display = 'block';
+  setTimeout(() => {
+    const close = (e) => {
+      if (!dd.contains(e.target) && e.target.id !== 'investedCustSearch'){
+        dd.style.display = 'none';
+        document.removeEventListener('click', close);
+      }
+    };
+    document.addEventListener('click', close);
+  }, 0);
+};
+
+window.filterInvestedDropdown = function(val){
+  buildInvestedDropdown(val);
+  const dd = document.getElementById('investedDropdown');
+  if (dd) dd.style.display = 'block';
+};
+
+function chartInvestedVsBilled(){
+  const BILL_RATE = 120; // €120/h assumed average billing rate
+  // Respect month exclusions (shared with monthly trend chart)
+  const monthIdxs = ALL_MONTHS.map((mk,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const months = monthIdxs.map(i=>ALL_MONTHS[i]);
+  const labels  = monthIdxs.map(i=>ALL_MLABELS[i]);
+
+  // Customer pool — filtered selection or all active customers
+  let pool;
+  if (investedFilterIds.length > 0){
+    pool = investedFilterIds.map(id => DATA.find(x => String(x.id) === String(id))).filter(Boolean);
+  } else {
+    pool = AD().filter(c => totalEffort(c) > 0);
+  }
+
+  // Monthly invested hours — split Dev and Bug separately for stacking
+  const devHrs = months.map(mk =>
+    Math.round(pool.reduce((s, c) => s + (c.dev?.monthly?.[mk] || 0), 0))
+  );
+  const bugHrs = months.map(mk =>
+    Math.round(pool.reduce((s, c) => s + (c.bug?.monthly?.[mk] || 0), 0))
+  );
+
+  // Monthly billed equivalent hours — DEV deals only, by close-date month
+  const billedHrs = months.map(mk =>
+    Math.round(pool.reduce((s, c) => {
+      const deals = (c.hsDeals || []).filter(d => d.t === 'dev' && (d.d || '').startsWith(mk));
+      return s + deals.reduce((t, d) => t + (d.a || 0), 0) / BILL_RATE;
+    }, 0))
+  );
+
+  // Monthly dev revenue — sum of dev deal amounts closed that month (right y-axis)
+  const devRevenue = months.map(mk =>
+    Math.round(pool.reduce((s, c) => {
+      const deals = (c.hsDeals || []).filter(d => d.t === 'dev' && (d.d || '').startsWith(mk));
+      return s + deals.reduce((t, d) => t + (d.a || 0), 0);
+    }, 0))
+  );
+
+  // (ARR line lives on the Top 20 chart, not here)
+
+  // ── YTD column (Jan 2026 → current month) ──────────────
+  const ytdMonths = months.filter(m => m.startsWith('2026-'));
+  const ytdDev     = devHrs.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
+  const ytdBug     = bugHrs.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
+  const ytdBilled  = billedHrs.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
+  const ytdRevenue = devRevenue.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
+  labels.push("YTD '26");
+  devHrs.push(ytdDev);
+  bugHrs.push(ytdBug);
+  billedHrs.push(ytdBilled);
+  devRevenue.push(ytdRevenue);
+
+  // total invested per column (for tooltip)
+  const investedHrs = devHrs.map((d, i) => d + bugHrs[i]);
+
+  // Distinct colors for YTD bars (slightly different shade to signal "summary")
+  const n = labels.length;
+  const devColors    = Array(n - 1).fill('#219EBC').concat(['#1565A0']);
+  const bugColors    = Array(n - 1).fill('#0E5F7A').concat(['#0A3F5A']);
+  const billedColors = Array(n - 1).fill('#95D600').concat(['#6A9E00']);
+
+  const poolLabel = investedFilterIds.length > 0
+    ? investedFilterIds.length + ' selected customer' + (investedFilterIds.length > 1 ? 's' : '')
+    : 'all active customers';
+
+  // Plugin: dashed vertical separator before the YTD bar
+  const ytdSepPlugin = { id:'ytdSep', beforeDraw(chart){
+    const { ctx, chartArea:ca, scales:{x} } = chart;
+    const lastPx = x.getPixelForValue(n - 1);
+    const prevPx = x.getPixelForValue(n - 2);
+    const sepX   = (lastPx + prevPx) / 2;
+    ctx.save();
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-strong').trim() || '#C2C7D0';
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(sepX, ca.top - 4); ctx.lineTo(sepX, ca.bottom); ctx.stroke();
+    // "YTD" label above separator
+    ctx.setLineDash([]);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-tertiary').trim() || '#98A2B3';
+    ctx.font = '600 10px Poppins';
+    ctx.textAlign = 'center';
+    ctx.fillText('YTD', sepX + (lastPx - prevPx) / 2 + 2, ca.top - 6);
+    ctx.restore();
+  }};
+
+  const opts = baseOpts();
+  opts.scales.x.stacked = true;
+  opts.scales.y = {
+    type: 'linear', position: 'left', stacked: true,
+    ticks: { color: col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => v+'h' },
+    grid: { color: col('--border') }, border: { display: false },
+    title: { display: true, text: 'Hours', color: col('--text-secondary'), font:{family:'Poppins',size:10.5} }
+  };
+  opts.scales.y1 = {
+    type: 'linear', position: 'right',
+    ticks: { color: col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => '€'+fmtK(v) },
+    grid: { display: false }, border: { display: false },
+    title: { display: true, text: 'Dev Revenue (€)', color: col('--text-secondary'), font:{family:'Poppins',size:10.5} }
+  };
+  opts.plugins.legend = {
+    display: true, position: 'top',
+    labels: { color: col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:12 }
+  };
+  opts.plugins.tooltip.callbacks = {
+    title: ctx => labels[ctx[0].dataIndex],
+    label: ctx => {
+      if (ctx.dataset.yAxisID === 'y1') return ' ' + ctx.dataset.label + ': €' + fmtK(ctx.raw);
+      return ' ' + ctx.dataset.label + ': ' + ctx.raw + 'h';
+    },
+    afterBody: ctx => {
+      const i = ctx[0].dataIndex;
+      const inv = investedHrs[i];
+      const bil = billedHrs[i];
+      if (!inv) return [];
+      const coverage = bil > 0 ? Math.round((bil / inv) * 100) : 0;
+      return [
+        '',
+        ' Total invested: ' + inv + 'h  (Dev ' + devHrs[i] + 'h + Bug ' + bugHrs[i] + 'h)',
+        ' Coverage: ' + coverage + '% of invested hours billed',
+      ];
+    }
+  };
+
+  if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; }
+  charts.investedVsBilled = new Chart(document.getElementById('cInvestedVsBilled'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Dev Hours',
+          data: devHrs,
+          backgroundColor: devColors,
+          borderRadius: 0,
+          maxBarThickness: 32,
+          yAxisID: 'y',
+          stack: 'invested',
+        },
+        {
+          label: 'Bug / Escalation Hours',
+          data: bugHrs,
+          backgroundColor: bugColors,
+          borderRadius: 3,
+          maxBarThickness: 32,
+          yAxisID: 'y',
+          stack: 'invested',
+        },
+        {
+          label: 'Billed Equiv. Hours (dev deals ÷ €120)',
+          data: billedHrs,
+          backgroundColor: billedColors,
+          borderRadius: 3,
+          maxBarThickness: 32,
+          yAxisID: 'y',
+          stack: 'billed',
+        },
+        {
+          label: 'Dev Revenue closed',
+          data: devRevenue,
+          type: 'line',
+          yAxisID: 'y1',
+          borderColor: '#F59E0B',
+          backgroundColor: '#F59E0B22',
+          pointRadius: labels.map((_, i) => i === n - 1 ? 6 : 4),
+          pointHoverRadius: 7,
+          borderWidth: 2.5,
+          tension: 0.3,
+          fill: false,
+        },
+      ]
+    },
+    options: opts,
+    plugins: [ytdSepPlugin],
   });
 }
 
@@ -2048,11 +2523,12 @@ window.saveOwnerEdit = function(id){
 function renderChartsForPane(pane){
   destroyCharts();
   if (pane==='overview'){
-    chartOvMonthly(); chartOvScatter(); chartOvDevRev();
+    renderMonthToggles(); chartOvMonthly(); chartOvScatter(); chartOvDevRev();
   } else if (pane==='effort'){
-    chartTop20(); chartRateTrend(); chartStageDonut(); chartMonthlyStack();
+    renderMonthToggles(); chartTop20(); chartRateTrend(); chartStageDonut(); chartMonthlyStack(); renderInvestedPills(); chartInvestedVsBilled();
   } else if (pane==='profit'){
     chartProfit(); chartRevVsEff(); chartNoReturn();
+    renderCsmTable();
   }
 }
 
@@ -2867,7 +3343,7 @@ function init(){
   document.querySelectorAll('#profSeg .seg-btn').forEach(b=>b.addEventListener('click',()=>{
     state.profMode=b.dataset.mode;
     document.querySelectorAll('#profSeg .seg-btn').forEach(x=>x.classList.toggle('active',x===b));
-    if (state.activeTab==='profit') { destroyCharts(); chartProfit(); chartRevVsEff(); chartNoReturn(); }
+    if (state.activeTab==='profit') { destroyCharts(); chartProfit(); chartRevVsEff(); chartNoReturn(); renderCsmTable(); }
   }));
 
   // View seg
