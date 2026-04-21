@@ -1,7 +1,7 @@
 'use strict';
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { fetchAllCompanies, fetchDeals, toUSD, VALID_CSMS } = require('./connectors/hubspot');
-const { streamAllTimeEntries, classifyEntry } = require('./connectors/clickup');
+const { streamAllTimeEntries, USER_TYPES, BUG_TASK_RE, BUG_LIST_RE } = require('./connectors/clickup');
 
 // ─── String helpers ───────────────────────────────────────────────────────────
 /** Normalise a string: lowercase, strip non-alphanumeric, strip diacritics */
@@ -275,11 +275,18 @@ async function refreshAll(onProgress = () => {}) {
     if (!customer) { unmatched++; return; }
 
     // ── Classification ────────────────────────────────────────────────────
-    // Pass the list name too — TechOps lists called "Bugs"/"Escalations"
-    // should count as bug even if the task title doesn't contain a keyword.
+    // Look up the user's role by their ClickUp ID. Entries from users not in
+    // USER_TYPES are silently skipped — they're guests/observers/irrelevant staff.
+    const userId   = entry.user?.id ? Number(entry.user.id) : null;
+    const baseType = userId ? USER_TYPES[userId] : null;
+    if (!baseType) { unmatched++; return; }
+
+    // For dev users, check task/list name for bug keywords
     const individualTask = entry.task?.name || '';
     const listName       = entry.task_location?.list_name || entry.task?.list?.name || '';
-    const type = classifyEntry(spaceName, username, individualTask, listName);
+    const isBug = baseType === 'dev' &&
+      (BUG_TASK_RE.test(individualTask) || BUG_LIST_RE.test(listName));
+    const type = isBug ? 'bug' : baseType;
 
     addHours(customer[type], durationMs, startMs, now);
     typeCount[type]++;

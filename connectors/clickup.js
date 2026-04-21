@@ -8,32 +8,54 @@ const SPACES = {
   TECHOPS:          { id: '66622361', name: 'TechOps' },
 };
 
-// SA team members — usernames that classify as SA even in Customer Success space
-const SA_USERNAMES = ['aleksandra', 'maher', 'ron koval', 'spitzer', 'ami'];
+// ─── Hard-coded user ID → role mapping ───────────────────────────────────────
+// Only users listed here are fetched & classified. Everyone else is skipped.
+// QA engineers are mapped to 'dev'. Bug detection (keyword regex) is applied
+// on top for dev users — see transform.js.
+const USER_TYPES = {
+  // ── CS ───────────────────────────────────────────────────────────────────
+  60870820: 'cs',  // Yonatan Harati
+  48855719: 'cs',  // Jonathan Kidushim
+  94585307: 'cs',  // Cecile Blau
+  88798574: 'cs',  // Adi Aharon Eldad
+  88798573: 'cs',  // Tal Graziani
+  88689584: 'cs',  // Yifat Yeger
+  88503592: 'cs',  // Lee Kleiman
+
+  // ── SA ───────────────────────────────────────────────────────────────────
+  48984875: 'sa',  // Spitzer Ami
+  94768495: 'sa',  // Aleksandra Ziomka
+  94768277: 'sa',  // Ron Koval
+  88670709: 'sa',  // Maher Kassis
+  88660063: 'sa',  // Shuki Shmuely
+
+  // ── Dev ──────────────────────────────────────────────────────────────────
+  48983630: 'dev', // Michal Drori
+  48983636: 'dev', // Dmitry Lipsky
+  48922247: 'dev', // Amir Miller
+  94761754: 'dev', // Dana Shlasky
+  88767405: 'dev', // Neta Elmaliach
+  82593562: 'dev', // Fedor Naumenko
+  60875904: 'dev', // Gal Agasi
+  60681485: 'dev', // Elad Vaknin
+  54833001: 'dev', // Michael Kapelovich
+  48860696: 'dev', // Gal Dolev
+  48983635: 'dev', // Omer Yasu
+
+  // ── QA → classified as dev ───────────────────────────────────────────────
+  94793140:  'dev', // Ori Bsor
+  100756845: 'dev', // Dmitry Volkov
+  100756843: 'dev', // Dor Bluvshtain
+  94634286:  'dev', // Yair Mor
+  88702998:  'dev', // Lena Lissin
+  38206185:  'dev', // Quicklizard Support
+};
 
 // ─── Classification ───────────────────────────────────────────────────────────
 // Match bug/escalation keywords in task titles
 const BUG_TASK_RE = /\bbug\b|escalat|hotfix|incident|\bwrong\b|incorrect|\bpatch\b/i;
 // Match bug/escalation keywords in LIST names (e.g. a list called "Bugs" or "Escalations")
 const BUG_LIST_RE = /\bbug|escalat|hotfix|incident|\bfix\b|patch/i;
-
-/**
- * Classify a time entry as cs / sa / dev / bug.
- *
- * @param {string} spaceName  ClickUp space name
- * @param {string} username   ClickUp username or email
- * @param {string} taskName   Individual task title (used for bug keyword detection)
- * @param {string} listName   ClickUp list name — lists named "Bugs"/"Escalations" → bug
- */
-function classifyEntry(spaceName, username, taskName, listName) {
-  if ((spaceName || '').replace(/\s+/g, '').toLowerCase() === 'techops') {
-    const isBug = BUG_TASK_RE.test(taskName || '') || BUG_LIST_RE.test(listName || '');
-    return isBug ? 'bug' : 'dev';
-  }
-  const u = (username || '').toLowerCase();
-  if (SA_USERNAMES.some((k) => u.includes(k.trim()))) return 'sa';
-  return 'cs';
-}
 
 // ─── HTTP helper ─────────────────────────────────────────────────────────────
 function cuGet(path, apiKey) {
@@ -217,8 +239,10 @@ async function streamAllTimeEntries(apiKey, onEntry, onProgress = () => {}) {
   onProgress({ step: 'Getting workspace members…', done: 0, total: 0 });
 
   const members   = await fetchAllMembers(apiKey);
-  const memberIds = members.map((m) => m.id).filter(Boolean);
-  if (memberIds.length === 0) throw new Error('ClickUp: team has 0 members');
+  // Only fetch entries for users we actually care about (saves ~90% of API calls)
+  const memberIds = members.map((m) => m.id).filter((id) => id && USER_TYPES[id]);
+  if (memberIds.length === 0) throw new Error('ClickUp: no relevant members found (check USER_TYPES IDs)');
+  console.log(`   Relevant members in USER_TYPES: ${memberIds.join(', ')}`);
 
   const spaces = [['CS', SPACES.CUSTOMER_SUCCESS.id], ['TechOps', SPACES.TECHOPS.id]];
   const total  = memberIds.length * spaces.length;
@@ -257,4 +281,4 @@ async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
   return entries;
 }
 
-module.exports = { streamAllTimeEntries, fetchAllTimeEntries, classifyEntry, SPACES, SA_USERNAMES };
+module.exports = { streamAllTimeEntries, fetchAllTimeEntries, USER_TYPES, BUG_TASK_RE, BUG_LIST_RE, SPACES };
