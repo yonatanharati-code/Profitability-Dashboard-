@@ -455,7 +455,7 @@ app.get('/', (req, res) => {
     if (cache) {
       html = injectData(html, cache, csvHrs);
     } else {
-      // No cache yet — still inject the Sync button so user can trigger first sync
+      // No cache yet — inject the Sync button + its script so user can trigger first sync
       const IMPORT_BTN = '>📤 Import ClickUp CSV</button>';
       if (html.includes(IMPORT_BTN)) {
         html = html.replace(IMPORT_BTN, IMPORT_BTN +
@@ -464,6 +464,29 @@ app.get('/', (req, res) => {
     ⟳ Sync HubSpot + ClickUp
   </button>`);
       }
+      // Inject the _syncFromApis function so the button actually works
+      html = html.replace('</body>', () => `<script>
+async function _syncFromApis() {
+  const btn = document.getElementById('apiSyncBtn');
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⟳ Syncing… (this takes ~60s)';
+  try {
+    const r = await fetch('/api/refresh', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      btn.textContent = '✓ Done — reloading…';
+      setTimeout(() => location.reload(), 800);
+    } else {
+      alert('Sync failed: ' + (j.error || 'unknown error'));
+      btn.textContent = orig; btn.disabled = false;
+    }
+  } catch (e) {
+    alert('Sync error: ' + e.message);
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+</script></body>`);
     }
     res.setHeader('Content-Type', 'text/html');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
