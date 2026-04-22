@@ -1,0 +1,6 @@
+node_modules/
+data/cache.json
+data/csv-hours.json
+*.log
+.env
+.DS_Store
