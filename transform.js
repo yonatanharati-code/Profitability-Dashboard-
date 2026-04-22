@@ -279,15 +279,21 @@ function matchDealToCustomer(dealName, customerIds, idToName) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-async function refreshAll(onProgress = () => {}) {
+/**
+ * @param {function} onProgress
+ * @param {{ hubspotOnly?: boolean }} opts
+ *   hubspotOnly: skip ClickUp fetch entirely (hours come from CSV upload)
+ */
+async function refreshAll(onProgress = () => {}, opts = {}) {
+  const { hubspotOnly = false } = opts;
   const hsKey = process.env.HUBSPOT_API_KEY;
   const cuKey = process.env.CLICKUP_API_KEY;
   if (!hsKey) throw new Error('HUBSPOT_API_KEY is not set in .env');
-  if (!cuKey) throw new Error('CLICKUP_API_KEY is not set in .env');
+  if (!hubspotOnly && !cuKey) throw new Error('CLICKUP_API_KEY is not set in .env');
 
   // ── Parallel fetch ──────────────────────────────────────────────────────────
   onProgress({ step: 'Fetching HubSpot data…' });
-  console.log('⟳  Fetching HubSpot companies + deals and ClickUp time entries...');
+  console.log(`⟳  Fetching HubSpot companies + deals${hubspotOnly ? ' (HubSpot only — hours from CSV)' : ' + ClickUp time entries'}...`);
   const [companies, rawDeals] = await Promise.all([
     fetchAllCompanies(hsKey).then((r) => { console.log(`   ✓ ${r.length} companies`); return r; }),
     fetchDeals(hsKey).then((r)         => { console.log(`   ✓ ${r.length} deals`);     return r; }),
@@ -316,8 +322,11 @@ async function refreshAll(onProgress = () => {}) {
 
   const idToName = Object.fromEntries(customers.map((c) => [c.id, c.name]));
 
-  // ── Stream ClickUp time entries — process each entry immediately, never
-  //    accumulate the full raw list in memory ──────────────────────────────────
+  // ── Stream ClickUp time entries — skipped when hubspotOnly=true ─────────────
+  if (hubspotOnly) {
+    onProgress({ step: 'HubSpot synced — hours will come from CSV upload ✓' });
+    console.log('   ↷  ClickUp skipped (hubspotOnly mode — hours sourced from CSV)');
+  } else {
   onProgress({ step: 'HubSpot done — fetching ClickUp…' });
   const now = Date.now();
   let unmatched = 0;
@@ -470,6 +479,7 @@ async function refreshAll(onProgress = () => {}) {
     console.log(`   ${type.padEnd(4)} | ${space.padEnd(20)} | ${u}`);
   }
   console.log(`   ── End classification ──\n`);
+  } // end if (!hubspotOnly)
 
   // Round all hours
   customers.forEach((c) => {

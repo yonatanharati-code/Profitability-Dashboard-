@@ -307,10 +307,10 @@ function injectData(html, cache, csvHours) {
     html = html.replace(
       IMPORT_BTN,
       IMPORT_BTN +
-      // ── Sync from API button ──
+      // ── Sync HubSpot button (hours come from CSV — ClickUp not fetched) ──
       `\n  <button class="import-btn" id="apiSyncBtn" onclick="_syncFromApis()"
     style="background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.3);color:#818cf8;margin-left:6px;">
-    ⟳ Sync HubSpot + ClickUp
+    ⟳ Sync HubSpot
   </button>` +
       // ── Import CSV Hours — use <label for="input"> so the file picker opens
       //    natively without JS .click() (which gets blocked by some browsers) ──
@@ -439,7 +439,7 @@ async function _syncFromApis() {
     }, 1500);
   }
   try {
-    await fetch('/api/refresh', { method: 'POST' });
+    await fetch('/api/refresh', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ hubspotOnly: true }) });
     startPolling();
   } catch (e) {
     alert('Sync error: ' + e.message);
@@ -548,7 +548,7 @@ async function _syncFromApis() {
     }, 1500);
   }
   try {
-    await fetch('/api/refresh', { method: 'POST' });
+    await fetch('/api/refresh', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ hubspotOnly: true }) });
     startPolling();
   } catch (e) {
     alert('Sync error: ' + e.message);
@@ -744,21 +744,24 @@ app.post('/api/refresh', (req, res) => {
   if (syncState.running) {
     return res.json({ ok: true, alreadyRunning: true });
   }
-  syncState = { running: true, step: 'Connecting…', done: 0, total: 0, error: null };
-  res.json({ ok: true, started: true }); // respond immediately so client can start polling
 
-  // API sync is the source of truth for hours — delete any uploaded CSV so the two
-  // sources never add together and double-count hours.
-  if (fs.existsSync(CSV_HOURS_FILE)) {
+  // hubspotOnly=true → skip ClickUp, keep CSV hours (default mode now)
+  // hubspotOnly=false → full sync including ClickUp hours (clears CSV)
+  const hubspotOnly = req.body?.hubspotOnly !== false; // default true
+
+  syncState = { running: true, step: 'Connecting…', done: 0, total: 0, error: null };
+  res.json({ ok: true, started: true });
+
+  if (!hubspotOnly && fs.existsSync(CSV_HOURS_FILE)) {
+    // Full ClickUp sync takes over hours — remove CSV to prevent doubling
     fs.unlinkSync(CSV_HOURS_FILE);
-    console.log('   🗑  Cleared uploaded CSV hours (API sync takes precedence)');
+    console.log('   🗑  Cleared uploaded CSV hours (full ClickUp sync takes precedence)');
   }
 
-  console.log('\n⟳  Refresh triggered via API…');
-  // Run the heavy work in the background
+  console.log(`\n⟳  Refresh triggered — mode: ${hubspotOnly ? 'HubSpot only' : 'HubSpot + ClickUp'}…`);
   (async () => {
     try {
-      const data = await refreshAll((update) => { Object.assign(syncState, update); });
+      const data = await refreshAll((update) => { Object.assign(syncState, update); }, { hubspotOnly });
       fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
       fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
       console.log(`✓  Refresh complete — ${data.meta.customerCount} customers, ${data.meta.dealCount} deals`);
