@@ -3700,6 +3700,10 @@ function renderAll(){
   renderChartsForPane(state.activeTab);
 }
 
+// Expose chart functions used by onchange="" attributes in HTML
+window.chartCustStack  = chartCustStack;
+window.chartByPerson   = chartByPerson;
+
 // Make init callable globally (for YTD patch + safety net)
 window._pfdInit = init;
 if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
