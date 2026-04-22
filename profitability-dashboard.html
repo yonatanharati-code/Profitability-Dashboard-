@@ -741,6 +741,51 @@ tr.selected-row{background:var(--teal-50) !important;}
     </div></div>
   </div>
 
+  <!-- Owner Analysis -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Revenue by Account Owner</div>
+        <div class="section-desc" id="ndrOwnerDesc">Income, cost &amp; profit grouped by CSM / account owner</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:11px;color:var(--text-secondary);">Month</label>
+        <select id="ndrOwnerMonthSel" onchange="window.renderNdrOwnerAnalysis()" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;"></select>
+      </div>
+    </div>
+    <div class="card"><div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:10px;">Income by Owner</div>
+        <div class="chart-wrap" style="height:260px"><canvas id="cNdrOwnerIncome"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:10px;">Margin % by Owner</div>
+        <div class="chart-wrap" style="height:260px"><canvas id="cNdrOwnerMargin"></canvas></div>
+      </div>
+    </div>
+    <div id="ndrOwnerTable" style="margin-top:8px;overflow-x:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Client drill-down -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Client Deep-Dive</div>
+        <div class="section-desc">Month-over-month income, cost, profit &amp; margin for a specific client</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:11px;color:var(--text-secondary);">Client</label>
+        <select id="ndrClientSel" onchange="window.renderNdrClientDrilldown()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;min-width:200px;"></select>
+      </div>
+    </div>
+    <div class="card"><div class="card-body">
+      <div id="ndrClientKpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
+      <div class="chart-wrap xl"><canvas id="cNdrClientTrend"></canvas></div>
+      <div id="ndrClientTable" style="margin-top:16px;overflow-x:auto;"></div>
+    </div></div>
+  </div>
+
   <!-- Client ranking -->
   <div class="section">
     <div class="section-head">
@@ -754,7 +799,7 @@ tr.selected-row{background:var(--teal-50) !important;}
       </div>
     </div>
     <div class="card"><div class="card-body">
-      <div class="chart-wrap" style="height:500px"><canvas id="cNdrRanking"></canvas></div>
+      <div class="chart-wrap" style="height:520px"><canvas id="cNdrRanking"></canvas></div>
     </div></div>
   </div>
 
@@ -3770,65 +3815,368 @@ function renderAll(){
 }
 
 // ── NDR Tab ────────────────────────────────────────────────────────────────
+
+// Money formatter: $7.2M / $520K / $1,234
+function fmtMoney(v) {
+  const av = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (av >= 1e6) return sign + '$' + (av/1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
+  if (av >= 1e3) return sign + '$' + Math.round(av/1e3) + 'K';
+  return sign + '$' + Math.round(av).toLocaleString();
+}
+
+// Short month label
+const _fmtMk = mk => { const [y,m] = mk.split('-'); return ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m] + ' ' + y.slice(2); };
+
+// ── Static NDR client → HubSpot owner map ────────────────────────────────────
+// Keys = NDR client name (exact, case-insensitive). Values = owner name.
+// Built from fuzzy matching + manual verification of all recurring NDR clients.
+const NDR_OWNER_MAP_RAW = {
+  'IKANO':                                          'Jonathan Kidushim',
+  'Apotek1':                                        'Jonathan Kidushim',
+  'Verkkokauppa.com Oyj':                           'Yonatan Harati',
+  'Israir':                                         'Yigal Gillis',
+  'Health and life':                                'Yonatan Harati',
+  'EDG':                                            'Jonathan Kidushim',
+  'Electrolux Home Products, Inc.':                 'Lee Kleiman',
+  'UAB Pigu':                                       'Tal Graziani',
+  'BAUHAUS Fachcentren AG':                         'Lee Kleiman',
+  'DK HARDWARE SUPPLY LLC':                         'Lee Kleiman',
+  'Stadt-parfumerie pieper GmbH Parfumerie Internat': 'Tal Graziani',
+  'HEMA':                                           'Yonatan Harati',
+  'Allegro':                                        'Tal Graziani',
+  'indiMade Brands':                                'Lee Kleiman',
+  'Logitech':                                       'Lee Kleiman',
+  'Whirlpool Corporation us':                       'Tal Graziani',
+  'Whirlpool EMEA':                                 'Tal Graziani',
+  'Dehner Gartencenter GmbH & Co.':                 'Yonatan Harati',
+  'Keter':                                          'Yonatan Harati',
+  'John Lewis':                                     'Adi Aharon Eldad',
+  'Wagner eCommerce Group GmbH':                    'Yonatan Harati',
+  'DUCATILLON NATURE':                              'Cecile Blau',
+  'Andlight':                                       'Jonathan Kidushim',
+  'Feelunique':                                     'Lee Kleiman',
+  'Samsung':                                        'Jonathan Kidushim',
+  'Samsung Global':                                 'Jonathan Kidushim',
+  'Samsung UK':                                     'Jonathan Kidushim',
+  'Arcelik Pazarlama A.S':                          'Yonatan Harati',
+  'Arcelik A.S- Spare Parts':                       'Yonatan Harati',
+  'Bike 24 GmbH':                                   'Tal Graziani',
+  'Cyberport SE':                                   'Yonatan Harati',
+  'DocMorris N.V.':                                 'Lee Kleiman',
+  'Elkjop':                                         'Jonathan Kidushim',
+  'Horze International GmbH':                       'Tal Graziani',
+  'Intersport Digital GmbH':                        'Jonathan Kidushim',
+  'S.oliver':                                       'Lee Kleiman',
+  'Thalia Bücher GmbH':                             'Adi Aharon Eldad',
+  'TonerPartner GmbH':                              'Jonathan Kidushim',
+  'Maxi Miliaan B.V':                               'Cecile Blau',
+  'BDSK Handels GmbH & Co.KG':                      '(Unassigned)',
+  'Zooplus SE':                                     '(Unassigned)',
+  'Byggmax':                                        '(Unassigned)',
+  'Interior A/S':                                   '(Unassigned)',
+  'ATEA':                                           '(Unassigned)',
+  'Coolshop':                                       '(Unassigned)',
+  'Price manager - Camping World':                  '(Unassigned)',
+  'Web Sundhed (Apo IT)':                           '(Unassigned)',
+  'Kronans Droghandel Apotek AB':                   '(Unassigned)',
+  'Lakuda Aps':                                     '(Unassigned)',
+  'Saxo.com A/S':                                   '(Unassigned)',
+  'OTTO Austria Group Gmbh':                        '(Unassigned)',
+  'DEALAVO Sp. z o.o.':                             '(Unassigned)',
+  'סאר טכנולוגיות (ז.ח) בע"מ (Istore)':            'Yonatan Harati',
+};
+// Normalize lookup key
+function getNdrOwner(clientName) {
+  if (!clientName) return '(Unassigned)';
+  const lc = clientName.toLowerCase();
+  for (const [k, v] of Object.entries(NDR_OWNER_MAP_RAW)) {
+    if (k.toLowerCase() === lc) return v;
+  }
+  // Fallback: try fuzzy match against DATA
+  const normS = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const nc = normS(clientName);
+  const match = (window.DATA||[]).find(d => {
+    const nd = normS(d.name);
+    if (!nd || !nc) return false;
+    if (nd === nc) return true;
+    if (nc.length >= 4 && nd.includes(nc)) return true;
+    if (nd.length >= 4 && nc.includes(nd)) return true;
+    return false;
+  });
+  return match?.owner || '(Unassigned)';
+}
+
+// ── NDR % calculation ─────────────────────────────────────────────────────────
+// For each consecutive month pair, compute retained revenue from same clients.
+// NDR = Σ(income in current month for clients present in prev month) / Σ(those clients' income in prev month)
+function calcNdrPct(data, months) {
+  if (months.length < 2) return null;
+  const prev = months[months.length - 2];
+  const curr = months[months.length - 1];
+  const prevClients = new Map((data[prev]||[]).map(r => [r.client, r.income]));
+  let base = 0, retained = 0;
+  for (const r of (data[curr]||[])) {
+    if (prevClients.has(r.client)) {
+      base      += prevClients.get(r.client);
+      retained  += r.income;
+    }
+  }
+  return base > 0 ? (retained / base * 100) : null;
+}
+
 function initNdrTab() {
   const data = window.NDR_DATA;
   if (!data || Object.keys(data).length === 0) {
-    document.getElementById('ndrKpiRow').innerHTML = '<p style="color:var(--text-secondary);padding:20px;">No NDR data loaded. Click "Sync NDR" to fetch from Google Sheets.</p>';
+    document.getElementById('ndrKpiRow').innerHTML = '<p style="color:var(--text-secondary);padding:20px;">No NDR data loaded. Click "↻ Sync NDR" to fetch from Google Sheets.</p>';
     return;
   }
 
   const months = Object.keys(data).sort();
-  const fmtMonth = mk => { const [y,m] = mk.split('-'); const names=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(m)]+' '+y.slice(2); };
 
-  // Populate month selector
-  const sel = document.getElementById('ndrMonthSel');
-  if (sel) {
-    sel.innerHTML = months.map(mk => `<option value="${mk}">${fmtMonth(mk)}</option>`).join('');
-    sel.value = months[months.length - 1];
+  // Populate all month selectors
+  const monthOpts = months.map(mk => `<option value="${mk}">${_fmtMk(mk)}</option>`).join('');
+  ['ndrMonthSel', 'ndrOwnerMonthSel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.innerHTML = monthOpts; el.value = months[months.length - 1]; }
+  });
+
+  // Populate client selector
+  const allClients = [...new Set(months.flatMap(mk => (data[mk]||[]).map(r => r.client)))].sort();
+  const clientSel = document.getElementById('ndrClientSel');
+  if (clientSel) {
+    clientSel.innerHTML = allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   }
 
-  // KPIs — YTD (sum across all months)
-  const ytdIncome = months.reduce((s,mk) => s + data[mk].reduce((a,r)=>a+r.income,0), 0);
-  const ytdCost   = months.reduce((s,mk) => s + data[mk].reduce((a,r)=>a+r.cost,0), 0);
+  // KPIs — latest month + YTD
+  const lastMk   = months[months.length - 1];
+  const lastRows = data[lastMk] || [];
+  const lIncome  = lastRows.reduce((s,r)=>s+r.income,0);
+  const lCost    = lastRows.reduce((s,r)=>s+r.cost,0);
+  const lProfit  = lIncome - lCost;
+  const lMargin  = lIncome > 0 ? lProfit/lIncome*100 : 0;
+
+  const ytdIncome = months.reduce((s,mk)=>s+data[mk].reduce((a,r)=>a+r.income,0),0);
+  const ytdCost   = months.reduce((s,mk)=>s+data[mk].reduce((a,r)=>a+r.cost,0),0);
   const ytdProfit = ytdIncome - ytdCost;
-  const ytdMargin = ytdIncome > 0 ? (ytdProfit / ytdIncome * 100) : 0;
+  const ytdMargin = ytdIncome > 0 ? ytdProfit/ytdIncome*100 : 0;
+
+  const ndrPct = calcNdrPct(data, months);
+  const ndrColor = ndrPct === null ? '#667085' : ndrPct >= 100 ? '#95D600' : ndrPct >= 90 ? '#F4A261' : '#E4A8A0';
 
   const kpis = [
-    { label: 'YTD Income',       value: '$' + (ytdIncome/1000).toFixed(0) + 'K', color: '#219EBC' },
-    { label: 'YTD Cost',         value: '$' + (ytdCost/1000).toFixed(0)   + 'K', color: '#E4A8A0' },
-    { label: 'YTD Profit',       value: '$' + (ytdProfit/1000).toFixed(0) + 'K', color: '#95D600' },
-    { label: 'Avg Margin',       value: ytdMargin.toFixed(1) + '%',               color: '#F4A261' },
+    { label: `${_fmtMk(lastMk)} Income`,  value: fmtMoney(lIncome),  color: '#219EBC', sub: `Margin ${lMargin.toFixed(1)}%` },
+    { label: `${_fmtMk(lastMk)} Profit`,  value: fmtMoney(lProfit),  color: lProfit>=0?'#95D600':'#E4A8A0', sub: `Cost ${fmtMoney(lCost)}` },
+    { label: 'YTD Income',                 value: fmtMoney(ytdIncome), color: '#219EBC', sub: `Margin ${ytdMargin.toFixed(1)}%` },
+    { label: 'YTD Profit',                 value: fmtMoney(ytdProfit), color: ytdProfit>=0?'#95D600':'#E4A8A0', sub: `Cost ${fmtMoney(ytdCost)}` },
+    { label: 'Net Revenue Retention',      value: ndrPct !== null ? ndrPct.toFixed(1)+'%' : '—', color: ndrColor,
+      sub: ndrPct !== null ? `${_fmtMk(months[months.length-2])} → ${_fmtMk(lastMk)}` : 'Need 2+ months' },
   ];
   document.getElementById('ndrKpiRow').innerHTML = kpis.map(k => `
-    <div style="flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;">
-      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">${k.label}</div>
-      <div style="font-size:24px;font-weight:700;color:${k.color};">${k.value}</div>
+    <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">${k.label}</div>
+      <div style="font-size:26px;font-weight:700;color:${k.color};line-height:1.1;">${k.value}</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">${k.sub||''}</div>
     </div>`).join('');
 
-  renderNdrTrend(data, months, fmtMonth);
+  renderNdrTrend(data, months);
+  window.renderNdrOwnerAnalysis();
+  window.renderNdrClientDrilldown();
   window.renderNdrRanking();
-  renderNdrCostBreak(data, months, fmtMonth);
+  renderNdrCostBreak(data, months);
 }
 
-function renderNdrTrend(data, months, fmtMonth) {
+function renderNdrTrend(data, months) {
   if (charts.ndrTrend) { charts.ndrTrend.destroy(); charts.ndrTrend = null; }
-  const labels  = months.map(fmtMonth);
-  const income  = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.income,0)));
-  const cost    = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.cost,0)));
-  const profit  = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.profit,0)));
+  const labels = months.map(_fmtMk);
+  const income = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.income,0)));
+  const cost   = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.cost,0)));
+  const profit = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.profit,0)));
   const opts = baseOpts();
-  opts.scales.y.ticks = { callback: v => '$' + (v/1000).toFixed(0) + 'K' };
-  opts.plugins.tooltip.callbacks = { label: c => c.dataset.label + ': $' + c.raw.toLocaleString() };
+  opts.scales.y.ticks = { callback: v => fmtMoney(v) };
+  opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw)}` };
   charts.ndrTrend = new Chart(document.getElementById('cNdrTrend'), {
-    type: 'line',
+    type: 'bar',
     data: { labels, datasets: [
-      { label: 'Income', data: income, borderColor: '#219EBC', backgroundColor: 'rgba(33,158,188,.1)', fill: true, tension: 0.3, pointRadius: 4 },
-      { label: 'Cost',   data: cost,   borderColor: '#E4A8A0', backgroundColor: 'rgba(228,168,160,.1)', fill: true, tension: 0.3, pointRadius: 4 },
-      { label: 'Profit', data: profit, borderColor: '#95D600', backgroundColor: 'rgba(149,214,0,.1)', fill: true, tension: 0.3, pointRadius: 4 },
+      { label: 'Income', data: income, backgroundColor: 'rgba(33,158,188,.75)', borderRadius: 4, maxBarThickness: 50 },
+      { label: 'Cost',   data: cost,   backgroundColor: 'rgba(228,168,160,.75)', borderRadius: 4, maxBarThickness: 50 },
+      { label: 'Profit', data: profit, type: 'line', borderColor: '#95D600', backgroundColor: 'rgba(149,214,0,.1)', fill: true, tension: 0.3, pointRadius: 5, order: -1 },
     ]},
     options: opts,
   });
 }
+
+// Owner analysis
+window.renderNdrOwnerAnalysis = function() {
+  const data = window.NDR_DATA;
+  if (!data) return;
+  const sel = document.getElementById('ndrOwnerMonthSel');
+  const mk  = sel?.value || Object.keys(data).sort().slice(-1)[0];
+  const rows = data[mk] || [];
+
+  // Group by owner
+  const owners = {};
+  for (const r of rows) {
+    const owner = getNdrOwner(r.client);
+    if (!owners[owner]) owners[owner] = { income:0, cost:0, profit:0, clients:[] };
+    owners[owner].income  += r.income;
+    owners[owner].cost    += r.cost;
+    owners[owner].profit  += r.profit;
+    owners[owner].clients.push(r.client);
+  }
+
+  const ownerList = Object.entries(owners)
+    .sort((a,b) => b[1].income - a[1].income)
+    .filter(([,v]) => v.income > 0);
+
+  const OWNER_PALETTE = ['#219EBC','#95D600','#F4A261','#E9C46A','#E4A8A0','#A8DADC','#8338EC','#FB5607'];
+  const colors = ownerList.map((_,i) => OWNER_PALETTE[i % OWNER_PALETTE.length]);
+
+  // Income chart
+  ['ndrOwnerIncome','ndrOwnerMargin'].forEach(id => {
+    if (charts[id]) { charts[id].destroy(); charts[id] = null; }
+  });
+
+  const incOpts = baseOpts();
+  incOpts.indexAxis = 'y';
+  incOpts.scales.x = { ticks: { callback: v => fmtMoney(v) }, grid: { color: 'rgba(128,128,128,.1)' } };
+  incOpts.scales.y = { ticks: { font: { size: 10 } }, grid: { display: false } };
+  incOpts.plugins.legend = { display: false };
+  incOpts.plugins.tooltip.callbacks = { label: c => ` ${fmtMoney(c.raw)}` };
+  charts.ndrOwnerIncome = new Chart(document.getElementById('cNdrOwnerIncome'), {
+    type: 'bar',
+    data: { labels: ownerList.map(([o])=>o), datasets: [{ data: ownerList.map(([,v])=>v.income), backgroundColor: colors, borderRadius: 4 }] },
+    options: incOpts,
+  });
+
+  const mrgOpts = baseOpts();
+  mrgOpts.indexAxis = 'y';
+  mrgOpts.scales.x = { ticks: { callback: v => v+'%' }, grid: { color: 'rgba(128,128,128,.1)' }, suggestedMin: 0 };
+  mrgOpts.scales.y = { ticks: { font: { size: 10 } }, grid: { display: false } };
+  mrgOpts.plugins.legend = { display: false };
+  mrgOpts.plugins.tooltip.callbacks = { label: c => ` ${c.raw.toFixed(1)}%` };
+  charts.ndrOwnerMargin = new Chart(document.getElementById('cNdrOwnerMargin'), {
+    type: 'bar',
+    data: {
+      labels: ownerList.map(([o])=>o),
+      datasets: [{ data: ownerList.map(([,v]) => v.income>0 ? Math.round(v.profit/v.income*1000)/10 : 0), backgroundColor: colors, borderRadius: 4 }],
+    },
+    options: mrgOpts,
+  });
+
+  // Summary table
+  const tbl = document.getElementById('ndrOwnerTable');
+  if (tbl) {
+    const th = s => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;">${s}</th>`;
+    const thL = s => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border);">${s}</th>`;
+    const td = (s,bold) => `<td style="padding:7px 12px;font-size:12px;text-align:right;${bold?'font-weight:600;':''}color:var(--text);">${s}</td>`;
+    const tdL = s => `<td style="padding:7px 12px;font-size:12px;text-align:left;color:var(--text);">${s}</td>`;
+    tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${thL('Owner')}${th('Clients')}${th('Income')}${th('Cost')}${th('Profit')}${th('Margin %')}</tr></thead><tbody>${
+      ownerList.map(([owner, v], i) => {
+        const margin = v.income > 0 ? (v.profit/v.income*100).toFixed(1) : '—';
+        const mColor = parseFloat(margin) >= 60 ? '#95D600' : parseFloat(margin) >= 30 ? '#F4A261' : '#E4A8A0';
+        return `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:7px 12px;font-size:12px;text-align:left;"><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:${colors[i]};display:inline-block;flex-shrink:0;"></span>${escapeHtml(owner)}</span></td>
+          ${td(v.clients.length)}
+          ${td(fmtMoney(v.income), true)}
+          ${td(fmtMoney(v.cost))}
+          ${td(fmtMoney(v.profit), true)}
+          <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:600;color:${mColor};">${margin}%</td>
+        </tr>`;
+      }).join('')
+    }</tbody></table>`;
+  }
+};
+
+// Client drill-down
+window.renderNdrClientDrilldown = function() {
+  const data = window.NDR_DATA;
+  if (!data) return;
+  const sel = document.getElementById('ndrClientSel');
+  const client = sel?.value || '';
+  if (!client) return;
+
+  const months = Object.keys(data).sort();
+  const clientData = months.map(mk => {
+    const r = (data[mk]||[]).find(x => x.client === client);
+    return r || null;
+  });
+
+  // KPI cards for this client (latest month with data)
+  const lastIdx = clientData.map((d,i)=>[d,i]).filter(([d])=>d).slice(-1)[0];
+  const kpiEl = document.getElementById('ndrClientKpis');
+  if (kpiEl) {
+    if (!lastIdx) {
+      kpiEl.innerHTML = '<p style="color:var(--text-secondary);">No data for this client.</p>';
+    } else {
+      const [r, idx] = lastIdx;
+      const prevR = clientData.slice(0, idx).filter(Boolean).slice(-1)[0];
+      const incChg = prevR && prevR.income > 0 ? ((r.income - prevR.income)/prevR.income*100) : null;
+      const chgStr = incChg !== null ? ` <span style="font-size:11px;color:${incChg>=0?'#95D600':'#E4A8A0'}">${incChg>=0?'▲':'▼'}${Math.abs(incChg).toFixed(1)}% MoM</span>` : '';
+      const owner = getNdrOwner(client);
+      kpiEl.innerHTML = [
+        { label: `${_fmtMk(months[idx])} Income`, value: fmtMoney(r.income), sub: chgStr, color: '#219EBC' },
+        { label: `${_fmtMk(months[idx])} Cost`,   value: fmtMoney(r.cost),   sub: '', color: '#E4A8A0' },
+        { label: `${_fmtMk(months[idx])} Profit`,  value: fmtMoney(r.profit), sub: '', color: r.profit>=0?'#95D600':'#E4A8A0' },
+        { label: 'Margin',   value: r.income > 0 ? (r.profit/r.income*100).toFixed(1)+'%' : '—', sub: '', color: '#F4A261' },
+        { label: 'Account Owner', value: escapeHtml(owner), sub: '', color: '#667085' },
+      ].map(k => `<div style="min-width:130px;background:var(--surface-subtle);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 16px;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:3px;">${k.label}</div>
+        <div style="font-size:18px;font-weight:700;color:${k.color};">${k.value}${k.sub}</div>
+      </div>`).join('');
+    }
+  }
+
+  // Line chart MoM
+  if (charts.ndrClientTrend) { charts.ndrClientTrend.destroy(); charts.ndrClientTrend = null; }
+  const labels = months.map(_fmtMk);
+  const income = clientData.map(r => r ? r.income : null);
+  const cost   = clientData.map(r => r ? r.cost   : null);
+  const profit = clientData.map(r => r ? r.profit  : null);
+  const margin = clientData.map(r => r && r.income > 0 ? Math.round(r.profit/r.income*1000)/10 : null);
+  const opts = baseOpts();
+  opts.scales.y = { ticks: { callback: v => fmtMoney(v) }, grid: { color: 'rgba(128,128,128,.1)' } };
+  opts.scales.y1 = { position: 'right', ticks: { callback: v => v+'%' }, grid: { display: false } };
+  opts.plugins.tooltip.callbacks = {
+    label: c => c.dataset.label === 'Margin %' ? ` Margin: ${c.raw !== null ? c.raw.toFixed(1)+'%' : '—'}` : ` ${c.dataset.label}: ${c.raw !== null ? fmtMoney(c.raw) : '—'}`
+  };
+  opts.plugins.legend = { display: true, position: 'bottom', labels: { font: { family: 'Poppins', size: 10 }, boxWidth: 12 } };
+  opts.spanGaps = true;
+  charts.ndrClientTrend = new Chart(document.getElementById('cNdrClientTrend'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Income', data: income, borderColor: '#219EBC', backgroundColor: 'rgba(33,158,188,.08)', fill: true, tension: 0.3, pointRadius: 4 },
+      { label: 'Cost',   data: cost,   borderColor: '#E4A8A0', backgroundColor: 'rgba(228,168,160,.08)', fill: false, tension: 0.3, pointRadius: 4 },
+      { label: 'Profit', data: profit, borderColor: '#95D600', backgroundColor: 'rgba(149,214,0,.08)', fill: false, tension: 0.3, pointRadius: 4 },
+      { label: 'Margin %', data: margin, borderColor: '#F4A261', borderDash: [4,3], fill: false, tension: 0.3, pointRadius: 3, yAxisID: 'y1' },
+    ]},
+    options: opts,
+  });
+
+  // Month-by-month table
+  const tblEl = document.getElementById('ndrClientTable');
+  if (tblEl) {
+    const th = s => `<th style="padding:7px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;border-bottom:1px solid var(--border);">${s}</th>`;
+    const thL = s => `<th style="padding:7px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border);">${s}</th>`;
+    const td = (s, color) => `<td style="padding:6px 12px;font-size:12px;text-align:right;${color?`color:${color};font-weight:600;`:''}">${s}</td>`;
+    const rows = months.map((mk, i) => {
+      const r = clientData[i];
+      if (!r) return `<tr><td style="padding:6px 12px;font-size:12px;text-align:left;color:var(--text-secondary);">${_fmtMk(mk)}</td><td colspan="5" style="text-align:center;color:var(--text-secondary);font-size:11px;">—</td></tr>`;
+      const mrg = r.income > 0 ? (r.profit/r.income*100).toFixed(1)+'%' : '—';
+      const mrgColor = parseFloat(mrg) >= 60 ? '#95D600' : parseFloat(mrg) >= 30 ? '#F4A261' : '#E4A8A0';
+      const prev = clientData.slice(0, i).filter(Boolean).slice(-1)[0];
+      const chg = prev && prev.income > 0 ? ((r.income - prev.income)/prev.income*100) : null;
+      const chgCell = chg !== null ? `<span style="color:${chg>=0?'#95D600':'#E4A8A0'}">${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(1)}%</span>` : '—';
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:6px 12px;font-size:12px;font-weight:500;">${_fmtMk(mk)}</td>
+        ${td(fmtMoney(r.income),'#219EBC')}${td(fmtMoney(r.cost))}${td(fmtMoney(r.profit),r.profit>=0?'#95D600':'#E4A8A0')}
+        <td style="padding:6px 12px;font-size:12px;text-align:right;font-weight:600;color:${mrgColor}">${mrg}</td>
+        ${td(chgCell)}
+      </tr>`;
+    }).join('');
+    tblEl.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${thL('Month')}${th('Income')}${th('Cost')}${th('Profit')}${th('Margin')}${th('MoM Δ')}</tr></thead><tbody>${rows}</tbody></table>`;
+  }
+};
 
 window.renderNdrRanking = function() {
   const data = window.NDR_DATA;
@@ -3836,19 +4184,19 @@ window.renderNdrRanking = function() {
   const sel = document.getElementById('ndrMonthSel');
   const mk  = sel?.value || Object.keys(data).sort().slice(-1)[0];
   const rows = [...(data[mk] || [])].sort((a,b) => b.profit_pct - a.profit_pct);
-  const fmtMonth = m => { const [y,mo] = m.split('-'); const names=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(mo)]+' '+y.slice(2); };
   const desc = document.getElementById('ndrRankDesc');
-  if (desc) desc.textContent = fmtMonth(mk) + ' · sorted by profitability %';
+  if (desc) desc.textContent = _fmtMk(mk) + ' · sorted by profitability %';
 
   if (charts.ndrRanking) { charts.ndrRanking.destroy(); charts.ndrRanking = null; }
   const opts = baseOpts();
   opts.indexAxis = 'y';
-  opts.scales.x = { ticks: { callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,.06)' } };
+  opts.scales.x = { ticks: { callback: v => v + '%' }, grid: { color: 'rgba(128,128,128,.1)' } };
   opts.scales.y = { ticks: { font: { size: 10 } }, grid: { display: false } };
+  opts.plugins.legend = { display: false };
   opts.plugins.tooltip.callbacks = {
     label: c => {
       const r = rows[c.dataIndex];
-      return [` Margin: ${c.raw.toFixed(1)}%`, ` Income: $${r.income.toLocaleString()}`, ` Profit: $${r.profit.toLocaleString()}`];
+      return [` Margin: ${c.raw.toFixed(1)}%`, ` Income: ${fmtMoney(r.income)}`, ` Profit: ${fmtMoney(r.profit)}`, ` Owner: ${getNdrOwner(r.client)}`];
     }
   };
   charts.ndrRanking = new Chart(document.getElementById('cNdrRanking'), {
@@ -3866,14 +4214,14 @@ window.renderNdrRanking = function() {
   });
 };
 
-function renderNdrCostBreak(data, months, fmtMonth) {
+function renderNdrCostBreak(data, months) {
   if (charts.ndrCostBreak) { charts.ndrCostBreak.destroy(); charts.ndrCostBreak = null; }
-  // Use latest month, top 20 clients by cost
   const mk   = months[months.length - 1];
   const rows = [...(data[mk] || [])].sort((a,b) => b.cost - a.cost).slice(0, 20);
   const opts = baseOpts();
   opts.scales.x.stacked = true; opts.scales.y.stacked = true;
-  opts.scales.y.ticks = { callback: v => '$' + v.toLocaleString() };
+  opts.scales.y.ticks = { callback: v => fmtMoney(v) };
+  opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw)}` };
   opts.plugins.legend = { display: true, position: 'bottom', labels: { font: { family:'Poppins', size: 10 }, boxWidth: 10 } };
   charts.ndrCostBreak = new Chart(document.getElementById('cNdrCostBreak'), {
     type: 'bar',
