@@ -46,7 +46,9 @@ fetchPortalInfo();
 // Path to the original static dashboard HTML (template)
 const DASHBOARD_HTML = process.env.DASHBOARD_HTML
   ? path.resolve(__dirname, process.env.DASHBOARD_HTML)
-  : path.join(__dirname, '..', 'profitability-dashboard.html');
+  : fs.existsSync(path.join(__dirname, 'profitability-dashboard.html'))
+    ? path.join(__dirname, 'profitability-dashboard.html')            // same dir (Railway)
+    : path.join(__dirname, '..', 'profitability-dashboard.html');     // parent dir (local dev)
 
 // Cached data paths
 const CACHE_FILE     = path.join(__dirname, 'data', 'cache.json');
