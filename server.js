@@ -54,6 +54,7 @@ const DASHBOARD_HTML = process.env.DASHBOARD_HTML
 const CACHE_FILE     = path.join(__dirname, 'data', 'cache.json');
 const CSV_HOURS_FILE = path.join(__dirname, 'data', 'csv-hours.json');
 const OVERRIDES_FILE = path.join(__dirname, 'data', 'overrides.json');
+const NDR_FILE       = path.join(__dirname, 'data', 'ndr-snapshot.json');
 
 app.use(express.json({ limit: '50mb' }));      // CSV text can be large
 app.use(express.text({ limit: '50mb', type: 'text/csv' }));
@@ -71,6 +72,13 @@ function readCsvHours() {
   try {
     if (!fs.existsSync(CSV_HOURS_FILE)) return null;
     return JSON.parse(fs.readFileSync(CSV_HOURS_FILE, 'utf8'));
+  } catch { return null; }
+}
+
+function readNdr() {
+  try {
+    if (!fs.existsSync(NDR_FILE)) return null;
+    return JSON.parse(fs.readFileSync(NDR_FILE, 'utf8'));
   } catch { return null; }
 }
 
@@ -280,6 +288,22 @@ function injectData(html, cache, csvHours) {
       html = html.slice(0, uhStart) +
              `const USER_HOURS=${JSON.stringify(uhData)}` +
              html.slice(uhEnd + 1);
+    }
+  }
+
+  // ── Replace NDR_DATA object ───────────────────────────────────────────────
+  const ndrData = readNdr();
+  if (ndrData) {
+    const NDR_MARKER = 'const NDR_DATA={';
+    const ndrStart = html.indexOf(NDR_MARKER);
+    if (ndrStart !== -1) {
+      const ndrOpen = ndrStart + NDR_MARKER.length - 1;
+      const ndrEnd  = findBlockEnd(html, ndrOpen, '{', '}');
+      if (ndrEnd !== -1) {
+        html = html.slice(0, ndrStart) +
+               `const NDR_DATA=${JSON.stringify(ndrData)}` +
+               html.slice(ndrEnd + 1);
+      }
     }
   }
 
@@ -874,6 +898,15 @@ app.get('/api/csv-hours', (req, res) => {
   const h = readCsvHours();
   if (!h) return res.status(404).json({ loaded: false });
   res.json({ loaded: true, ...h.meta });
+});
+
+/** Return NDR snapshot status */
+app.get('/api/ndr-status', (req, res) => {
+  const ndr = readNdr();
+  if (!ndr) return res.json({ ok: false });
+  const months = Object.keys(ndr).sort();
+  const lastKey = months[months.length - 1] || null;
+  res.json({ ok: true, months, lastMonth: lastKey });
 });
 
 /** Save user overrides (devHoursPurchased, devPaidManual, excluded, etc.) */

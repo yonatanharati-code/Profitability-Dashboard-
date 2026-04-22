@@ -462,6 +462,7 @@ tr.selected-row{background:var(--teal-50) !important;}
     <button class="tab active" data-pane="overview">Overview</button>
     <button class="tab" data-pane="effort">Effort</button>
     <button class="tab" data-pane="profit">Profitability</button>
+    <button class="tab" data-pane="ndr">NDR</button>
     <button class="tab" data-pane="budget">Dev Budget</button>
     <button class="tab" data-pane="customers">Customers <span class="tab-count" id="custCount">—</span></button>
   </div>
@@ -720,6 +721,57 @@ tr.selected-row{background:var(--teal-50) !important;}
     </div>
 
   </div><!-- /pane-effort -->
+
+<!-- ════ NDR PANE ════ -->
+<div class="pane" id="pane-ndr" style="display:none">
+
+  <!-- KPI row -->
+  <div class="kpi-row" id="ndrKpiRow" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;"></div>
+
+  <!-- Monthly trend -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Monthly Income vs Cost vs Profit</div>
+        <div class="section-desc">All clients combined · USD</div>
+      </div>
+    </div>
+    <div class="card"><div class="card-body">
+      <div class="chart-wrap xl"><canvas id="cNdrTrend"></canvas></div>
+    </div></div>
+  </div>
+
+  <!-- Client ranking -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Client Profitability Ranking</div>
+        <div class="section-desc" id="ndrRankDesc">Latest month · sorted by profitability %</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:11px;color:var(--text-secondary);">Month</label>
+        <select id="ndrMonthSel" onchange="window.renderNdrRanking()" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;"></select>
+      </div>
+    </div>
+    <div class="card"><div class="card-body">
+      <div class="chart-wrap" style="height:500px"><canvas id="cNdrRanking"></canvas></div>
+    </div></div>
+  </div>
+
+  <!-- Cost breakdown -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Cost Component Breakdown</div>
+        <div class="section-desc">Top clients · Hours / Pricing / Partner / Stock / Competitor data costs</div>
+      </div>
+    </div>
+    <div class="card"><div class="card-body">
+      <div class="chart-wrap xl"><canvas id="cNdrCostBreak"></canvas></div>
+    </div></div>
+  </div>
+
+</div><!-- /pane-ndr -->
 
   <!-- ══ PROFITABILITY pane ══ -->
   <div class="pane" id="pane-profit">
@@ -1000,9 +1052,10 @@ tr.selected-row{background:var(--teal-50) !important;}
 const DATA = []
 const DEALS={}
 const USER_HOURS={}
+const NDR_DATA={}
 const HS_PORTAL_ID=0
 const HS_PORTAL_DOMAIN=""
-window.DATA = DATA; window.DEALS = DEALS; window.USER_HOURS = USER_HOURS;
+window.DATA = DATA; window.DEALS = DEALS; window.USER_HOURS = USER_HOURS; window.NDR_DATA = NDR_DATA;
 
 /* ═══════════════════════════════════════════════════════════════
    Profitability Dashboard v2 — tabs, executive summary, restrained palette
@@ -2784,6 +2837,8 @@ function renderChartsForPane(pane){
     renderMonthToggles(); chartOvMonthly(); chartOvScatter(); chartOvDevRev();
   } else if (pane==='effort'){
     renderMonthToggles(); chartTop20(); chartRateTrend(); chartStageDonut(); chartMonthlyStack(); chartCustStack(); initPersonSelect(); renderInvestedPills(); chartInvestedVsBilled();
+  } else if (pane==='ndr'){
+    initNdrTab();
   } else if (pane==='profit'){
     chartProfit(); chartRevVsEff(); chartNoReturn();
     renderCsmTable();
@@ -3712,6 +3767,128 @@ function renderAll(){
   renderTable();
   renderBudget();
   renderChartsForPane(state.activeTab);
+}
+
+// ── NDR Tab ────────────────────────────────────────────────────────────────
+function initNdrTab() {
+  const data = window.NDR_DATA;
+  if (!data || Object.keys(data).length === 0) {
+    document.getElementById('ndrKpiRow').innerHTML = '<p style="color:var(--text-secondary);padding:20px;">No NDR data loaded. Click "Sync NDR" to fetch from Google Sheets.</p>';
+    return;
+  }
+
+  const months = Object.keys(data).sort();
+  const fmtMonth = mk => { const [y,m] = mk.split('-'); const names=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(m)]+' '+y.slice(2); };
+
+  // Populate month selector
+  const sel = document.getElementById('ndrMonthSel');
+  if (sel) {
+    sel.innerHTML = months.map(mk => `<option value="${mk}">${fmtMonth(mk)}</option>`).join('');
+    sel.value = months[months.length - 1];
+  }
+
+  // KPIs — YTD (sum across all months)
+  const ytdIncome = months.reduce((s,mk) => s + data[mk].reduce((a,r)=>a+r.income,0), 0);
+  const ytdCost   = months.reduce((s,mk) => s + data[mk].reduce((a,r)=>a+r.cost,0), 0);
+  const ytdProfit = ytdIncome - ytdCost;
+  const ytdMargin = ytdIncome > 0 ? (ytdProfit / ytdIncome * 100) : 0;
+
+  const kpis = [
+    { label: 'YTD Income',       value: '$' + (ytdIncome/1000).toFixed(0) + 'K', color: '#219EBC' },
+    { label: 'YTD Cost',         value: '$' + (ytdCost/1000).toFixed(0)   + 'K', color: '#E4A8A0' },
+    { label: 'YTD Profit',       value: '$' + (ytdProfit/1000).toFixed(0) + 'K', color: '#95D600' },
+    { label: 'Avg Margin',       value: ytdMargin.toFixed(1) + '%',               color: '#F4A261' },
+  ];
+  document.getElementById('ndrKpiRow').innerHTML = kpis.map(k => `
+    <div style="flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;">${k.label}</div>
+      <div style="font-size:24px;font-weight:700;color:${k.color};">${k.value}</div>
+    </div>`).join('');
+
+  renderNdrTrend(data, months, fmtMonth);
+  window.renderNdrRanking();
+  renderNdrCostBreak(data, months, fmtMonth);
+}
+
+function renderNdrTrend(data, months, fmtMonth) {
+  if (charts.ndrTrend) { charts.ndrTrend.destroy(); charts.ndrTrend = null; }
+  const labels  = months.map(fmtMonth);
+  const income  = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.income,0)));
+  const cost    = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.cost,0)));
+  const profit  = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.profit,0)));
+  const opts = baseOpts();
+  opts.scales.y.ticks = { callback: v => '$' + (v/1000).toFixed(0) + 'K' };
+  opts.plugins.tooltip.callbacks = { label: c => c.dataset.label + ': $' + c.raw.toLocaleString() };
+  charts.ndrTrend = new Chart(document.getElementById('cNdrTrend'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Income', data: income, borderColor: '#219EBC', backgroundColor: 'rgba(33,158,188,.1)', fill: true, tension: 0.3, pointRadius: 4 },
+      { label: 'Cost',   data: cost,   borderColor: '#E4A8A0', backgroundColor: 'rgba(228,168,160,.1)', fill: true, tension: 0.3, pointRadius: 4 },
+      { label: 'Profit', data: profit, borderColor: '#95D600', backgroundColor: 'rgba(149,214,0,.1)', fill: true, tension: 0.3, pointRadius: 4 },
+    ]},
+    options: opts,
+  });
+}
+
+window.renderNdrRanking = function() {
+  const data = window.NDR_DATA;
+  if (!data) return;
+  const sel = document.getElementById('ndrMonthSel');
+  const mk  = sel?.value || Object.keys(data).sort().slice(-1)[0];
+  const rows = [...(data[mk] || [])].sort((a,b) => b.profit_pct - a.profit_pct);
+  const fmtMonth = m => { const [y,mo] = m.split('-'); const names=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(mo)]+' '+y.slice(2); };
+  const desc = document.getElementById('ndrRankDesc');
+  if (desc) desc.textContent = fmtMonth(mk) + ' · sorted by profitability %';
+
+  if (charts.ndrRanking) { charts.ndrRanking.destroy(); charts.ndrRanking = null; }
+  const opts = baseOpts();
+  opts.indexAxis = 'y';
+  opts.scales.x = { ticks: { callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,.06)' } };
+  opts.scales.y = { ticks: { font: { size: 10 } }, grid: { display: false } };
+  opts.plugins.tooltip.callbacks = {
+    label: c => {
+      const r = rows[c.dataIndex];
+      return [` Margin: ${c.raw.toFixed(1)}%`, ` Income: $${r.income.toLocaleString()}`, ` Profit: $${r.profit.toLocaleString()}`];
+    }
+  };
+  charts.ndrRanking = new Chart(document.getElementById('cNdrRanking'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.client),
+      datasets: [{
+        label: 'Profitability %',
+        data: rows.map(r => Math.round(r.profit_pct * 10) / 10),
+        backgroundColor: rows.map(r => r.profit_pct >= 80 ? '#95D600' : r.profit_pct >= 50 ? '#219EBC' : r.profit_pct >= 0 ? '#F4A261' : '#E4A8A0'),
+        borderRadius: 3,
+      }]
+    },
+    options: opts,
+  });
+};
+
+function renderNdrCostBreak(data, months, fmtMonth) {
+  if (charts.ndrCostBreak) { charts.ndrCostBreak.destroy(); charts.ndrCostBreak = null; }
+  // Use latest month, top 20 clients by cost
+  const mk   = months[months.length - 1];
+  const rows = [...(data[mk] || [])].sort((a,b) => b.cost - a.cost).slice(0, 20);
+  const opts = baseOpts();
+  opts.scales.x.stacked = true; opts.scales.y.stacked = true;
+  opts.scales.y.ticks = { callback: v => '$' + v.toLocaleString() };
+  opts.plugins.legend = { display: true, position: 'bottom', labels: { font: { family:'Poppins', size: 10 }, boxWidth: 10 } };
+  charts.ndrCostBreak = new Chart(document.getElementById('cNdrCostBreak'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.client),
+      datasets: [
+        { label: 'Hours cost',      data: rows.map(r => r.hours_cost),      backgroundColor: '#08173C', borderRadius: 2, maxBarThickness: 40 },
+        { label: 'Pricing cost',    data: rows.map(r => r.pricing_cost),    backgroundColor: '#219EBC', borderRadius: 2, maxBarThickness: 40 },
+        { label: 'Partner cost',    data: rows.map(r => r.partner_cost),    backgroundColor: '#F4A261', borderRadius: 2, maxBarThickness: 40 },
+        { label: 'Stock cost',      data: rows.map(r => r.stock_cost),      backgroundColor: '#E9C46A', borderRadius: 2, maxBarThickness: 40 },
+        { label: 'Competitor data', data: rows.map(r => r.competitor_cost), backgroundColor: '#E4A8A0', borderRadius: 2, maxBarThickness: 40 },
+      ]
+    },
+    options: opts,
+  });
 }
 
 // Expose chart functions used by onchange="" attributes in HTML
