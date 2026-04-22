@@ -725,6 +725,29 @@ tr.selected-row{background:var(--teal-50) !important;}
 <!-- ════ NDR PANE ════ -->
 <div class="pane" id="pane-ndr">
 
+  <!-- Period + Cohort controls -->
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">Period</span>
+      <div class="seg" id="ndrPeriodSeg">
+        <button class="seg-btn active" data-period="full"  onclick="window.setNdrPeriod('full',this)">Full</button>
+        <button class="seg-btn"        data-period="ytd"   onclick="window.setNdrPeriod('ytd',this)">YTD 2026</button>
+        <button class="seg-btn"        data-period="l6m"   onclick="window.setNdrPeriod('l6m',this)">L6M</button>
+        <button class="seg-btn"        data-period="l3m"   onclick="window.setNdrPeriod('l3m',this)">L3M</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">From Month</span>
+      <select id="ndrFromSel" onchange="window.setNdrFrom()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;"></select>
+      <span style="font-size:11px;color:var(--text-secondary);">→</span>
+      <select id="ndrToSel" onchange="window.setNdrFrom()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;"></select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+      <span style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">NDR Cohort starts</span>
+      <select id="ndrCohortSel" onchange="window.refreshNdrTab()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;"></select>
+    </div>
+  </div>
+
   <!-- KPI row -->
   <div class="kpi-row" id="ndrKpiRow" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;"></div>
 
@@ -3888,19 +3911,114 @@ function fmtMoney(v) {
 // Short month label
 const _fmtMk = mk => { const [y,m] = mk.split('-'); return ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m] + ' ' + y.slice(2); };
 
-// ── NDR analytics helpers ────────────────────────────────────────────────────
+// ── NDR period & cohort state ─────────────────────────────────────────────────
+let _ndrPeriod    = 'full';   // 'full' | 'ytd' | 'l6m' | 'l3m' | 'custom'
+let _ndrFromMk    = null;     // custom range start (YYYY-MM)
+let _ndrToMk      = null;     // custom range end
+let _ndrCohortMk  = null;     // NDR cohort start override
 
-// YTD NDR: revenue from first-month cohort now vs then
-function calcYtdNdr(data, months) {
-  if (months.length < 2) return null;
-  const first = months[0], last = months[months.length-1];
-  const firstMap = new Map((data[first]||[]).map(r => [r.client, r.income]));
+function _allNdrMonths() {
+  const data = window.NDR_DATA;
+  return data ? Object.keys(data).sort() : [];
+}
+
+function _filteredNdrMonths() {
+  const all = _allNdrMonths();
+  if (!all.length) return [];
+  if (_ndrPeriod === 'ytd') {
+    const yr = String(new Date().getFullYear());
+    const filtered = all.filter(mk => mk.startsWith(yr));
+    return filtered.length ? filtered : all;
+  }
+  if (_ndrPeriod === 'l6m') return all.slice(-6);
+  if (_ndrPeriod === 'l3m') return all.slice(-3);
+  if (_ndrPeriod === 'custom' && _ndrFromMk && _ndrToMk)
+    return all.filter(mk => mk >= _ndrFromMk && mk <= _ndrToMk);
+  return all; // 'full'
+}
+
+window.setNdrPeriod = function(period, btnEl) {
+  _ndrPeriod = period;
+  document.querySelectorAll('#ndrPeriodSeg .seg-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  // Sync from/to selectors to reflect the chosen period
+  const months = _filteredNdrMonths();
+  const fromEl = document.getElementById('ndrFromSel');
+  const toEl   = document.getElementById('ndrToSel');
+  if (fromEl && months.length) fromEl.value = months[0];
+  if (toEl   && months.length) toEl.value   = months[months.length-1];
+  window.refreshNdrTab();
+};
+
+window.setNdrFrom = function() {
+  _ndrPeriod = 'custom';
+  document.querySelectorAll('#ndrPeriodSeg .seg-btn').forEach(b => b.classList.remove('active'));
+  const fromEl = document.getElementById('ndrFromSel');
+  const toEl   = document.getElementById('ndrToSel');
+  _ndrFromMk = fromEl?.value || null;
+  _ndrToMk   = toEl?.value   || null;
+  window.refreshNdrTab();
+};
+
+window.refreshNdrTab = function() { initNdrTab(); };
+
+// ── Sortable table registry ───────────────────────────────────────────────────
+// Tables register themselves so header clicks can re-sort without re-fetching data
+const _tblRegistry = {}; // id → { data, rowFn, cols, sortKey, sortDir }
+
+window._ndrSortBy = function(id, key) {
+  const t = _tblRegistry[id];
+  if (!t) return;
+  t.sortDir = (t.sortKey === key) ? -t.sortDir : -1; // default desc on new col
+  t.sortKey = key;
+  _renderSortableTable(id);
+};
+
+function _registerTable(id, data, cols, rowFn, defaultKey, defaultDir) {
+  const prev = _tblRegistry[id];
+  _tblRegistry[id] = {
+    data, cols, rowFn,
+    sortKey: prev?.sortKey || defaultKey || cols[0]?.key,
+    sortDir: prev?.sortDir ?? (defaultDir ?? -1),
+  };
+  _renderSortableTable(id);
+}
+
+function _renderSortableTable(id) {
+  const t = _tblRegistry[id];
+  if (!t) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const { data, cols, rowFn, sortKey, sortDir } = t;
+  const sorted = [...data].sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (typeof av === 'number' && typeof bv === 'number') return sortDir * (bv - av);
+    return sortDir * String(bv||'').localeCompare(String(av||''));
+  });
+  const thBase = 'padding:7px 10px;font-size:11px;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;';
+  const ind = k => k===sortKey ? (sortDir<0?' ↓':' ↑') : ' <span style="opacity:.3">↕</span>';
+  const header = cols.map(c =>
+    `<th style="${thBase}text-align:${c.al||'right'};" onclick="window._ndrSortBy('${id}','${c.key}')">${c.label}${ind(c.key)}</th>`
+  ).join('');
+  const body = sorted.map((r,i) => rowFn(r, i, sorted)).join('');
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+// ── NDR analytics helpers ─────────────────────────────────────────────────────
+
+// Cohort NDR: revenue from cohortMk clients in lastMk ÷ their cohortMk revenue
+function calcCohortNdr(data, months, cohortMk) {
+  const last = months[months.length-1];
+  if (!cohortMk || cohortMk === last) return null;
+  const cohortMap = new Map((data[cohortMk]||[]).map(r => [r.client, r.income]));
   let base = 0, curr = 0;
   for (const r of (data[last]||[])) {
-    if (firstMap.has(r.client)) { base += firstMap.get(r.client); curr += r.income; }
+    if (cohortMap.has(r.client)) { base += cohortMap.get(r.client); curr += r.income; }
   }
   return base > 0 ? curr/base*100 : null;
 }
+// Keep calcYtdNdr for backwards compat (used in generateNdrInsights)
+function calcYtdNdr(data, months) { return calcCohortNdr(data, months, months[0]); }
 
 // Per-client NDR: MoM % and YTD % for every client
 function calcClientNdrs(data, months) {
@@ -4150,24 +4268,48 @@ function initNdrTab() {
     return;
   }
 
-  const months = Object.keys(data).sort();
+  const allMonths = _allNdrMonths();
+  const months    = _filteredNdrMonths();
+  if (!months.length) return;
 
-  // Populate all month selectors
+  // ── Populate period selectors (first load or data change) ─────────────────
+  const allOpts = allMonths.map(mk => `<option value="${mk}">${_fmtMk(mk)}</option>`).join('');
+  const fromEl  = document.getElementById('ndrFromSel');
+  const toEl    = document.getElementById('ndrToSel');
+  const cohEl   = document.getElementById('ndrCohortSel');
+  if (fromEl && !fromEl.options.length) { fromEl.innerHTML = allOpts; fromEl.value = months[0]; }
+  if (toEl   && !toEl.options.length)   { toEl.innerHTML   = allOpts; toEl.value   = months[months.length-1]; }
+  if (cohEl  && !cohEl.options.length)  { cohEl.innerHTML  = allOpts; cohEl.value  = months[0]; }
+  // Sync from/to to current filtered range
+  if (fromEl) fromEl.value = months[0];
+  if (toEl)   toEl.value   = months[months.length-1];
+
+  // Cohort start: user-selected or first month of filtered range
+  const cohortMk = (cohEl?.value && months.includes(cohEl.value)) ? cohEl.value : months[0];
+
+  // ── Populate single-month selectors ──────────────────────────────────────
   const monthOpts = months.map(mk => `<option value="${mk}">${_fmtMk(mk)}</option>`).join('');
-  ['ndrMonthSel', 'ndrOwnerMonthSel'].forEach(id => {
+  ['ndrMonthSel','ndrOwnerMonthSel'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.innerHTML = monthOpts; el.value = months[months.length-1]; }
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = monthOpts;
+    el.value = months.includes(prev) ? prev : months[months.length-1];
   });
 
-  // Populate client selector
+  // ── Populate client selector ──────────────────────────────────────────────
   const allClients = [...new Set(months.flatMap(mk => (data[mk]||[]).map(r => r.client)))].sort();
-  const clientSel = document.getElementById('ndrClientSel');
-  if (clientSel) clientSel.innerHTML = allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  const clientSel  = document.getElementById('ndrClientSel');
+  if (clientSel) {
+    const prev = clientSel.value;
+    clientSel.innerHTML = allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    if (allClients.includes(prev)) clientSel.value = prev;
+  }
 
-  // Pre-compute per-client NDRs (shared by multiple sections)
+  // ── Pre-compute per-client NDRs ───────────────────────────────────────────
   const clientNdrs = calcClientNdrs(data, months);
 
-  // ── KPIs ─────────────────────────────────────────────────────────────────
+  // ── KPIs ──────────────────────────────────────────────────────────────────
   const lastMk   = months[months.length-1];
   const lastRows = data[lastMk]||[];
   const lIncome  = lastRows.reduce((s,r)=>s+r.income,0);
@@ -4175,41 +4317,40 @@ function initNdrTab() {
   const lProfit  = lIncome - lCost;
   const lMargin  = lIncome > 0 ? lProfit/lIncome*100 : 0;
 
-  const ytdIncome = months.reduce((s,mk)=>s+data[mk].reduce((a,r)=>a+r.income,0),0);
-  const ytdCost   = months.reduce((s,mk)=>s+data[mk].reduce((a,r)=>a+r.cost,0),0);
-  const ytdProfit = ytdIncome - ytdCost;
-  const ytdMargin = ytdIncome > 0 ? ytdProfit/ytdIncome*100 : 0;
+  const periodLabel = months.length === 1 ? _fmtMk(months[0]) : _fmtMk(months[0]) + ' – ' + _fmtMk(lastMk);
+  const totIncome = months.reduce((s,mk)=>s+data[mk].reduce((a,r)=>a+r.income,0),0);
+  const totCost   = months.reduce((s,mk)=>s+data[mk].reduce((a,r)=>a+r.cost,0),0);
+  const totProfit = totIncome - totCost;
+  const totMargin = totIncome > 0 ? totProfit/totIncome*100 : 0;
 
-  const momNdr  = calcNdrPct(data, months);
-  const ytdNdr  = calcYtdNdr(data, months);
-  const momColor = momNdr === null ? '#667085' : momNdr >= 100 ? '#95D600' : momNdr >= 90 ? '#F4A261' : '#E4A8A0';
-  const ytdColor = ytdNdr === null ? '#667085' : ytdNdr >= 100 ? '#95D600' : ytdNdr >= 90 ? '#F4A261' : '#E4A8A0';
+  const momNdr   = calcNdrPct(data, months);
+  const cohNdr   = calcCohortNdr(data, months, cohortMk);
+  const momColor = momNdr===null?'#667085':momNdr>=100?'#95D600':momNdr>=90?'#F4A261':'#E4A8A0';
+  const cohColor = cohNdr===null?'#667085':cohNdr>=100?'#95D600':cohNdr>=90?'#F4A261':'#E4A8A0';
 
-  // MoM NDR explanation tooltip
-  const momTip = `title="NDR MoM: revenue in ${_fmtMk(lastMk)} from clients who also existed in ${_fmtMk(months[months.length-2])} ÷ those same clients' revenue in ${_fmtMk(months[months.length-2])} × 100. &gt;100% = net expansion."`;
-  // YTD NDR explanation tooltip
-  const ytdTip = `title="YTD NDR: revenue in ${_fmtMk(lastMk)} from the cohort of clients who existed in ${_fmtMk(months[0])} ÷ those same clients' revenue in ${_fmtMk(months[0])} × 100. Measures full-period revenue growth from original customers — excludes new logos."`;
+  const momTip = `title="NDR MoM: ${_fmtMk(lastMk)} revenue from clients also in ${months.length>=2?_fmtMk(months[months.length-2]):''} ÷ their revenue then. &gt;100% = net expansion."`;
+  const cohTip = `title="Cohort NDR: ${_fmtMk(lastMk)} revenue from ${_fmtMk(cohortMk)} cohort ÷ their ${_fmtMk(cohortMk)} revenue. Excludes new logos added after ${_fmtMk(cohortMk)}."`;
 
   const kpis = [
-    { label: `${_fmtMk(lastMk)} Income`,  value: fmtMoney(lIncome),  color: '#219EBC', sub: `Margin ${lMargin.toFixed(1)}%` },
-    { label: `${_fmtMk(lastMk)} Profit`,  value: fmtMoney(lProfit),  color: lProfit>=0?'#95D600':'#E4A8A0', sub: `Cost ${fmtMoney(lCost)}` },
-    { label: 'YTD Income',                 value: fmtMoney(ytdIncome), color: '#219EBC', sub: `Margin ${ytdMargin.toFixed(1)}%` },
-    { label: 'YTD Profit',                 value: fmtMoney(ytdProfit), color: ytdProfit>=0?'#95D600':'#E4A8A0', sub: `Cost ${fmtMoney(ytdCost)}` },
-    { label: 'NDR Month-over-Month', value: momNdr !== null ? momNdr.toFixed(1)+'%' : '—', color: momColor,
-      sub: momNdr !== null ? (_fmtMk(months[months.length-2]) + ' → ' + _fmtMk(lastMk)) : '', tip: momTip },
-    { label: `NDR YTD (${_fmtMk(months[0])} cohort)`, value: ytdNdr !== null ? ytdNdr.toFixed(1)+'%' : '—', color: ytdColor,
-      sub: ytdNdr !== null ? `${_fmtMk(months[0])} → ${_fmtMk(lastMk)} · same clients` : 'Need 2+ months', tip: ytdTip },
+    { label: `${_fmtMk(lastMk)} Income`, value: fmtMoney(lIncome), color: '#219EBC', sub: 'Margin ' + lMargin.toFixed(1) + '%' },
+    { label: `${_fmtMk(lastMk)} Profit`, value: fmtMoney(lProfit), color: lProfit>=0?'#95D600':'#E4A8A0', sub: 'Cost ' + fmtMoney(lCost) },
+    { label: 'Period Income',  value: fmtMoney(totIncome), color: '#219EBC', sub: periodLabel + ' · Margin ' + totMargin.toFixed(1) + '%' },
+    { label: 'Period Profit',  value: fmtMoney(totProfit), color: totProfit>=0?'#95D600':'#E4A8A0', sub: 'Cost ' + fmtMoney(totCost) },
+    { label: 'NDR Month-over-Month', value: momNdr!==null?momNdr.toFixed(1)+'%':'—', color: momColor,
+      sub: months.length>=2 ? _fmtMk(months[months.length-2])+' → '+_fmtMk(lastMk) : '', tip: momTip },
+    { label: 'Cohort NDR (from '+_fmtMk(cohortMk)+')', value: cohNdr!==null?cohNdr.toFixed(1)+'%':'—', color: cohColor,
+      sub: cohNdr!==null ? _fmtMk(cohortMk)+' → '+_fmtMk(lastMk)+' · same clients' : 'Need 2+ months', tip: cohTip },
   ];
   document.getElementById('ndrKpiRow').innerHTML = kpis.map(k => `
     <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;cursor:${k.tip?'help':'default'}" ${k.tip||''}>
-      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">${k.label}${k.tip?' <span style="color:var(--text-tertiary);font-size:10px;">ⓘ</span>':''}</div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">${k.label}${k.tip?' <span style="color:var(--text-tertiary)">ⓘ</span>':''}</div>
       <div style="font-size:26px;font-weight:700;color:${k.color};line-height:1.1;">${k.value}</div>
       <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">${k.sub||''}</div>
     </div>`).join('');
 
   renderNdrTrend(data, months);
   renderNdrInsights(data, months, clientNdrs);
-  window.renderNdrTopBottom(null, 'profit_pct', data, months);
+  window.renderNdrTopBottom(null, null, data, months);
   renderNdrClientNdrTable(data, months, clientNdrs);
   renderNdrSpikes(data, months);
   window.renderNdrOwnerAnalysis(data, months, clientNdrs);
@@ -4237,98 +4378,123 @@ function renderNdrInsights(data, months, clientNdrs) {
 let _ndrTopMetric = 'profit_pct';
 window.renderNdrTopBottom = function(btnEl, metric, dataArg, monthsArg) {
   const data   = dataArg   || window.NDR_DATA; if (!data) return;
-  const months = monthsArg || Object.keys(data).sort();
+  const months = monthsArg || _filteredNdrMonths();
   if (metric) _ndrTopMetric = metric;
-
-  // Update seg button active state
   if (btnEl) {
     document.querySelectorAll('#ndrTopSeg .seg-btn').forEach(b => b.classList.remove('active'));
     btnEl.classList.add('active');
   }
 
-  // Aggregate YTD per client
   const clientTotals = {};
   for (const mk of months) {
     for (const r of (data[mk]||[])) {
-      if (!clientTotals[r.client]) clientTotals[r.client] = { income:0, cost:0, profit:0 };
+      if (!clientTotals[r.client]) clientTotals[r.client] = { client: r.client, income:0, cost:0, profit:0 };
       clientTotals[r.client].income += r.income;
       clientTotals[r.client].cost   += r.cost;
       clientTotals[r.client].profit += r.profit;
     }
   }
-  for (const c of Object.values(clientTotals))
-    c.profit_pct = c.income > 0 ? c.profit/c.income*100 : 0;
+  const rows = Object.values(clientTotals).map(c => ({ ...c, profit_pct: c.income>0?c.profit/c.income*100:0, owner: getNdrOwner(c.client) }));
+  const sortedDesc = [...rows].sort((a,b) => b[_ndrTopMetric] - a[_ndrTopMetric]);
+  const top10 = sortedDesc.slice(0, 10);
+  const bot10 = sortedDesc.slice(-10);
 
-  const sorted = Object.entries(clientTotals).sort((a,b) => b[1][_ndrTopMetric] - a[1][_ndrTopMetric]);
-  const top10 = sorted.slice(0, 10);
-  const bot10 = sorted.slice(-10).reverse();
+  const cols = [
+    { key:'client',     label:'Client',    al:'left' },
+    { key:'owner',      label:'Owner',     al:'left' },
+    { key:'income',     label:'Income'  },
+    { key:'profit',     label:'Profit'  },
+    { key:'profit_pct', label:'Margin %'},
+  ];
+  const fmtV = (k, v) => k==='profit_pct' ? v.toFixed(1)+'%' : k==='client'||k==='owner' ? escapeHtml(v||'—') : fmtMoney(v);
+  const colr = (k, v) => k==='profit_pct'||k==='profit' ? (v>=60||v>=0?'#95D600':'#E4A8A0') : 'var(--text)';
+  const rowFn = (r,i) => `<tr style="border-bottom:1px solid var(--border);">` +
+    cols.map(c => `<td style="padding:6px 10px;font-size:12px;text-align:${c.al||'right'};${c.key!=='client'&&c.key!=='owner'?'font-weight:600;color:'+colr(c.key,r[c.key])+';':''}">${fmtV(c.key,r[c.key])}</td>`).join('') +
+    `</tr>`;
 
-  const fmt = v => _ndrTopMetric === 'profit_pct' ? v.toFixed(1)+'%' : fmtMoney(v);
-  const color = (v, met) => met==='profit_pct' ? (v>=60?'#95D600':v>=30?'#F4A261':'#E4A8A0') : (v>=0?'#95D600':'#E4A8A0');
+  _registerTable('ndrTop10Table', top10, cols, rowFn, _ndrTopMetric, -1);
+  _registerTable('ndrBot10Table', bot10, cols, rowFn, _ndrTopMetric, 1);
 
-  const buildTable = (rows, label) => rows.map(([client, v], i) => {
-    const val = v[_ndrTopMetric];
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);gap:8px;">
-      <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${escapeHtml(client)}">${i+1}. ${escapeHtml(client)}</div>
-      <div style="font-size:13px;font-weight:700;color:${color(val,_ndrTopMetric)};white-space:nowrap;">${fmt(val)}</div>
-    </div>`;
-  }).join('');
-
-  const d10 = document.getElementById('ndrTop10Table');
-  const b10 = document.getElementById('ndrBot10Table');
-  if (d10) d10.innerHTML = buildTable(top10, 'top');
-  if (b10) b10.innerHTML = buildTable(bot10, 'bot');
   const desc = document.getElementById('ndrTopDesc');
-  if (desc) desc.textContent = `YTD (${months.map(_fmtMk).join(' – ')}) — top & bottom 10 by ${_ndrTopMetric==='profit_pct'?'margin %':_ndrTopMetric==='profit'?'profit $':'income $'}`;
+  if (desc) desc.textContent = 'Period: ' + months.map(_fmtMk).join(' – ');
 };
 
 // ── Per-client NDR heatmap table ─────────────────────────────────────────────
+let _clientNdrSort = { key: 'ytdNdr', dir: -1 };
 function renderNdrClientNdrTable(data, months, clientNdrs) {
   const el = document.getElementById('ndrClientNdrTable');
   if (!el) return;
 
-  // Sort clients by YTD NDR desc, then by latest income desc
   const lastMk = months[months.length-1];
   const lastIncMap = new Map((data[lastMk]||[]).map(r=>[r.client, r.income]));
-  const clients = Object.entries(clientNdrs)
-    .filter(([, cd]) => Object.keys(cd.incomes).length >= 2)
-    .sort((a,b) => {
-      const ya = a[1].ytdNdr ?? -999, yb = b[1].ytdNdr ?? -999;
-      if (Math.abs(ya-yb) > 1) return yb - ya;
-      return (lastIncMap.get(b[0])||0) - (lastIncMap.get(a[0])||0);
+
+  // Build flat row objects for sorting
+  const rows = Object.entries(clientNdrs)
+    .filter(([, cd]) => Object.keys(cd.incomes).length >= 1)
+    .map(([client, cd]) => {
+      const r = { client, owner: getNdrOwner(client), ytdNdr: cd.ytdNdr ?? -9999, lastIncome: lastIncMap.get(client)||0 };
+      for (const mk of months) r['ndr_'+mk] = cd.momNdrs[mk] ?? null;
+      r['inc_'+months[0]] = cd.incomes[months[0]] ?? null;
+      return r;
     });
 
   const cellColor = pct => pct >= 115 ? '#95D600' : pct >= 100 ? '#7AB800' : pct >= 85 ? '#F4A261' : '#E4A8A0';
   const cellBg   = pct => pct >= 115 ? 'rgba(149,214,0,.15)' : pct >= 100 ? 'rgba(122,184,0,.10)' : pct >= 85 ? 'rgba(244,162,97,.12)' : 'rgba(228,168,160,.15)';
 
-  const thStyle = 'padding:6px 10px;font-size:10px;font-weight:600;color:var(--text-secondary);white-space:nowrap;border-bottom:1px solid var(--border);';
-  const header = `<tr><th style="${thStyle}text-align:left;">Client</th><th style="${thStyle}">Owner</th>`
-    + months.map((mk,i) => `<th style="${thStyle}text-align:center;">${i===0?`${_fmtMk(mk)}<br><span style="font-size:9px;font-weight:400;">base</span>`:_fmtMk(mk)}</th>`).join('')
-    + `<th style="${thStyle}text-align:center;border-left:2px solid var(--border-strong);">YTD NDR</th></tr>`;
+  // Static columns for the sortable header
+  const fixedCols = [
+    { key:'client',  label:'Client',   al:'left' },
+    { key:'owner',   label:'Owner',    al:'left' },
+  ];
+  const monthColKeys = months.map((mk,i) => ({ key: i===0?('inc_'+mk):('ndr_'+mk), label: _fmtMk(mk), isFirst: i===0, mk }));
+  const ytdCol = { key:'ytdNdr', label:'Period NDR' };
+  const allCols = [...fixedCols, ...monthColKeys, ytdCol];
 
-  const rows = clients.map(([client, cd]) => {
-    const owner = getNdrOwner(client);
-    const cells = months.map((mk, i) => {
-      if (i === 0) {
-        const inc = cd.incomes[mk];
-        return `<td style="padding:5px 8px;text-align:center;font-size:11px;color:var(--text-secondary);">${inc !== undefined ? fmtMoney(inc) : '—'}</td>`;
+  const sorted = [...rows].sort((a,b) => {
+    const sk = _clientNdrSort.key, d = _clientNdrSort.dir;
+    const av = a[sk] ?? -9999, bv = b[sk] ?? -9999;
+    return d < 0 ? bv - av : av - bv;
+  });
+
+  const thBase = 'padding:6px 8px;font-size:10px;font-weight:600;color:var(--text-secondary);white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;';
+  const ind = k => k===_clientNdrSort.key ? (_clientNdrSort.dir<0?' ↓':' ↑') : '';
+
+  const header = allCols.map(c => {
+    const align = c.al||'center';
+    const extra = c.key==='ytdNdr'?'border-left:2px solid var(--border-strong);':'';
+    return `<th style="${thBase}text-align:${align};${extra}" onclick="window._sortClientNdrTable('${c.key}')">${c.label}${ind(c.key)}</th>`;
+  }).join('');
+
+  const body = sorted.map(r => {
+    const cells = monthColKeys.map(({ key, mk, isFirst }) => {
+      if (isFirst) {
+        const inc = r[key];
+        return `<td style="padding:5px 8px;text-align:center;font-size:11px;color:var(--text-secondary);">${inc!==null?fmtMoney(inc):'—'}</td>`;
       }
-      const ndr = cd.momNdrs[mk];
-      if (ndr === undefined) return `<td style="padding:5px 8px;text-align:center;font-size:11px;color:var(--text-tertiary);">—</td>`;
+      const ndr = r[key];
+      if (ndr === null) return `<td style="padding:5px 8px;text-align:center;font-size:11px;color:var(--text-tertiary);">—</td>`;
       return `<td style="padding:5px 8px;text-align:center;font-size:11px;font-weight:600;background:${cellBg(ndr)};color:${cellColor(ndr)};">${ndr.toFixed(0)}%</td>`;
     }).join('');
-    const ytd = cd.ytdNdr;
-    const ytdCell = ytd !== null
+    const ytd = r.ytdNdr > -9999 ? r.ytdNdr : null;
+    const ytdCell = ytd!==null
       ? `<td style="padding:5px 10px;text-align:center;font-size:12px;font-weight:700;background:${cellBg(ytd)};color:${cellColor(ytd)};border-left:2px solid var(--border-strong);">${ytd.toFixed(0)}%</td>`
       : `<td style="padding:5px 10px;text-align:center;color:var(--text-tertiary);border-left:2px solid var(--border-strong);">—</td>`;
     return `<tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:5px 10px;font-size:12px;font-weight:500;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(client)}">${escapeHtml(client)}</td>
-      <td style="padding:5px 10px;font-size:11px;color:var(--text-secondary);white-space:nowrap;">${escapeHtml(owner)}</td>
+      <td style="padding:5px 10px;font-size:12px;font-weight:500;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(r.client)}">${escapeHtml(r.client)}</td>
+      <td style="padding:5px 10px;font-size:11px;color:var(--text-secondary);white-space:nowrap;">${escapeHtml(r.owner)}</td>
       ${cells}${ytdCell}</tr>`;
   }).join('');
 
-  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead>${header}</thead><tbody>${rows}</tbody></table>`;
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
 }
+// Sort handler for client NDR table
+window._sortClientNdrTable = function(key) {
+  _clientNdrSort.dir = _clientNdrSort.key === key ? -_clientNdrSort.dir : -1;
+  _clientNdrSort.key = key;
+  const data = window.NDR_DATA; if (!data) return;
+  const months = _filteredNdrMonths();
+  renderNdrClientNdrTable(data, months, calcClientNdrs(data, months));
+};
 
 // ── Revenue Spikes vs Deals ──────────────────────────────────────────────────
 function renderNdrSpikes(data, months) {
@@ -4465,31 +4631,40 @@ window.renderNdrOwnerAnalysis = function(dataArg, monthsArg, clientNdrsArg) {
     options: mrgOpts,
   });
 
-  // Summary table (with YTD NDR column)
-  const tbl = document.getElementById('ndrOwnerTable');
-  if (tbl) {
-    const th = s => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;">${s}</th>`;
-    const thL = s => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border);">${s}</th>`;
-    const td = (s,bold) => `<td style="padding:7px 12px;font-size:12px;text-align:right;${bold?'font-weight:600;':''}color:var(--text);">${s}</td>`;
-    tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${thL('Owner')}${th('Clients')}${th('Income')}${th('Cost')}${th('Profit')}${th('Margin %')}${th('YTD NDR')}</tr></thead><tbody>${
-      ownerList.map(([owner, v], i) => {
-        const margin = v.income > 0 ? (v.profit/v.income*100).toFixed(1) : '—';
-        const mColor = parseFloat(margin) >= 60 ? '#95D600' : parseFloat(margin) >= 30 ? '#F4A261' : '#E4A8A0';
-        const ownerNdr = ownerYtdNdr[owner];
-        const ndrVal = ownerNdr && ownerNdr.base > 0 ? (ownerNdr.curr/ownerNdr.base*100).toFixed(1)+'%' : '—';
-        const ndrColor = ownerNdr && ownerNdr.base > 0 ? (ownerNdr.curr/ownerNdr.base*100 >= 100 ? '#95D600' : '#F4A261') : 'var(--text-secondary)';
-        return `<tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:7px 12px;font-size:12px;text-align:left;"><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:${colors[i]};display:inline-block;flex-shrink:0;"></span>${escapeHtml(owner)}</span></td>
-          ${td(v.clients.length)}
-          ${td(fmtMoney(v.income), true)}
-          ${td(fmtMoney(v.cost))}
-          ${td(fmtMoney(v.profit), true)}
-          <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:600;color:${mColor};">${margin}%</td>
-          <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:700;color:${ndrColor};">${ndrVal}</td>
-        </tr>`;
-      }).join('')
-    }</tbody></table>`;
-  }
+  // Sortable owner table
+  const ownerRows = ownerList.map(([owner, v], i) => {
+    const ownerNdr = ownerYtdNdr[owner];
+    return {
+      owner, clients: v.clients.length, income: v.income, cost: v.cost, profit: v.profit,
+      margin: v.income > 0 ? v.profit/v.income*100 : 0,
+      cohort_ndr: ownerNdr && ownerNdr.base > 0 ? ownerNdr.curr/ownerNdr.base*100 : null,
+      _color: colors[i],
+    };
+  });
+  const ownerCols = [
+    { key:'owner',      label:'Owner',     al:'left' },
+    { key:'clients',    label:'Clients'  },
+    { key:'income',     label:'Income'   },
+    { key:'cost',       label:'Cost'     },
+    { key:'profit',     label:'Profit'   },
+    { key:'margin',     label:'Margin %' },
+    { key:'cohort_ndr', label:'Cohort NDR' },
+  ];
+  const ownerRowFn = (r) => {
+    const mColor = r.margin>=60?'#95D600':r.margin>=30?'#F4A261':'#E4A8A0';
+    const ndrColor = r.cohort_ndr===null?'var(--text-secondary)':r.cohort_ndr>=100?'#95D600':'#F4A261';
+    const ndrVal = r.cohort_ndr!==null ? r.cohort_ndr.toFixed(1)+'%' : '—';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:7px 12px;font-size:12px;text-align:left;"><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:${r._color};display:inline-block;flex-shrink:0;"></span>${escapeHtml(r.owner)}</span></td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;">${r.clients}</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:600;">${fmtMoney(r.income)}</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;">${fmtMoney(r.cost)}</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:600;">${fmtMoney(r.profit)}</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:600;color:${mColor};">${r.margin.toFixed(1)}%</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:700;color:${ndrColor};">${ndrVal}</td>
+    </tr>`;
+  };
+  _registerTable('ndrOwnerTable', ownerRows, ownerCols, ownerRowFn, 'income', -1);
 };
 
 // Client drill-down
@@ -4500,7 +4675,7 @@ window.renderNdrClientDrilldown = function() {
   const client = sel?.value || '';
   if (!client) return;
 
-  const months = Object.keys(data).sort();
+  const months = _filteredNdrMonths();
   const clientData = months.map(mk => {
     const r = (data[mk]||[]).find(x => x.client === client);
     return r || null;
@@ -4557,29 +4732,46 @@ window.renderNdrClientDrilldown = function() {
     options: opts,
   });
 
-  // Month-by-month table
-  const tblEl = document.getElementById('ndrClientTable');
-  if (tblEl) {
-    const th = s => `<th style="padding:7px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;border-bottom:1px solid var(--border);">${s}</th>`;
-    const thL = s => `<th style="padding:7px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border);">${s}</th>`;
-    const td = (s, color) => `<td style="padding:6px 12px;font-size:12px;text-align:right;${color?`color:${color};font-weight:600;`:''}">${s}</td>`;
-    const rows = months.map((mk, i) => {
-      const r = clientData[i];
-      if (!r) return `<tr><td style="padding:6px 12px;font-size:12px;text-align:left;color:var(--text-secondary);">${_fmtMk(mk)}</td><td colspan="5" style="text-align:center;color:var(--text-secondary);font-size:11px;">—</td></tr>`;
-      const mrg = r.income > 0 ? (r.profit/r.income*100).toFixed(1)+'%' : '—';
-      const mrgColor = parseFloat(mrg) >= 60 ? '#95D600' : parseFloat(mrg) >= 30 ? '#F4A261' : '#E4A8A0';
-      const prev = clientData.slice(0, i).filter(Boolean).slice(-1)[0];
-      const chg = prev && prev.income > 0 ? ((r.income - prev.income)/prev.income*100) : null;
-      const chgCell = chg !== null ? `<span style="color:${chg>=0?'#95D600':'#E4A8A0'}">${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(1)}%</span>` : '—';
-      return `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:6px 12px;font-size:12px;font-weight:500;">${_fmtMk(mk)}</td>
-        ${td(fmtMoney(r.income),'#219EBC')}${td(fmtMoney(r.cost))}${td(fmtMoney(r.profit),r.profit>=0?'#95D600':'#E4A8A0')}
-        <td style="padding:6px 12px;font-size:12px;text-align:right;font-weight:600;color:${mrgColor}">${mrg}</td>
-        ${td(chgCell)}
-      </tr>`;
-    }).join('');
-    tblEl.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${thL('Month')}${th('Income')}${th('Cost')}${th('Profit')}${th('Margin')}${th('MoM Δ')}</tr></thead><tbody>${rows}</tbody></table>`;
-  }
+  // Month-by-month sortable table
+  const drillRows = months.map((mk, i) => {
+    const r = clientData[i];
+    const prev = clientData.slice(0, i).filter(Boolean).slice(-1)[0];
+    const mom = r && prev && prev.income > 0 ? (r.income - prev.income)/prev.income*100 : null;
+    return {
+      month: mk, monthLabel: _fmtMk(mk),
+      income: r ? r.income : null, cost: r ? r.cost : null,
+      profit: r ? r.profit : null,
+      margin: r && r.income > 0 ? r.profit/r.income*100 : null,
+      mom,
+    };
+  }).filter(r => r.income !== null);
+
+  const drillCols = [
+    { key:'monthLabel', label:'Month', al:'left' },
+    { key:'income',     label:'Income'  },
+    { key:'cost',       label:'Cost'    },
+    { key:'profit',     label:'Profit'  },
+    { key:'margin',     label:'Margin %'},
+    { key:'mom',        label:'MoM Δ'  },
+  ];
+  const drillFmt = (k, v) => {
+    if (v === null || v === undefined) return '—';
+    if (k==='monthLabel') return escapeHtml(v);
+    if (k==='margin') return v.toFixed(1)+'%';
+    if (k==='mom') return (v>=0?'▲':'▼') + Math.abs(v).toFixed(1)+'%';
+    return fmtMoney(v);
+  };
+  const drillColor = (k, v) => {
+    if (v === null) return 'var(--text)';
+    if (k==='income') return '#219EBC';
+    if (k==='profit'||k==='margin') return v>=0?'#95D600':'#E4A8A0';
+    if (k==='mom') return v>=0?'#95D600':'#E4A8A0';
+    return 'var(--text)';
+  };
+  const drillRowFn = (r) => `<tr style="border-bottom:1px solid var(--border);">${drillCols.map(c=>
+    `<td style="padding:6px 12px;font-size:12px;text-align:${c.al||'right'};font-weight:${c.key!=='monthLabel'?'600':'400'};color:${drillColor(c.key,r[c.key])};">${drillFmt(c.key,r[c.key])}</td>`
+  ).join('')}</tr>`;
+  _registerTable('ndrClientTable', drillRows, drillCols, drillRowFn, 'month', -1);
 };
 
 window.renderNdrRanking = function() {
