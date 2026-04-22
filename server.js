@@ -264,6 +264,19 @@ function injectData(html, cache, csvHours) {
     }
   }
 
+  // ── Replace USER_HOURS object ─────────────────────────────────────────────
+  const UH_MARKER = 'const USER_HOURS={';
+  const uhStart   = html.indexOf(UH_MARKER);
+  if (uhStart !== -1) {
+    const uhOpen = uhStart + UH_MARKER.length - 1;
+    const uhEnd  = findBlockEnd(html, uhOpen, '{', '}');
+    if (uhEnd !== -1) {
+      html = html.slice(0, uhStart) +
+             `const USER_HOURS=${JSON.stringify(cache.userHours || {})}` +
+             html.slice(uhEnd + 1);
+    }
+  }
+
   // ── Intercept sendChat at its first line so ALL call paths use local engine ──
   // This covers: onclick button, Enter key, askQuick preset buttons — everything.
   html = html.replace(

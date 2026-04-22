@@ -326,6 +326,9 @@ async function refreshAll(onProgress = () => {}) {
   const userTypeMap = {};
   // Collect unmatched candidate names for diagnostics (capped at 300)
   const unmatchedNames = {};
+  // Per-user per-customer monthly hours — powers the "by person" chart in the Effort tab.
+  // Structure: userHours[displayName] = { type, customers: { customerId: { monthly: { 'YYYY-MM': h } } } }
+  const userHours = {};
 
   const SKIP_NAMES = new Set([
     'Sprint Folder', 'Customer Management', 'General Meetings',
@@ -430,6 +433,16 @@ async function refreshAll(onProgress = () => {}) {
     addHours(customer[type], durationMs, startMs, now);
     typeCount[type]++;
     if (username && !userTypeMap[username]) userTypeMap[username] = { type, space: spaceName };
+
+    // ── Per-user per-customer monthly tracking ────────────────────────────
+    if (username && startMs > 0) {
+      if (!userHours[username]) userHours[username] = { type: baseType, customers: {} };
+      const uc = userHours[username].customers;
+      if (!uc[customer.id]) uc[customer.id] = { name: customer.name, monthly: {} };
+      const d  = new Date(startMs);
+      const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      uc[customer.id].monthly[mk] = rnd((uc[customer.id].monthly[mk] || 0) + durationMs / 3_600_000);
+    }
   }, onProgress);
 
   console.log(`   ✓ ${totalEntries} time entries processed (streamed)`);
@@ -553,6 +566,7 @@ async function refreshAll(onProgress = () => {}) {
   return {
     customers,
     deals,
+    userHours,
     lastRefreshed: new Date().toISOString(),
     meta: {
       customerCount:   customers.length,

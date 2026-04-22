@@ -643,6 +643,68 @@ tr.selected-row{background:var(--teal-50) !important;}
       </div>
     </div>
 
+    <!-- ── All-customers stacked by customer ── -->
+    <div class="section" id="section-custStack">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Monthly Effort by Customer</div>
+          <div class="section-desc">Top customers stacked — see who drives hours each month</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="font-size:11px;color:var(--text-secondary);">Show top</label>
+          <select id="custStackTop" onchange="chartCustStack()"
+            style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;">
+            <option value="10">10</option>
+            <option value="15" selected>15</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+          </select>
+          <div class="legend">
+            <span class="legend-item" style="font-size:11px;color:var(--text-secondary);">others grouped</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <div class="chart-wrap xl"><canvas id="cCustStack"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── By-person breakdown ── -->
+    <div class="section" id="section-byPerson">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Hours by Person</div>
+          <div class="section-desc">Select a team member to see their effort per customer, month by month</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="position:relative;">
+            <select id="personSelect" onchange="chartByPerson()"
+              style="font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;min-width:200px;">
+              <option value="">— Select a person —</option>
+            </select>
+          </div>
+          <div id="personTypeBadge" style="display:none;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:var(--surface-subtle);color:var(--text-secondary);"></div>
+          <select id="personViewMode" onchange="chartByPerson()"
+            style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;">
+            <option value="monthly">Month by month</option>
+            <option value="ytd">YTD total</option>
+            <option value="6m">6-month total</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" id="personChartBody">
+          <div style="text-align:center;padding:40px;color:var(--text-secondary);font-size:13px;">
+            Select a team member above to see their hours per customer
+          </div>
+        </div>
+      </div>
+      <!-- YTD / 6M summary pills -->
+      <div id="personSummaryRow" style="display:none;margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
   </div><!-- /pane-effort -->
 
   <!-- ══ PROFITABILITY pane ══ -->
@@ -923,9 +985,10 @@ tr.selected-row{background:var(--teal-50) !important;}
 <script>
 const DATA = []
 const DEALS={}
+const USER_HOURS={}
 const HS_PORTAL_ID=0
 const HS_PORTAL_DOMAIN=""
-window.DATA = DATA; window.DEALS = DEALS;
+window.DATA = DATA; window.DEALS = DEALS; window.USER_HOURS = USER_HOURS;
 
 /* ═══════════════════════════════════════════════════════════════
    Profitability Dashboard v2 — tabs, executive summary, restrained palette
@@ -1447,6 +1510,8 @@ window.toggleMonth = function(mk){
   // Refresh whichever monthly charts are currently rendered
   if (charts.ovMonthly)       { charts.ovMonthly.destroy();       delete charts.ovMonthly;       chartOvMonthly(); }
   if (charts.monthlyStack)    { charts.monthlyStack.destroy();    delete charts.monthlyStack;    chartMonthlyStack(); }
+  if (charts.custStack)       { charts.custStack.destroy();       delete charts.custStack;       chartCustStack(); }
+  if (charts.byPerson)        { chartByPerson(); }
   if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; chartInvestedVsBilled(); }
 };
 
@@ -1806,6 +1871,185 @@ function chartMonthlyStack(){
       {label:'Bug/Esc', data:sum('bug'), backgroundColor:'#E4A8A0', borderRadius:2, maxBarThickness:60},
     ]}, options:opts
   });
+}
+
+// Effort: monthly stacked by customer (top N + "Others")
+const CUSTOMER_PALETTE = [
+  '#95D600','#219EBC','#08173C','#E4A8A0','#F4A261','#2A9D8F','#E9C46A','#6A4C93',
+  '#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F',
+  '#BB8FCE','#85C1E9','#F0B27A','#82E0AA','#F1948A','#76D7C4','#7FB3D3','#F9E79F',
+  '#C39BD3','#A9CCE3','#A3E4D7','#FAD7A0','#D2B4DE','#AED6F1',
+];
+function chartCustStack(){
+  if (charts.custStack) { charts.custStack.destroy(); charts.custStack = null; }
+  const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const months    = monthIdxs.map(i=>ALL_MONTHS[i]);
+  const labels    = monthIdxs.map(i=>ALL_MLABELS[i]);
+  const N = parseInt(document.getElementById('custStackTop')?.value || '15');
+
+  // Total hours per customer across visible months
+  const custTotals = AD().map(c => ({
+    c,
+    total: months.reduce((s,m) => s + (c.cs?.monthly?.[m]||0) + (c.sa?.monthly?.[m]||0) + (c.dev?.monthly?.[m]||0) + (c.bug?.monthly?.[m]||0), 0),
+  })).filter(x => x.total > 0).sort((a,b) => b.total - a.total);
+
+  const top    = custTotals.slice(0, N);
+  const others = custTotals.slice(N);
+
+  const opts = baseOpts();
+  opts.scales.x.stacked = true; opts.scales.y.stacked = true;
+  opts.scales.y.ticks.callback = v => v + 'h';
+  opts.plugins.legend = { display: true, position: 'right', labels: { font: { family:'Poppins', size:10 }, boxWidth:10, padding:6 } };
+  opts.plugins.tooltip.callbacks = {
+    label: c => c.dataset.label + ': ' + Math.round(c.raw) + 'h',
+    footer: items => {
+      const total = items.reduce((s,i) => s + i.raw, 0);
+      return 'Total: ' + Math.round(total) + 'h';
+    },
+  };
+
+  const datasets = top.map((x, i) => ({
+    label: x.c.name.length > 20 ? x.c.name.slice(0, 19) + '…' : x.c.name,
+    data: months.map(m => {
+      const c = x.c;
+      return Math.round(((c.cs?.monthly?.[m]||0) + (c.sa?.monthly?.[m]||0) + (c.dev?.monthly?.[m]||0) + (c.bug?.monthly?.[m]||0)) * 10) / 10;
+    }),
+    backgroundColor: CUSTOMER_PALETTE[i % CUSTOMER_PALETTE.length],
+    borderRadius: 2, maxBarThickness: 60,
+  }));
+
+  if (others.length) {
+    datasets.push({
+      label: `Others (${others.length})`,
+      data: months.map(m => {
+        return Math.round(others.reduce((s,x) => {
+          const c = x.c;
+          return s + (c.cs?.monthly?.[m]||0) + (c.sa?.monthly?.[m]||0) + (c.dev?.monthly?.[m]||0) + (c.bug?.monthly?.[m]||0);
+        }, 0) * 10) / 10;
+      }),
+      backgroundColor: '#cccccc', borderRadius: 2, maxBarThickness: 60,
+    });
+  }
+
+  charts.custStack = new Chart(document.getElementById('cCustStack'), {
+    type: 'bar', data: { labels, datasets }, options: opts,
+  });
+}
+
+// Effort: by-person chart
+function initPersonSelect(){
+  const sel = document.getElementById('personSelect');
+  if (!sel || !window.USER_HOURS) return;
+  const people = Object.entries(window.USER_HOURS)
+    .map(([name, d]) => ({ name, type: d.type }))
+    .sort((a,b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">— Select a person —</option>' +
+    people.map(p => `<option value="${p.name}">${p.name} (${p.type.toUpperCase()})</option>`).join('');
+}
+
+function chartByPerson(){
+  const sel     = document.getElementById('personSelect');
+  const name    = sel?.value;
+  const body    = document.getElementById('personChartBody');
+  const badge   = document.getElementById('personTypeBadge');
+  const sumRow  = document.getElementById('personSummaryRow');
+  if (!name || !window.USER_HOURS?.[name]) {
+    if (body) body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);font-size:13px;">Select a team member above to see their hours per customer</div>';
+    if (badge) badge.style.display = 'none';
+    if (sumRow) sumRow.style.display = 'none';
+    return;
+  }
+
+  const person   = window.USER_HOURS[name];
+  const viewMode = document.getElementById('personViewMode')?.value || 'monthly';
+  const typeColor = { cs:'#95D600', sa:'#219EBC', dev:'#08173C', bug:'#E4A8A0' };
+
+  // Badge
+  if (badge) {
+    badge.style.display = 'inline-block';
+    badge.style.background = typeColor[person.type] + '22';
+    badge.style.color = typeColor[person.type];
+    badge.textContent = person.type.toUpperCase();
+  }
+
+  // Build customer list sorted by total hours in selected window
+  const thisYear = new Date().getFullYear() + '';
+  const custEntries = Object.entries(person.customers).map(([custId, d]) => {
+    const monthly = d.monthly || {};
+    const total6m = Object.values(monthly).reduce((s,h) => s+h, 0);
+    const totalYTD = Object.entries(monthly).filter(([mk]) => mk.startsWith(thisYear)).reduce((s,[,h]) => s+h, 0);
+    return { custId, name: d.name, monthly, total6m, totalYTD };
+  }).filter(x => x.total6m > 0).sort((a,b) => b.total6m - a.total6m).slice(0, 20);
+
+  if (!custEntries.length) {
+    if (body) body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);font-size:13px;">No hours found for this person in the last 6 months</div>';
+    return;
+  }
+
+  // Destroy old chart
+  if (charts.byPerson) { charts.byPerson.destroy(); charts.byPerson = null; }
+  body.innerHTML = '<div class="chart-wrap xl"><canvas id="cByPerson"></canvas></div>';
+
+  const opts = baseOpts();
+  let labels, datasets;
+
+  if (viewMode === 'monthly') {
+    const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+    const months  = monthIdxs.map(i => ALL_MONTHS[i]);
+    labels = monthIdxs.map(i => ALL_MLABELS[i]);
+    opts.scales.x.stacked = true; opts.scales.y.stacked = true;
+    opts.scales.y.ticks.callback = v => v + 'h';
+    opts.plugins.legend = { display: true, position: 'right', labels: { font:{family:'Poppins',size:10}, boxWidth:10, padding:6 } };
+    opts.plugins.tooltip.callbacks = {
+      label: c => c.dataset.label + ': ' + Math.round(c.raw) + 'h',
+      footer: items => 'Total: ' + Math.round(items.reduce((s,i) => s+i.raw, 0)) + 'h',
+    };
+    datasets = custEntries.map((x, i) => ({
+      label: x.name.length > 22 ? x.name.slice(0, 21) + '…' : x.name,
+      data: months.map(m => Math.round((x.monthly[m] || 0) * 10) / 10),
+      backgroundColor: CUSTOMER_PALETTE[i % CUSTOMER_PALETTE.length],
+      borderRadius: 2, maxBarThickness: 60,
+    }));
+  } else {
+    // YTD or 6M — horizontal bar per customer
+    opts.indexAxis = 'y';
+    opts.scales.x.ticks.callback = v => v + 'h';
+    opts.plugins.legend = { display: false };
+    opts.plugins.tooltip.callbacks = { label: c => Math.round(c.raw) + 'h' };
+    const sortKey = viewMode === 'ytd' ? 'totalYTD' : 'total6m';
+    const sorted = [...custEntries].sort((a,b) => b[sortKey] - a[sortKey]);
+    labels = sorted.map(x => x.name.length > 30 ? x.name.slice(0, 29) + '…' : x.name);
+    datasets = [{
+      label: viewMode === 'ytd' ? 'YTD hours' : '6-month hours',
+      data: sorted.map(x => Math.round(x[sortKey] * 10) / 10),
+      backgroundColor: sorted.map((_,i) => CUSTOMER_PALETTE[i % CUSTOMER_PALETTE.length]),
+      borderRadius: 3, maxBarThickness: 20,
+    }];
+  }
+
+  charts.byPerson = new Chart(document.getElementById('cByPerson'), {
+    type: 'bar', data: { labels, datasets }, options: opts,
+  });
+
+  // Summary pills
+  if (sumRow) {
+    const totalYTD = custEntries.reduce((s,x) => s + x.totalYTD, 0);
+    const total6m  = custEntries.reduce((s,x) => s + x.total6m, 0);
+    sumRow.style.display = 'flex';
+    sumRow.innerHTML = `
+      <div style="padding:6px 12px;border-radius:var(--r-md);background:var(--surface-subtle);border:1px solid var(--border);font-size:12px;">
+        <span style="color:var(--text-secondary);">YTD total</span>
+        <span style="font-weight:600;margin-left:6px;">${Math.round(totalYTD)}h</span>
+      </div>
+      <div style="padding:6px 12px;border-radius:var(--r-md);background:var(--surface-subtle);border:1px solid var(--border);font-size:12px;">
+        <span style="color:var(--text-secondary);">6-month total</span>
+        <span style="font-weight:600;margin-left:6px;">${Math.round(total6m)}h</span>
+      </div>
+      <div style="padding:6px 12px;border-radius:var(--r-md);background:var(--surface-subtle);border:1px solid var(--border);font-size:12px;">
+        <span style="color:var(--text-secondary);">Customers active</span>
+        <span style="font-weight:600;margin-left:6px;">${custEntries.length}</span>
+      </div>`;
+  }
 }
 
 // Profitability: main chart
@@ -2525,7 +2769,7 @@ function renderChartsForPane(pane){
   if (pane==='overview'){
     renderMonthToggles(); chartOvMonthly(); chartOvScatter(); chartOvDevRev();
   } else if (pane==='effort'){
-    renderMonthToggles(); chartTop20(); chartRateTrend(); chartStageDonut(); chartMonthlyStack(); renderInvestedPills(); chartInvestedVsBilled();
+    renderMonthToggles(); chartTop20(); chartRateTrend(); chartStageDonut(); chartMonthlyStack(); chartCustStack(); initPersonSelect(); renderInvestedPills(); chartInvestedVsBilled();
   } else if (pane==='profit'){
     chartProfit(); chartRevVsEff(); chartNoReturn();
     renderCsmTable();
