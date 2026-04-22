@@ -6,6 +6,7 @@ const path    = require('path');
 const fs      = require('fs');
 const { refreshAll } = require('./transform');
 const { parseCsvHours } = require('./connectors/csv-hours');
+const { fetchNdrSnapshot } = require('./connectors/ndr');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -349,7 +350,12 @@ function injectData(html, cache, csvHours) {
       `\n  <label for="csvHoursInput" id="csvHoursBtn" class="import-btn"
     style="background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.3);color:#34d399;margin-left:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"${csvStatus}>
     📂 Import Hours CSV${csvHours ? ' ✓' : ''}
-  </label>`
+  </label>` +
+      // ── Sync NDR button ──────────────────────────────────────────────────────
+      `\n  <button class="import-btn" id="ndrSyncBtn" onclick="_syncNdr()"
+    style="background:rgba(250,204,21,.10);border-color:rgba(250,204,21,.3);color:#facc15;margin-left:6px;">
+    ↻ Sync NDR
+  </button>`
     );
   }
 
@@ -477,6 +483,40 @@ async function _syncFromApis() {
   }
 }
 
+// ── Sync NDR data from Google Sheets ─────────────────────────────────────────
+async function _syncNdr() {
+  const btn = document.getElementById('ndrSyncBtn');
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '↻ Fetching…';
+  let pollTimer = null;
+  function startPolling() {
+    pollTimer = setInterval(async () => {
+      try {
+        const s = await fetch('/api/ndr-sync-status').then(r => r.json());
+        if (s.running) {
+          btn.textContent = '↻ ' + (s.step || '…');
+        } else if (s.step === 'complete') {
+          clearInterval(pollTimer);
+          btn.textContent = '✓ NDR synced — reloading…';
+          setTimeout(() => location.reload(), 800);
+        } else if (s.error) {
+          clearInterval(pollTimer);
+          alert('NDR sync failed: ' + s.error);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      } catch (_) {}
+    }, 1500);
+  }
+  try {
+    await fetch('/api/sync-ndr', { method: 'POST' });
+    startPolling();
+  } catch (e) {
+    alert('NDR sync error: ' + e.message);
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
 // ── Import hours from ClickUp CSV export ─────────────────────────────────────
 async function _importCsvHours(input) {
   const file = input.files[0];
@@ -553,7 +593,11 @@ app.get('/', (req, res) => {
           `\n  <label for="csvHoursInput" id="csvHoursBtn" class="import-btn"
     style="background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.3);color:#34d399;margin-left:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
     📂 Import Hours CSV
-  </label>`
+  </label>` +
+          `\n  <button class="import-btn" id="ndrSyncBtn" onclick="_syncNdr()"
+    style="background:rgba(250,204,21,.10);border-color:rgba(250,204,21,.3);color:#facc15;margin-left:6px;">
+    ↻ Sync NDR
+  </button>`
         );
       }
       // Inject the _syncFromApis function so the button actually works
@@ -616,6 +660,38 @@ async function _importCsvHours(input) {
     if (lbl) { lbl.textContent = orig; lbl.style.pointerEvents = ''; lbl.style.opacity = ''; }
   }
   input.value = '';
+}
+async function _syncNdr() {
+  const btn = document.getElementById('ndrSyncBtn');
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '↻ Fetching…';
+  let pollTimer = null;
+  function startPolling() {
+    pollTimer = setInterval(async () => {
+      try {
+        const s = await fetch('/api/ndr-sync-status').then(r => r.json());
+        if (s.running) {
+          btn.textContent = '↻ ' + (s.step || '…');
+        } else if (s.step === 'complete') {
+          clearInterval(pollTimer);
+          btn.textContent = '✓ NDR synced — reloading…';
+          setTimeout(() => location.reload(), 800);
+        } else if (s.error) {
+          clearInterval(pollTimer);
+          alert('NDR sync failed: ' + s.error);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      } catch (_) {}
+    }, 1500);
+  }
+  try {
+    await fetch('/api/sync-ndr', { method: 'POST' });
+    startPolling();
+  } catch (e) {
+    alert('NDR sync error: ' + e.message);
+    btn.textContent = orig; btn.disabled = false;
+  }
 }
 </script></body>`);
     }
@@ -907,6 +983,35 @@ app.get('/api/ndr-status', (req, res) => {
   const months = Object.keys(ndr).sort();
   const lastKey = months[months.length - 1] || null;
   res.json({ ok: true, months, lastMonth: lastKey });
+});
+
+/** Fetch fresh NDR data from published Google Sheets CSVs and update snapshot */
+let ndrSyncState = { running: false, step: 'idle', error: null };
+
+app.get('/api/ndr-sync-status', (req, res) => res.json(ndrSyncState));
+
+app.post('/api/sync-ndr', (req, res) => {
+  if (ndrSyncState.running) return res.json({ ok: true, alreadyRunning: true });
+  ndrSyncState = { running: true, step: 'Starting…', error: null };
+  res.json({ ok: true, started: true });
+
+  console.log('\n⟳  NDR sync triggered…');
+  (async () => {
+    try {
+      const snapshot = await fetchNdrSnapshot((msg) => {
+        ndrSyncState.step = msg;
+      });
+      fs.mkdirSync(path.dirname(NDR_FILE), { recursive: true });
+      fs.writeFileSync(NDR_FILE, JSON.stringify(snapshot, null, 2));
+      const months = Object.keys(snapshot).sort();
+      console.log(`✓  NDR sync complete — ${months.length} months`);
+      ndrSyncState = { running: false, step: 'complete', error: null, months };
+    } catch (err) {
+      const msg = err?.message || String(err);
+      console.error('NDR sync failed:', msg);
+      ndrSyncState = { running: false, step: 'error', error: msg };
+    }
+  })();
 });
 
 /** Save user overrides (devHoursPurchased, devPaidManual, excluded, etc.) */
