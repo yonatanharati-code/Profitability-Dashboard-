@@ -869,6 +869,7 @@ tr.selected-row{background:var(--teal-50) !important;}
       <div id="ndrClientKpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
       <div class="chart-wrap xl"><canvas id="cNdrClientTrend"></canvas></div>
       <div id="ndrClientTable" style="margin-top:16px;overflow-x:auto;"></div>
+      <div id="ndrClientDeals" style="margin-top:20px;"></div>
     </div></div>
   </div>
 
@@ -4547,14 +4548,15 @@ function renderNdrSpikes(data, months) {
       const dealDate = new Date(d.d);
       const spikeDate = new Date(sp.month + '-15');
       const diff = (spikeDate - dealDate) / (1000*60*60*24);
-      return diff >= -30 && diff <= 120; // deal closed 30 days after or up to 4 months before spike
+      return diff >= -60 && diff <= 180; // deal closed 60 days after or up to 6 months before spike
     });
+    const stageLabel = s => s === '512617702' ? '<span style="color:#95D600;font-weight:700;">✓ Closed Won</span>' : '<span style="color:#F4A261;font-weight:600;">Commit</span>';
     const dealHtml = deals.length
-      ? deals.map(d => `<div style="margin-top:6px;padding:6px 8px;background:rgba(33,158,188,.08);border:1px solid rgba(33,158,188,.2);border-radius:6px;font-size:11px;">
-          <div style="font-weight:600;color:var(--text);">${escapeHtml(d.n)}</div>
-          <div style="color:var(--text-secondary);margin-top:2px;">${d.d} · ${fmtMoney(d.a)} · <span style="color:#95D600;">${d.s}</span>${d.t?' · '+d.t:''}</div>
-        </div>`).join('')
-      : `<div style="margin-top:6px;font-size:11px;color:var(--text-secondary);font-style:italic;">No HubSpot deal found within ±4 months. May be organic growth or billing cycle.</div>`;
+      ? deals.map(d => '<div style="margin-top:6px;padding:6px 8px;background:rgba(33,158,188,.08);border:1px solid rgba(33,158,188,.2);border-radius:6px;font-size:11px;">'
+          + '<div style="font-weight:600;color:var(--text);">'+escapeHtml(d.n)+'</div>'
+          + '<div style="color:var(--text-secondary);margin-top:2px;">'+(d.d?d.d.slice(0,10):'—')+' · <strong>'+fmtMoney(d.a)+'</strong> · '+stageLabel(d.s)+(d.t?' · <em>'+escapeHtml(d.t)+'</em>':'')+'</div>'
+          + '</div>').join('')
+      : '<div style="margin-top:6px;font-size:11px;color:var(--text-secondary);font-style:italic;">No HubSpot deal found within ±6 months. May be organic growth or billing cycle.</div>';
 
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">
@@ -4806,6 +4808,70 @@ window.renderNdrClientDrilldown = function() {
     `<td style="padding:6px 12px;font-size:12px;text-align:${c.al||'right'};font-weight:${c.key!=='monthLabel'?'600':'400'};color:${drillColor(c.key,r[c.key])};">${drillFmt(c.key,r[c.key])}</td>`
   ).join('')}</tr>`;
   _registerTable('ndrClientTable', drillRows, drillCols, drillRowFn, 'month', -1);
+
+  // ── HubSpot Deals panel ────────────────────────────────────────────────────
+  const dealsEl = document.getElementById('ndrClientDeals');
+  if (dealsEl) {
+    const hsCust = getNdrHsCustomer(client);
+    const hsDeals = (hsCust?.hsDeals || []).slice().sort((a,b)=>{
+      const da = new Date(a.d||''), db = new Date(b.d||'');
+      return db - da; // newest first
+    });
+
+    const portalId = (typeof HS_PORTAL_ID !== 'undefined') ? HS_PORTAL_ID : '';
+    const portalDomain = (typeof HS_PORTAL_DOMAIN !== 'undefined') ? HS_PORTAL_DOMAIN : '';
+
+    const dealUrl = (id) => portalDomain && portalId && id
+      ? 'https://' + portalDomain + '/contacts/' + portalId + '/deal/' + id
+      : null;
+
+    const typeBadge = (t) => {
+      const map = { renewal:'#219EBC', upsell:'#95D600', dev:'#F4A261', nrr:'#8B5CF6' };
+      const col = map[t] || '#667085';
+      return '<span style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:'+col+';background:'+col+'22;border-radius:3px;padding:1px 5px;">'+escapeHtml(t||'deal')+'</span>';
+    };
+
+    let dealsBody;
+    if (!hsDeals.length) {
+      dealsBody = hsCust
+        ? '<p style="font-size:12px;color:var(--text-secondary);margin:0;">No HubSpot deals found for <strong>'+escapeHtml(hsCust.name)+'</strong> in the CSM pipeline.</p>'
+        : '<p style="font-size:12px;color:var(--text-secondary);margin:0;">Could not match <strong>'+escapeHtml(client)+'</strong> to a HubSpot company. Check name mapping.</p>';
+    } else {
+      dealsBody = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
+        + '<thead><tr style="border-bottom:2px solid var(--border);">'
+        + '<th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);">Deal</th>'
+        + '<th style="padding:6px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);">Type</th>'
+        + '<th style="padding:6px 12px;text-align:right;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);">Amount (USD)</th>'
+        + '<th style="padding:6px 12px;text-align:right;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);">Close Date</th>'
+        + '<th style="padding:6px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);">Stage</th>'
+        + '</tr></thead><tbody>'
+        + hsDeals.map(d => {
+            const url = dealUrl(d.id);
+            const nameCell = url
+              ? '<a href="'+url+'" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'+escapeHtml(d.n||'—')+' <svg style="width:10px;height:10px;opacity:.4;vertical-align:middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>'
+              : '<span style="font-weight:600;">'+escapeHtml(d.n||'—')+'</span>';
+            const isWon = d.s === '512617702' || (d.s||'').toLowerCase().includes('won');
+            const stageLabel = isWon ? '<span style="color:#95D600;font-weight:700;">✓ Won</span>' : '<span style="color:#F4A261;font-weight:600;">Commit</span>';
+            const closeDate = d.d ? d.d.slice(0,10) : '—';
+            return '<tr style="border-bottom:1px solid var(--border);">'
+              + '<td style="padding:7px 12px;">'+nameCell+'</td>'
+              + '<td style="padding:7px 12px;text-align:center;">'+typeBadge(d.t)+'</td>'
+              + '<td style="padding:7px 12px;text-align:right;font-weight:700;color:'+(d.a>20000?'#95D600':'var(--text)')+';">'+(d.a?fmtMoney(d.a):'—')+'</td>'
+              + '<td style="padding:7px 12px;text-align:right;color:var(--text-secondary);">'+closeDate+'</td>'
+              + '<td style="padding:7px 12px;text-align:center;">'+stageLabel+'</td>'
+              + '</tr>';
+          }).join('')
+        + '</tbody></table></div>'
+        + '<p style="font-size:11px;color:var(--text-secondary);margin:8px 0 0;">Matched to HubSpot: <strong>'+escapeHtml(hsCust.name)+'</strong> · '
+        + hsDeals.length+' deal'+(hsDeals.length!==1?'s':'')+' · Total: '
+        + fmtMoney(hsDeals.reduce((s,d)=>s+(d.a||0),0))+'</p>';
+    }
+
+    dealsEl.innerHTML = '<div style="margin-top:4px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px;">HubSpot Deals (CSM Pipeline)</div>'
+      + dealsBody
+      + '</div>';
+  }
 };
 
 window.renderNdrRanking = function() {
