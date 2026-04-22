@@ -780,12 +780,15 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section-head">
       <div>
         <div class="section-title">Best &amp; Worst Performers</div>
-        <div class="section-desc" id="ndrTopDesc">YTD — top 10 and bottom 10 clients</div>
+        <div class="section-desc" id="ndrTopDesc"></div>
       </div>
-      <div class="seg" id="ndrTopSeg">
-        <button class="seg-btn active" data-tb="profit_pct" onclick="window.renderNdrTopBottom(this,'profit_pct')">Margin %</button>
-        <button class="seg-btn" data-tb="profit" onclick="window.renderNdrTopBottom(this,'profit')">Profit $</button>
-        <button class="seg-btn" data-tb="income" onclick="window.renderNdrTopBottom(this,'income')">Income $</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <select id="ndrTopMonthSel" onchange="window.renderNdrTopBottom(null,null)" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;"></select>
+        <div class="seg" id="ndrTopSeg">
+          <button class="seg-btn active" data-tb="profit_pct" onclick="window.renderNdrTopBottom(this,'profit_pct')">Margin %</button>
+          <button class="seg-btn" data-tb="profit" onclick="window.renderNdrTopBottom(this,'profit')">Profit $</button>
+          <button class="seg-btn" data-tb="income" onclick="window.renderNdrTopBottom(this,'income')">Income $</button>
+        </div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
@@ -4377,14 +4380,38 @@ function renderNdrInsights(data, months, clientNdrs) {
 // ── Top 10 / Bottom 10 ────────────────────────────────────────────────────────
 let _ndrTopMetric = 'profit_pct';
 window.renderNdrTopBottom = function(btnEl, metric, dataArg, monthsArg) {
-  const data   = dataArg   || window.NDR_DATA; if (!data) return;
-  const months = monthsArg || _filteredNdrMonths();
+  const data        = dataArg   || window.NDR_DATA; if (!data) return;
+  const periodMonths = monthsArg || _filteredNdrMonths();
   if (metric) _ndrTopMetric = metric;
   if (btnEl) {
     document.querySelectorAll('#ndrTopSeg .seg-btn').forEach(b => b.classList.remove('active'));
     btnEl.classList.add('active');
   }
 
+  // ── Populate month selector (first time or when period changes) ───────────
+  const sel = document.getElementById('ndrTopMonthSel');
+  if (sel) {
+    const thisYear = String(new Date().getFullYear());
+    const ytdMonths = periodMonths.filter(mk => mk.startsWith(thisYear));
+    const prevVal   = sel.value;
+    sel.innerHTML =
+      `<option value="__period__">Full period</option>` +
+      (ytdMonths.length > 1 ? `<option value="__ytd__">YTD ${thisYear}</option>` : '') +
+      periodMonths.map(mk => `<option value="${mk}">${_fmtMk(mk)}</option>`).join('');
+    // Restore selection if still valid, else default to full period
+    if ([...sel.options].some(o => o.value === prevVal)) sel.value = prevVal;
+    else sel.value = '__period__';
+  }
+
+  // ── Determine which months to aggregate ──────────────────────────────────
+  const selVal = sel?.value || '__period__';
+  const thisYear = String(new Date().getFullYear());
+  let months;
+  if (selVal === '__period__')   months = periodMonths;
+  else if (selVal === '__ytd__') months = periodMonths.filter(mk => mk.startsWith(thisYear));
+  else                           months = periodMonths.includes(selVal) ? [selVal] : periodMonths;
+
+  // ── Aggregate ─────────────────────────────────────────────────────────────
   const clientTotals = {};
   for (const mk of months) {
     for (const r of (data[mk]||[])) {
@@ -4394,29 +4421,36 @@ window.renderNdrTopBottom = function(btnEl, metric, dataArg, monthsArg) {
       clientTotals[r.client].profit += r.profit;
     }
   }
-  const rows = Object.values(clientTotals).map(c => ({ ...c, profit_pct: c.income>0?c.profit/c.income*100:0, owner: getNdrOwner(c.client) }));
+  const rows = Object.values(clientTotals).map(c => ({
+    ...c,
+    profit_pct: c.income > 0 ? c.profit/c.income*100 : 0,
+    owner: getNdrOwner(c.client),
+  }));
   const sortedDesc = [...rows].sort((a,b) => b[_ndrTopMetric] - a[_ndrTopMetric]);
   const top10 = sortedDesc.slice(0, 10);
   const bot10 = sortedDesc.slice(-10);
 
   const cols = [
-    { key:'client',     label:'Client',    al:'left' },
-    { key:'owner',      label:'Owner',     al:'left' },
+    { key:'client',     label:'Client',   al:'left' },
+    { key:'owner',      label:'Owner',    al:'left' },
     { key:'income',     label:'Income'  },
     { key:'profit',     label:'Profit'  },
     { key:'profit_pct', label:'Margin %'},
   ];
   const fmtV = (k, v) => k==='profit_pct' ? v.toFixed(1)+'%' : k==='client'||k==='owner' ? escapeHtml(v||'—') : fmtMoney(v);
-  const colr = (k, v) => k==='profit_pct'||k==='profit' ? (v>=60||v>=0?'#95D600':'#E4A8A0') : 'var(--text)';
-  const rowFn = (r,i) => `<tr style="border-bottom:1px solid var(--border);">` +
+  const colr = (k, v) => (k==='profit_pct'||k==='profit') ? (v>=0?'#95D600':'#E4A8A0') : 'var(--text)';
+  const rowFn = (r) => `<tr style="border-bottom:1px solid var(--border);">` +
     cols.map(c => `<td style="padding:6px 10px;font-size:12px;text-align:${c.al||'right'};${c.key!=='client'&&c.key!=='owner'?'font-weight:600;color:'+colr(c.key,r[c.key])+';':''}">${fmtV(c.key,r[c.key])}</td>`).join('') +
     `</tr>`;
 
   _registerTable('ndrTop10Table', top10, cols, rowFn, _ndrTopMetric, -1);
   _registerTable('ndrBot10Table', bot10, cols, rowFn, _ndrTopMetric, 1);
 
+  const rangeLabel = months.length === 1 ? _fmtMk(months[0]) :
+    selVal === '__ytd__' ? 'YTD ' + thisYear :
+    months.map(_fmtMk).join(' – ');
   const desc = document.getElementById('ndrTopDesc');
-  if (desc) desc.textContent = 'Period: ' + months.map(_fmtMk).join(' – ');
+  if (desc) desc.textContent = rangeLabel + ' · top & bottom 10 by ' + (_ndrTopMetric==='profit_pct'?'margin %':_ndrTopMetric==='profit'?'profit $':'income $');
 };
 
 // ── Per-client NDR heatmap table ─────────────────────────────────────────────
