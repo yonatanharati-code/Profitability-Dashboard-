@@ -4422,11 +4422,16 @@ window.renderNdrTopBottom = function(btnEl, metric, dataArg, monthsArg) {
       clientTotals[r.client].profit += r.profit;
     }
   }
-  const rows = Object.values(clientTotals).map(c => ({
-    ...c,
-    profit_pct: c.income > 0 ? c.profit/c.income*100 : 0,
-    owner: getNdrOwner(c.client),
-  }));
+  // Minimum income threshold: exclude clients too small to be meaningful in ranking
+  // (avg < $5K/month across selected period, or total < $5K for single-month views)
+  const minIncome = Math.max(5000, months.length * 2000);
+  const rows = Object.values(clientTotals)
+    .filter(c => c.income >= minIncome)
+    .map(c => ({
+      ...c,
+      profit_pct: c.income > 0 ? c.profit/c.income*100 : 0,
+      owner: getNdrOwner(c.client),
+    }));
   const sortedDesc = [...rows].sort((a,b) => b[_ndrTopMetric] - a[_ndrTopMetric]);
   const top10 = sortedDesc.slice(0, 10);
   const bot10 = sortedDesc.slice(-10);
