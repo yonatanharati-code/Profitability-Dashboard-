@@ -312,15 +312,14 @@ function injectData(html, cache, csvHours) {
     style="background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.3);color:#818cf8;margin-left:6px;">
     ⟳ Sync HubSpot + ClickUp
   </button>` +
-      // ── Hidden file input ──
+      // ── Import CSV Hours — use <label for="input"> so the file picker opens
+      //    natively without JS .click() (which gets blocked by some browsers) ──
       `\n  <input type="file" id="csvHoursInput" accept=".csv" style="display:none"
     onchange="_importCsvHours(this)">` +
-      // ── Import CSV Hours button ──
-      `\n  <button class="import-btn" id="csvHoursBtn"
-    onclick="document.getElementById('csvHoursInput').click()"
-    style="background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.3);color:#34d399;margin-left:6px;"${csvStatus}>
+      `\n  <label for="csvHoursInput" id="csvHoursBtn" class="import-btn"
+    style="background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.3);color:#34d399;margin-left:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"${csvStatus}>
     📂 Import Hours CSV${csvHours ? ' ✓' : ''}
-  </button>`
+  </label>`
     );
   }
 
@@ -452,9 +451,10 @@ async function _syncFromApis() {
 async function _importCsvHours(input) {
   const file = input.files[0];
   if (!file) return;
-  const btn = document.getElementById('csvHoursBtn');
-  const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = '⏳ Importing…';
+  const lbl = document.getElementById('csvHoursBtn');
+  const orig = lbl ? lbl.textContent : '';
+  // Disable label during upload (pointer-events works on label elements)
+  if (lbl) { lbl.style.pointerEvents = 'none'; lbl.style.opacity = '0.6'; lbl.textContent = '⏳ Importing…'; }
   try {
     const text = await file.text();
     const r    = await fetch('/api/import-hours', {
@@ -464,15 +464,15 @@ async function _importCsvHours(input) {
     });
     const j = await r.json();
     if (j.ok) {
-      btn.textContent = '✓ ' + j.parsed + ' rows — reloading…';
+      if (lbl) lbl.textContent = '✓ ' + j.parsed + ' rows — reloading…';
       setTimeout(() => location.reload(), 800);
     } else {
       alert('Import failed: ' + (j.error || 'unknown'));
-      btn.textContent = orig; btn.disabled = false;
+      if (lbl) { lbl.textContent = orig; lbl.style.pointerEvents = ''; lbl.style.opacity = ''; }
     }
   } catch (e) {
     alert('Import error: ' + e.message);
-    btn.textContent = orig; btn.disabled = false;
+    if (lbl) { lbl.textContent = orig; lbl.style.pointerEvents = ''; lbl.style.opacity = ''; }
   }
   input.value = '';
 }
