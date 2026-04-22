@@ -323,21 +323,19 @@ async function refreshAll(onProgress = () => {}, opts = {}) {
   const idToName = Object.fromEntries(customers.map((c) => [c.id, c.name]));
 
   // ── Stream ClickUp time entries — skipped when hubspotOnly=true ─────────────
+  let unmatched = 0;
+  let totalEntries = 0;
+  const typeCount   = { cs: 0, sa: 0, dev: 0, bug: 0 };
+  const userTypeMap = {};
+  const unmatchedNames = {};
+  const userHours = {};
+
   if (hubspotOnly) {
     onProgress({ step: 'HubSpot synced — hours will come from CSV upload ✓' });
     console.log('   ↷  ClickUp skipped (hubspotOnly mode — hours sourced from CSV)');
   } else {
   onProgress({ step: 'HubSpot done — fetching ClickUp…' });
   const now = Date.now();
-  let unmatched = 0;
-  let totalEntries = 0;
-  const typeCount   = { cs: 0, sa: 0, dev: 0, bug: 0 };
-  const userTypeMap = {};
-  // Collect unmatched candidate names for diagnostics (capped at 300)
-  const unmatchedNames = {};
-  // Per-user per-customer monthly hours — powers the "by person" chart in the Effort tab.
-  // Structure: userHours[displayName] = { type, customers: { customerId: { monthly: { 'YYYY-MM': h } } } }
-  const userHours = {};
 
   const SKIP_NAMES = new Set([
     'Sprint Folder', 'Customer Management', 'General Meetings',
