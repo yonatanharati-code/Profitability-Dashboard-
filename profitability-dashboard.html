@@ -1858,7 +1858,7 @@ function chartMonthlyStack(){
   const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
   const months = monthIdxs.map(i=>ALL_MONTHS[i]);
   const labels  = monthIdxs.map(i=>ALL_MLABELS[i]);
-  const sum = l => months.map(m => AD().reduce((s,c)=>s+(c[l]?.monthly?.[m]||0),0));
+  const sum = l => state.hiddenLayers.includes(l) ? months.map(()=>0) : months.map(m => AD().reduce((s,c)=>s+(c[l]?.monthly?.[m]||0),0));
   const opts = baseOpts();
   opts.scales.x.stacked = true; opts.scales.y.stacked = true;
   opts.scales.y.ticks.callback = v => v+'h';
@@ -1887,10 +1887,18 @@ function chartCustStack(){
   const labels    = monthIdxs.map(i=>ALL_MLABELS[i]);
   const N = parseInt(document.getElementById('custStackTop')?.value || '15');
 
-  // Total hours per customer across visible months
+  // Helper: total active-type hours for one customer in one month key
+  const hl = state.hiddenLayers;
+  const mh = (c, mk) =>
+    (hl.includes('cs')  ? 0 : (c.cs?.monthly?.[mk]  || 0)) +
+    (hl.includes('sa')  ? 0 : (c.sa?.monthly?.[mk]  || 0)) +
+    (hl.includes('dev') ? 0 : (c.dev?.monthly?.[mk] || 0)) +
+    (hl.includes('bug') ? 0 : (c.bug?.monthly?.[mk] || 0));
+
+  // Total hours per customer across visible months (respects hidden layers)
   const custTotals = AD().map(c => ({
     c,
-    total: months.reduce((s,m) => s + (c.cs?.monthly?.[m]||0) + (c.sa?.monthly?.[m]||0) + (c.dev?.monthly?.[m]||0) + (c.bug?.monthly?.[m]||0), 0),
+    total: months.reduce((s,m) => s + mh(c, m), 0),
   })).filter(x => x.total > 0).sort((a,b) => b.total - a.total);
 
   const top    = custTotals.slice(0, N);
@@ -1910,10 +1918,7 @@ function chartCustStack(){
 
   const datasets = top.map((x, i) => ({
     label: x.c.name.length > 20 ? x.c.name.slice(0, 19) + '…' : x.c.name,
-    data: months.map(m => {
-      const c = x.c;
-      return Math.round(((c.cs?.monthly?.[m]||0) + (c.sa?.monthly?.[m]||0) + (c.dev?.monthly?.[m]||0) + (c.bug?.monthly?.[m]||0)) * 10) / 10;
-    }),
+    data: months.map(m => Math.round(mh(x.c, m) * 10) / 10),
     backgroundColor: CUSTOMER_PALETTE[i % CUSTOMER_PALETTE.length],
     borderRadius: 2, maxBarThickness: 60,
   }));
@@ -1921,12 +1926,7 @@ function chartCustStack(){
   if (others.length) {
     datasets.push({
       label: `Others (${others.length})`,
-      data: months.map(m => {
-        return Math.round(others.reduce((s,x) => {
-          const c = x.c;
-          return s + (c.cs?.monthly?.[m]||0) + (c.sa?.monthly?.[m]||0) + (c.dev?.monthly?.[m]||0) + (c.bug?.monthly?.[m]||0);
-        }, 0) * 10) / 10;
-      }),
+      data: months.map(m => Math.round(others.reduce((s,x) => s + mh(x.c, m), 0) * 10) / 10),
       backgroundColor: '#cccccc', borderRadius: 2, maxBarThickness: 60,
     });
   }

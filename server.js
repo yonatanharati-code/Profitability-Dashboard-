@@ -273,8 +273,12 @@ function injectData(html, cache, csvHours) {
     const uhOpen = uhStart + UH_MARKER.length - 1;
     const uhEnd  = findBlockEnd(html, uhOpen, '{', '}');
     if (uhEnd !== -1) {
+      // Prefer CSV userHours (more complete — has per-user detail from export)
+      const uhData = (csvHours?.userHours && Object.keys(csvHours.userHours).length > 0)
+        ? csvHours.userHours
+        : (cache.userHours || {});
       html = html.slice(0, uhStart) +
-             `const USER_HOURS=${JSON.stringify(cache.userHours || {})}` +
+             `const USER_HOURS=${JSON.stringify(uhData)}` +
              html.slice(uhEnd + 1);
     }
   }
@@ -818,7 +822,7 @@ app.post('/api/import-hours', (req, res) => {
     }
 
     console.log(`\n📂  Importing hours CSV: ${filename} (${(csv.length / 1024).toFixed(1)} KB)`);
-    const { hours, parsed, skipped } = parseCsvHours(csv);
+    const { hours, userHours, parsed, skipped } = parseCsvHours(csv);
     const customers = Object.keys(hours);
 
     // CSV upload is now the sole source of hours — zero out any API-synced hours in
@@ -838,6 +842,7 @@ app.post('/api/import-hours', (req, res) => {
 
     const payload = {
       hours,
+      userHours,
       meta: { parsed, skipped, customers: customers.length, importedAt: new Date().toISOString(), filename },
     };
 

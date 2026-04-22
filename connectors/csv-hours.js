@@ -120,6 +120,9 @@ function parseCsvHours(csvText) {
     console.warn('   ⚠ "Customer" column not found in CSV — falling back to list/task name matching');
   }
 
+  // Per-user per-customer monthly hours — powers the "Hours by Person" chart
+  const userHours = {};
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
@@ -174,6 +177,17 @@ function parseCsvHours(csvText) {
       result[customer][type].m6 += durationMs / 3_600_000;
     }
     parsed++;
+
+    // ── Per-user tracking ─────────────────────────────────────────────────────
+    const username = (cols[COL.username] || '').trim() || String(userId);
+    if (username && startMs > 0) {
+      if (!userHours[username]) userHours[username] = { type: baseType, customers: {} };
+      const uc = userHours[username].customers;
+      if (!uc[customer]) uc[customer] = { name: customer, monthly: {} };
+      const d  = new Date(startMs);
+      const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      uc[customer].monthly[mk] = Math.round(((uc[customer].monthly[mk] || 0) + durationMs / 3_600_000) * 10) / 10;
+    }
   }
 
   // Round all buckets
@@ -184,8 +198,8 @@ function parseCsvHours(csvText) {
     roundBucket(buckets.bug);
   }
 
-  console.log(`   CSV parsed: ${parsed} rows, ${skipped} skipped (outside range/no customer), ${skippedUser} skipped (user not in USER_TYPES)`);
-  return { hours: result, parsed, skipped, format };
+  console.log(`   CSV parsed: ${parsed} rows, ${skipped} skipped (outside range/no customer), ${skippedUser} skipped (user not in USER_TYPES), ${Object.keys(userHours).length} people tracked`);
+  return { hours: result, userHours, parsed, skipped, format };
 }
 
 module.exports = { parseCsvHours };
