@@ -4008,7 +4008,7 @@ function generateNdrInsights(data, months, clientNdrs) {
   if (atRisk.length)
     insights.push({ icon: '⚠️', type: 'risk',
       title: `${atRisk.length} at-risk client${atRisk.length>1?'s':''} — declining 2+ months`,
-      body: `${atRisk.slice(0,4).map(c=>`<strong>${c}</strong>`).join(', ')}${atRisk.length>4?` +${atRisk.length-4} more`:''} showed income contraction (>10%) for 2+ of the last 3 months. Prioritise retention conversation.` });
+      body: atRisk.slice(0,4).map(c=>'<strong>'+c+'</strong>').join(', ') + (atRisk.length>4?' +'+(atRisk.length-4)+' more':'') + ' showed income contraction (>10%) for 2+ of the last 3 months. Prioritise retention conversation.' });
 
   // 6. Growth stars (2+ consecutive months growing >15%)
   const stars = Object.entries(clientNdrs).filter(([, cd]) => {
@@ -4018,7 +4018,7 @@ function generateNdrInsights(data, months, clientNdrs) {
   if (stars.length)
     insights.push({ icon: '🚀', type: 'positive',
       title: `${stars.length} high-growth client${stars.length>1?'s':''} — expanding 2+ months`,
-      body: `${stars.slice(0,4).map(c=>`<strong>${c}</strong>`).join(', ')}${stars.length>4?` +${stars.length-4} more':''} grew revenue >15% for 2+ consecutive months. Strong upsell signal — consider proactive QBR.` });
+      body: stars.slice(0,4).map(c=>'<strong>'+c+'</strong>').join(', ') + (stars.length>4?' +'+(stars.length-4)+' more':'') + ' grew revenue >15% for 2+ consecutive months. Strong upsell signal — consider proactive QBR.' });
 
   // 7. Low-margin high-revenue opportunity
   const lowMrg = lastRows.filter(r=>r.income>10000 && r.profit_pct>0 && r.profit_pct<30).sort((a,b)=>b.income-a.income);
@@ -4196,7 +4196,7 @@ function initNdrTab() {
     { label: 'YTD Income',                 value: fmtMoney(ytdIncome), color: '#219EBC', sub: `Margin ${ytdMargin.toFixed(1)}%` },
     { label: 'YTD Profit',                 value: fmtMoney(ytdProfit), color: ytdProfit>=0?'#95D600':'#E4A8A0', sub: `Cost ${fmtMoney(ytdCost)}` },
     { label: 'NDR Month-over-Month', value: momNdr !== null ? momNdr.toFixed(1)+'%' : '—', color: momColor,
-      sub: momNdr !== null ? `${_fmtMk(months[months.length-2])} → ${_fmtMk(lastMk)}`, tip: momTip },
+      sub: momNdr !== null ? (_fmtMk(months[months.length-2]) + ' → ' + _fmtMk(lastMk)) : '', tip: momTip },
     { label: `NDR YTD (${_fmtMk(months[0])} cohort)`, value: ytdNdr !== null ? ytdNdr.toFixed(1)+'%' : '—', color: ytdColor,
       sub: ytdNdr !== null ? `${_fmtMk(months[0])} → ${_fmtMk(lastMk)} · same clients` : 'Need 2+ months', tip: ytdTip },
   ];
