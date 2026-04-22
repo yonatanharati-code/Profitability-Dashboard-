@@ -728,6 +728,17 @@ tr.selected-row{background:var(--teal-50) !important;}
   <!-- KPI row -->
   <div class="kpi-row" id="ndrKpiRow" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;"></div>
 
+  <!-- FP&A Insights -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">FP&amp;A Insights</div>
+        <div class="section-desc">Auto-generated analysis from your revenue data · updated on sync</div>
+      </div>
+    </div>
+    <div id="ndrInsightsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;"></div>
+  </div>
+
   <!-- Monthly trend -->
   <div class="section">
     <div class="section-head">
@@ -741,12 +752,61 @@ tr.selected-row{background:var(--teal-50) !important;}
     </div></div>
   </div>
 
+  <!-- Top 10 / Bottom 10 -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Best &amp; Worst Performers</div>
+        <div class="section-desc" id="ndrTopDesc">YTD — top 10 and bottom 10 clients</div>
+      </div>
+      <div class="seg" id="ndrTopSeg">
+        <button class="seg-btn active" data-tb="profit_pct" onclick="window.renderNdrTopBottom(this,'profit_pct')">Margin %</button>
+        <button class="seg-btn" data-tb="profit" onclick="window.renderNdrTopBottom(this,'profit')">Profit $</button>
+        <button class="seg-btn" data-tb="income" onclick="window.renderNdrTopBottom(this,'income')">Income $</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div class="card"><div class="card-body">
+        <div style="font-size:11px;font-weight:700;color:#95D600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">▲ Top 10</div>
+        <div id="ndrTop10Table"></div>
+      </div></div>
+      <div class="card"><div class="card-body">
+        <div style="font-size:11px;font-weight:700;color:#E4A8A0;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">▼ Bottom 10</div>
+        <div id="ndrBot10Table"></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Client NDR table -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Net Revenue Retention — Per Client</div>
+        <div class="section-desc">Month-over-month income retention %. Green = growth, orange = mild contraction, red = decline</div>
+      </div>
+    </div>
+    <div class="card"><div class="card-body" style="overflow-x:auto;">
+      <div id="ndrClientNdrTable"></div>
+    </div></div>
+  </div>
+
+  <!-- Revenue Spikes vs Deals -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Revenue Spikes &amp; Deal Correlation</div>
+        <div class="section-desc">Months where an existing client's income jumped ≥25% — correlated with HubSpot deals closed near that date</div>
+      </div>
+    </div>
+    <div id="ndrSpikesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
+  </div>
+
   <!-- Owner Analysis -->
   <div class="section">
     <div class="section-head">
       <div>
         <div class="section-title">Revenue by Account Owner</div>
-        <div class="section-desc" id="ndrOwnerDesc">Income, cost &amp; profit grouped by CSM / account owner</div>
+        <div class="section-desc">Income, cost, profit &amp; NDR grouped by CSM / account owner</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <label style="font-size:11px;color:var(--text-secondary);">Month</label>
@@ -799,7 +859,7 @@ tr.selected-row{background:var(--teal-50) !important;}
       </div>
     </div>
     <div class="card"><div class="card-body">
-      <div class="chart-wrap" style="height:520px"><canvas id="cNdrRanking"></canvas></div>
+      <div class="chart-wrap" style="height:540px"><canvas id="cNdrRanking"></canvas></div>
     </div></div>
   </div>
 
@@ -3828,6 +3888,164 @@ function fmtMoney(v) {
 // Short month label
 const _fmtMk = mk => { const [y,m] = mk.split('-'); return ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m] + ' ' + y.slice(2); };
 
+// ── NDR analytics helpers ────────────────────────────────────────────────────
+
+// YTD NDR: revenue from first-month cohort now vs then
+function calcYtdNdr(data, months) {
+  if (months.length < 2) return null;
+  const first = months[0], last = months[months.length-1];
+  const firstMap = new Map((data[first]||[]).map(r => [r.client, r.income]));
+  let base = 0, curr = 0;
+  for (const r of (data[last]||[])) {
+    if (firstMap.has(r.client)) { base += firstMap.get(r.client); curr += r.income; }
+  }
+  return base > 0 ? curr/base*100 : null;
+}
+
+// Per-client NDR: MoM % and YTD % for every client
+function calcClientNdrs(data, months) {
+  const allClients = [...new Set(months.flatMap(mk => (data[mk]||[]).map(r => r.client)))];
+  const result = {};
+  for (const client of allClients) {
+    const incomes = {};
+    for (const mk of months) {
+      const r = (data[mk]||[]).find(x => x.client === client);
+      if (r) incomes[mk] = r.income;
+    }
+    const momNdrs = {};
+    for (let i = 1; i < months.length; i++) {
+      const p = months[i-1], c = months[i];
+      if (incomes[p] > 0 && incomes[c] !== undefined) momNdrs[c] = incomes[c]/incomes[p]*100;
+    }
+    const withData = months.filter(mk => incomes[mk] !== undefined);
+    let ytdNdr = null;
+    if (withData.length >= 2) {
+      const f = withData[0], l = withData[withData.length-1];
+      if (incomes[f] > 0) ytdNdr = incomes[l]/incomes[f]*100;
+    }
+    result[client] = { incomes, momNdrs, ytdNdr };
+  }
+  return result;
+}
+
+// Detect income spikes (≥25% and ≥$5K delta on existing clients)
+function detectSpikes(data, months) {
+  const spikes = [];
+  for (let i = 1; i < months.length; i++) {
+    const prev = months[i-1], curr = months[i];
+    const prevMap = new Map((data[prev]||[]).map(r => [r.client, r.income]));
+    for (const r of (data[curr]||[])) {
+      const prevInc = prevMap.get(r.client);
+      if (prevInc > 0) {
+        const delta = r.income - prevInc, pct = delta/prevInc;
+        if (pct >= 0.25 && delta >= 5000)
+          spikes.push({ client: r.client, month: curr, prevMonth: prev, income: r.income, prevIncome: prevInc, delta, pct });
+      }
+    }
+  }
+  return spikes.sort((a,b) => b.delta - a.delta);
+}
+
+// Match NDR client to a HubSpot DATA entry (for deal lookup)
+function getNdrHsCustomer(clientName) {
+  const ns = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const nc = ns(clientName);
+  if (nc.length < 3) return null;
+  return (window.DATA||[]).find(d => {
+    const nd = ns(d.name);
+    return nd && (nd === nc || (nc.length>=4 && nd.includes(nc)) || (nd.length>=4 && nc.includes(nd)));
+  }) || null;
+}
+
+// Generate FP&A insight cards
+function generateNdrInsights(data, months, clientNdrs) {
+  const insights = [];
+  const last = months[months.length-1], first = months[0];
+  const lastRows = data[last]||[];
+  const totalIncome = lastRows.reduce((s,r)=>s+r.income,0);
+
+  // 1. Revenue trend (last vs 3 months ago)
+  if (months.length >= 3) {
+    const m1 = data[months[months.length-1]].reduce((s,r)=>s+r.income,0);
+    const m3 = data[months[months.length-3]].reduce((s,r)=>s+r.income,0);
+    const t = (m1-m3)/m3*100;
+    insights.push({ icon: t>5?'📈':t<-5?'📉':'➡️', type: t>5?'positive':t<-5?'risk':'neutral',
+      title: `Revenue ${t>5?'growing':t<-5?'declining':'stable'} over 3 months`,
+      body: `${_fmtMk(last)} vs ${_fmtMk(months[months.length-3])}: ${t>0?'+':''}${t.toFixed(1)}%. Current run-rate: <strong>${fmtMoney(m1)}/mo</strong>.` });
+  }
+
+  // 2. YTD NDR interpretation
+  const ytdNdr = calcYtdNdr(data, months);
+  if (ytdNdr !== null) {
+    const good = ytdNdr >= 100;
+    insights.push({ icon: ytdNdr>=110?'🏆':good?'✅':'⚠️', type: ytdNdr>=100?'positive':ytdNdr>=90?'warn':'risk',
+      title: `YTD NDR: ${ytdNdr.toFixed(1)}% (${_fmtMk(first)} → ${_fmtMk(last)})`,
+      body: `${ytdNdr>=110?'Excellent expansion — existing clients are growing without new logo dependency.':ytdNdr>=100?'Positive retention. Slight net expansion from your original cohort.':ytdNdr>=90?'Mild contraction. Some existing clients reduced scope.':'Contraction alert — significant revenue lost from the original cohort.'} Formula: revenue from ${_fmtMk(first)} cohort in ${_fmtMk(last)} ÷ their ${_fmtMk(first)} revenue.` });
+  }
+
+  // 3. Concentration risk
+  const sortedInc = [...lastRows].sort((a,b)=>b.income-a.income);
+  if (sortedInc.length > 0) {
+    const top3Income = sortedInc.slice(0,3).reduce((s,r)=>s+r.income,0);
+    const top3Pct = totalIncome > 0 ? top3Income/totalIncome*100 : 0;
+    if (top3Pct > 35) insights.push({ icon: top3Pct>55?'🚨':'⚡', type: top3Pct>55?'risk':'warn',
+      title: `Concentration: top 3 = ${top3Pct.toFixed(0)}% of revenue`,
+      body: `<strong>${sortedInc.slice(0,3).map(r=>r.client).join(', ')}</strong> together = ${fmtMoney(top3Income)} of ${fmtMoney(totalIncome)} in ${_fmtMk(last)}. ${top3Pct>55?'High single-client dependency — risk if any churns.':'Moderate concentration. Healthy to grow mid-tier clients.'}` });
+  }
+
+  // 4. Negative-margin clients
+  const negClients = lastRows.filter(r=>r.profit<-1000).sort((a,b)=>a.profit-b.profit);
+  if (negClients.length)
+    insights.push({ icon: '🔴', type: 'risk',
+      title: `${negClients.length} client${negClients.length>1?'s':''} with negative margin`,
+      body: `${negClients.slice(0,3).map(r=>`<strong>${r.client}</strong> (${fmtMoney(r.profit)})`).join(', ')}${negClients.length>3?` + ${negClients.length-3} more`:''}. Each is costing more to serve than it generates. Immediate pricing or scope review recommended.` });
+
+  // 5. At-risk clients (2+ consecutive months declining >10%)
+  const atRisk = Object.entries(clientNdrs).filter(([, cd]) => {
+    const recent = months.slice(-3);
+    return recent.slice(1).filter(mk => cd.momNdrs[mk] !== undefined && cd.momNdrs[mk] < 90).length >= 2;
+  }).map(([c]) => c);
+  if (atRisk.length)
+    insights.push({ icon: '⚠️', type: 'risk',
+      title: `${atRisk.length} at-risk client${atRisk.length>1?'s':''} — declining 2+ months`,
+      body: `${atRisk.slice(0,4).map(c=>`<strong>${c}</strong>`).join(', ')}${atRisk.length>4?` +${atRisk.length-4} more`:''} showed income contraction (>10%) for 2+ of the last 3 months. Prioritise retention conversation.` });
+
+  // 6. Growth stars (2+ consecutive months growing >15%)
+  const stars = Object.entries(clientNdrs).filter(([, cd]) => {
+    const recent = months.slice(-3);
+    return recent.slice(1).filter(mk => cd.momNdrs[mk] !== undefined && cd.momNdrs[mk] > 115).length >= 2;
+  }).map(([c]) => c);
+  if (stars.length)
+    insights.push({ icon: '🚀', type: 'positive',
+      title: `${stars.length} high-growth client${stars.length>1?'s':''} — expanding 2+ months`,
+      body: `${stars.slice(0,4).map(c=>`<strong>${c}</strong>`).join(', ')}${stars.length>4?` +${stars.length-4} more':''} grew revenue >15% for 2+ consecutive months. Strong upsell signal — consider proactive QBR.` });
+
+  // 7. Low-margin high-revenue opportunity
+  const lowMrg = lastRows.filter(r=>r.income>10000 && r.profit_pct>0 && r.profit_pct<30).sort((a,b)=>b.income-a.income);
+  if (lowMrg.length)
+    insights.push({ icon: '💡', type: 'opportunity',
+      title: `${lowMrg.length} high-revenue, low-margin client${lowMrg.length>1?'s':''}`,
+      body: `${lowMrg.slice(0,3).map(r=>`<strong>${r.client}</strong> (${r.profit_pct.toFixed(0)}% margin, ${fmtMoney(r.income)} revenue)`).join('; ')}. Pricing adjustments here have outsized P&L impact.` });
+
+  // 8. Owner performance gap
+  const ownerStats = {};
+  for (const r of lastRows) {
+    const o = getNdrOwner(r.client);
+    if (o==='(Unassigned)') continue;
+    if (!ownerStats[o]) ownerStats[o] = { income:0, profit:0 };
+    ownerStats[o].income += r.income; ownerStats[o].profit += r.profit;
+  }
+  const oList = Object.entries(ownerStats).map(([o,v])=>({o, m: v.income>0?v.profit/v.income*100:0, inc: v.income})).filter(x=>x.inc>5000).sort((a,b)=>b.m-a.m);
+  if (oList.length >= 2) {
+    const best = oList[0], worst = oList[oList.length-1];
+    insights.push({ icon: '👤', type: 'neutral',
+      title: `Owner margin spread: ${(best.m-worst.m).toFixed(0)}pp gap`,
+      body: `Best: <strong>${best.o}</strong> at ${best.m.toFixed(0)}% (${fmtMoney(best.inc)} revenue). Lowest: <strong>${worst.o}</strong> at ${worst.m.toFixed(0)}%. Investigate what's driving the gap — pricing, client mix, or cost allocation.` });
+  }
+
+  return insights;
+}
+
 // ── Static NDR client → HubSpot owner map ────────────────────────────────────
 // Keys = NDR client name (exact, case-insensitive). Values = owner name.
 // Built from fuzzy matching + manual verification of all recurring NDR clients.
@@ -3938,19 +4156,20 @@ function initNdrTab() {
   const monthOpts = months.map(mk => `<option value="${mk}">${_fmtMk(mk)}</option>`).join('');
   ['ndrMonthSel', 'ndrOwnerMonthSel'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.innerHTML = monthOpts; el.value = months[months.length - 1]; }
+    if (el) { el.innerHTML = monthOpts; el.value = months[months.length-1]; }
   });
 
   // Populate client selector
   const allClients = [...new Set(months.flatMap(mk => (data[mk]||[]).map(r => r.client)))].sort();
   const clientSel = document.getElementById('ndrClientSel');
-  if (clientSel) {
-    clientSel.innerHTML = allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-  }
+  if (clientSel) clientSel.innerHTML = allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 
-  // KPIs — latest month + YTD
-  const lastMk   = months[months.length - 1];
-  const lastRows = data[lastMk] || [];
+  // Pre-compute per-client NDRs (shared by multiple sections)
+  const clientNdrs = calcClientNdrs(data, months);
+
+  // ── KPIs ─────────────────────────────────────────────────────────────────
+  const lastMk   = months[months.length-1];
+  const lastRows = data[lastMk]||[];
   const lIncome  = lastRows.reduce((s,r)=>s+r.income,0);
   const lCost    = lastRows.reduce((s,r)=>s+r.cost,0);
   const lProfit  = lIncome - lCost;
@@ -3961,29 +4180,197 @@ function initNdrTab() {
   const ytdProfit = ytdIncome - ytdCost;
   const ytdMargin = ytdIncome > 0 ? ytdProfit/ytdIncome*100 : 0;
 
-  const ndrPct = calcNdrPct(data, months);
-  const ndrColor = ndrPct === null ? '#667085' : ndrPct >= 100 ? '#95D600' : ndrPct >= 90 ? '#F4A261' : '#E4A8A0';
+  const momNdr  = calcNdrPct(data, months);
+  const ytdNdr  = calcYtdNdr(data, months);
+  const momColor = momNdr === null ? '#667085' : momNdr >= 100 ? '#95D600' : momNdr >= 90 ? '#F4A261' : '#E4A8A0';
+  const ytdColor = ytdNdr === null ? '#667085' : ytdNdr >= 100 ? '#95D600' : ytdNdr >= 90 ? '#F4A261' : '#E4A8A0';
+
+  // MoM NDR explanation tooltip
+  const momTip = `title="NDR MoM: revenue in ${_fmtMk(lastMk)} from clients who also existed in ${_fmtMk(months[months.length-2])} ÷ those same clients' revenue in ${_fmtMk(months[months.length-2])} × 100. &gt;100% = net expansion."`;
+  // YTD NDR explanation tooltip
+  const ytdTip = `title="YTD NDR: revenue in ${_fmtMk(lastMk)} from the cohort of clients who existed in ${_fmtMk(months[0])} ÷ those same clients' revenue in ${_fmtMk(months[0])} × 100. Measures full-period revenue growth from original customers — excludes new logos."`;
 
   const kpis = [
     { label: `${_fmtMk(lastMk)} Income`,  value: fmtMoney(lIncome),  color: '#219EBC', sub: `Margin ${lMargin.toFixed(1)}%` },
     { label: `${_fmtMk(lastMk)} Profit`,  value: fmtMoney(lProfit),  color: lProfit>=0?'#95D600':'#E4A8A0', sub: `Cost ${fmtMoney(lCost)}` },
     { label: 'YTD Income',                 value: fmtMoney(ytdIncome), color: '#219EBC', sub: `Margin ${ytdMargin.toFixed(1)}%` },
     { label: 'YTD Profit',                 value: fmtMoney(ytdProfit), color: ytdProfit>=0?'#95D600':'#E4A8A0', sub: `Cost ${fmtMoney(ytdCost)}` },
-    { label: 'Net Revenue Retention',      value: ndrPct !== null ? ndrPct.toFixed(1)+'%' : '—', color: ndrColor,
-      sub: ndrPct !== null ? `${_fmtMk(months[months.length-2])} → ${_fmtMk(lastMk)}` : 'Need 2+ months' },
+    { label: 'NDR Month-over-Month', value: momNdr !== null ? momNdr.toFixed(1)+'%' : '—', color: momColor,
+      sub: momNdr !== null ? `${_fmtMk(months[months.length-2])} → ${_fmtMk(lastMk)}`, tip: momTip },
+    { label: `NDR YTD (${_fmtMk(months[0])} cohort)`, value: ytdNdr !== null ? ytdNdr.toFixed(1)+'%' : '—', color: ytdColor,
+      sub: ytdNdr !== null ? `${_fmtMk(months[0])} → ${_fmtMk(lastMk)} · same clients` : 'Need 2+ months', tip: ytdTip },
   ];
   document.getElementById('ndrKpiRow').innerHTML = kpis.map(k => `
-    <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;">
-      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">${k.label}</div>
+    <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;cursor:${k.tip?'help':'default'}" ${k.tip||''}>
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">${k.label}${k.tip?' <span style="color:var(--text-tertiary);font-size:10px;">ⓘ</span>':''}</div>
       <div style="font-size:26px;font-weight:700;color:${k.color};line-height:1.1;">${k.value}</div>
       <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">${k.sub||''}</div>
     </div>`).join('');
 
   renderNdrTrend(data, months);
-  window.renderNdrOwnerAnalysis();
+  renderNdrInsights(data, months, clientNdrs);
+  window.renderNdrTopBottom(null, 'profit_pct', data, months);
+  renderNdrClientNdrTable(data, months, clientNdrs);
+  renderNdrSpikes(data, months);
+  window.renderNdrOwnerAnalysis(data, months, clientNdrs);
   window.renderNdrClientDrilldown();
   window.renderNdrRanking();
   renderNdrCostBreak(data, months);
+}
+
+// ── Insights panel ────────────────────────────────────────────────────────────
+function renderNdrInsights(data, months, clientNdrs) {
+  const el = document.getElementById('ndrInsightsGrid');
+  if (!el) return;
+  const items = generateNdrInsights(data, months, clientNdrs);
+  const bg = { positive: 'rgba(149,214,0,.08)', risk: 'rgba(228,168,160,.12)', warn: 'rgba(244,162,97,.10)', neutral: 'rgba(33,158,188,.08)', opportunity: 'rgba(139,92,246,.10)' };
+  const border = { positive: 'rgba(149,214,0,.3)', risk: 'rgba(228,168,160,.4)', warn: 'rgba(244,162,97,.3)', neutral: 'rgba(33,158,188,.3)', opportunity: 'rgba(139,92,246,.3)' };
+  el.innerHTML = items.map(ins => `
+    <div style="background:${bg[ins.type]||bg.neutral};border:1px solid ${border[ins.type]||border.neutral};border-radius:var(--r-lg);padding:16px 18px;">
+      <div style="font-size:20px;margin-bottom:6px;">${ins.icon}</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:5px;color:var(--text);">${ins.title}</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">${ins.body}</div>
+    </div>`).join('');
+}
+
+// ── Top 10 / Bottom 10 ────────────────────────────────────────────────────────
+let _ndrTopMetric = 'profit_pct';
+window.renderNdrTopBottom = function(btnEl, metric, dataArg, monthsArg) {
+  const data   = dataArg   || window.NDR_DATA; if (!data) return;
+  const months = monthsArg || Object.keys(data).sort();
+  if (metric) _ndrTopMetric = metric;
+
+  // Update seg button active state
+  if (btnEl) {
+    document.querySelectorAll('#ndrTopSeg .seg-btn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+  }
+
+  // Aggregate YTD per client
+  const clientTotals = {};
+  for (const mk of months) {
+    for (const r of (data[mk]||[])) {
+      if (!clientTotals[r.client]) clientTotals[r.client] = { income:0, cost:0, profit:0 };
+      clientTotals[r.client].income += r.income;
+      clientTotals[r.client].cost   += r.cost;
+      clientTotals[r.client].profit += r.profit;
+    }
+  }
+  for (const c of Object.values(clientTotals))
+    c.profit_pct = c.income > 0 ? c.profit/c.income*100 : 0;
+
+  const sorted = Object.entries(clientTotals).sort((a,b) => b[1][_ndrTopMetric] - a[1][_ndrTopMetric]);
+  const top10 = sorted.slice(0, 10);
+  const bot10 = sorted.slice(-10).reverse();
+
+  const fmt = v => _ndrTopMetric === 'profit_pct' ? v.toFixed(1)+'%' : fmtMoney(v);
+  const color = (v, met) => met==='profit_pct' ? (v>=60?'#95D600':v>=30?'#F4A261':'#E4A8A0') : (v>=0?'#95D600':'#E4A8A0');
+
+  const buildTable = (rows, label) => rows.map(([client, v], i) => {
+    const val = v[_ndrTopMetric];
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);gap:8px;">
+      <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${escapeHtml(client)}">${i+1}. ${escapeHtml(client)}</div>
+      <div style="font-size:13px;font-weight:700;color:${color(val,_ndrTopMetric)};white-space:nowrap;">${fmt(val)}</div>
+    </div>`;
+  }).join('');
+
+  const d10 = document.getElementById('ndrTop10Table');
+  const b10 = document.getElementById('ndrBot10Table');
+  if (d10) d10.innerHTML = buildTable(top10, 'top');
+  if (b10) b10.innerHTML = buildTable(bot10, 'bot');
+  const desc = document.getElementById('ndrTopDesc');
+  if (desc) desc.textContent = `YTD (${months.map(_fmtMk).join(' – ')}) — top & bottom 10 by ${_ndrTopMetric==='profit_pct'?'margin %':_ndrTopMetric==='profit'?'profit $':'income $'}`;
+};
+
+// ── Per-client NDR heatmap table ─────────────────────────────────────────────
+function renderNdrClientNdrTable(data, months, clientNdrs) {
+  const el = document.getElementById('ndrClientNdrTable');
+  if (!el) return;
+
+  // Sort clients by YTD NDR desc, then by latest income desc
+  const lastMk = months[months.length-1];
+  const lastIncMap = new Map((data[lastMk]||[]).map(r=>[r.client, r.income]));
+  const clients = Object.entries(clientNdrs)
+    .filter(([, cd]) => Object.keys(cd.incomes).length >= 2)
+    .sort((a,b) => {
+      const ya = a[1].ytdNdr ?? -999, yb = b[1].ytdNdr ?? -999;
+      if (Math.abs(ya-yb) > 1) return yb - ya;
+      return (lastIncMap.get(b[0])||0) - (lastIncMap.get(a[0])||0);
+    });
+
+  const cellColor = pct => pct >= 115 ? '#95D600' : pct >= 100 ? '#7AB800' : pct >= 85 ? '#F4A261' : '#E4A8A0';
+  const cellBg   = pct => pct >= 115 ? 'rgba(149,214,0,.15)' : pct >= 100 ? 'rgba(122,184,0,.10)' : pct >= 85 ? 'rgba(244,162,97,.12)' : 'rgba(228,168,160,.15)';
+
+  const thStyle = 'padding:6px 10px;font-size:10px;font-weight:600;color:var(--text-secondary);white-space:nowrap;border-bottom:1px solid var(--border);';
+  const header = `<tr><th style="${thStyle}text-align:left;">Client</th><th style="${thStyle}">Owner</th>`
+    + months.map((mk,i) => `<th style="${thStyle}text-align:center;">${i===0?`${_fmtMk(mk)}<br><span style="font-size:9px;font-weight:400;">base</span>`:_fmtMk(mk)}</th>`).join('')
+    + `<th style="${thStyle}text-align:center;border-left:2px solid var(--border-strong);">YTD NDR</th></tr>`;
+
+  const rows = clients.map(([client, cd]) => {
+    const owner = getNdrOwner(client);
+    const cells = months.map((mk, i) => {
+      if (i === 0) {
+        const inc = cd.incomes[mk];
+        return `<td style="padding:5px 8px;text-align:center;font-size:11px;color:var(--text-secondary);">${inc !== undefined ? fmtMoney(inc) : '—'}</td>`;
+      }
+      const ndr = cd.momNdrs[mk];
+      if (ndr === undefined) return `<td style="padding:5px 8px;text-align:center;font-size:11px;color:var(--text-tertiary);">—</td>`;
+      return `<td style="padding:5px 8px;text-align:center;font-size:11px;font-weight:600;background:${cellBg(ndr)};color:${cellColor(ndr)};">${ndr.toFixed(0)}%</td>`;
+    }).join('');
+    const ytd = cd.ytdNdr;
+    const ytdCell = ytd !== null
+      ? `<td style="padding:5px 10px;text-align:center;font-size:12px;font-weight:700;background:${cellBg(ytd)};color:${cellColor(ytd)};border-left:2px solid var(--border-strong);">${ytd.toFixed(0)}%</td>`
+      : `<td style="padding:5px 10px;text-align:center;color:var(--text-tertiary);border-left:2px solid var(--border-strong);">—</td>`;
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:5px 10px;font-size:12px;font-weight:500;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(client)}">${escapeHtml(client)}</td>
+      <td style="padding:5px 10px;font-size:11px;color:var(--text-secondary);white-space:nowrap;">${escapeHtml(owner)}</td>
+      ${cells}${ytdCell}</tr>`;
+  }).join('');
+
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead>${header}</thead><tbody>${rows}</tbody></table>`;
+}
+
+// ── Revenue Spikes vs Deals ──────────────────────────────────────────────────
+function renderNdrSpikes(data, months) {
+  const el = document.getElementById('ndrSpikesGrid');
+  if (!el) return;
+  const spikes = detectSpikes(data, months);
+  if (!spikes.length) {
+    el.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;">No significant spikes detected (threshold: ≥25% and ≥$5K increase from previous month).</p>';
+    return;
+  }
+
+  el.innerHTML = spikes.slice(0, 12).map(sp => {
+    const hsCust = getNdrHsCustomer(sp.client);
+    const deals = (hsCust?.hsDeals || []).filter(d => {
+      if (!d.d) return false;
+      const dealDate = new Date(d.d);
+      const spikeDate = new Date(sp.month + '-15');
+      const diff = (spikeDate - dealDate) / (1000*60*60*24);
+      return diff >= -30 && diff <= 120; // deal closed 30 days after or up to 4 months before spike
+    });
+    const dealHtml = deals.length
+      ? deals.map(d => `<div style="margin-top:6px;padding:6px 8px;background:rgba(33,158,188,.08);border:1px solid rgba(33,158,188,.2);border-radius:6px;font-size:11px;">
+          <div style="font-weight:600;color:var(--text);">${escapeHtml(d.n)}</div>
+          <div style="color:var(--text-secondary);margin-top:2px;">${d.d} · ${fmtMoney(d.a)} · <span style="color:#95D600;">${d.s}</span>${d.t?' · '+d.t:''}</div>
+        </div>`).join('')
+      : `<div style="margin-top:6px;font-size:11px;color:var(--text-secondary);font-style:italic;">No HubSpot deal found within ±4 months. May be organic growth or billing cycle.</div>`;
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">
+        <div style="font-size:13px;font-weight:600;">${escapeHtml(sp.client)}</div>
+        <div style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">${_fmtMk(sp.prevMonth)} → ${_fmtMk(sp.month)}</div>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+        <div><span style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">Income jump</span><br><span style="font-size:18px;font-weight:700;color:#95D600;">+${fmtMoney(sp.delta)}</span></div>
+        <div><span style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">Change</span><br><span style="font-size:18px;font-weight:700;color:#95D600;">+${(sp.pct*100).toFixed(0)}%</span></div>
+        <div><span style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">${_fmtMk(sp.prevMonth)}</span><br><span style="font-size:14px;font-weight:500;">${fmtMoney(sp.prevIncome)}</span></div>
+        <div><span style="font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">${_fmtMk(sp.month)}</span><br><span style="font-size:14px;font-weight:500;">${fmtMoney(sp.income)}</span></div>
+      </div>
+      <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px;">HubSpot deals ±4 months (${deals.length} found)</div>
+      ${dealHtml}
+    </div>`;
+  }).join('');
 }
 
 function renderNdrTrend(data, months) {
@@ -4007,12 +4394,26 @@ function renderNdrTrend(data, months) {
 }
 
 // Owner analysis
-window.renderNdrOwnerAnalysis = function() {
-  const data = window.NDR_DATA;
+window.renderNdrOwnerAnalysis = function(dataArg, monthsArg, clientNdrsArg) {
+  const data = dataArg || window.NDR_DATA;
   if (!data) return;
+  const months = monthsArg || Object.keys(data).sort();
   const sel = document.getElementById('ndrOwnerMonthSel');
-  const mk  = sel?.value || Object.keys(data).sort().slice(-1)[0];
+  const mk  = sel?.value || months[months.length-1];
   const rows = data[mk] || [];
+  // Per-owner YTD NDR: aggregate client YTD NDRs weighted by first-month income
+  const clientNdrs = clientNdrsArg || calcClientNdrs(data, months);
+  const ownerYtdNdr = {}; // owner → { base, curr }
+  for (const [client, cd] of Object.entries(clientNdrs)) {
+    const owner = getNdrOwner(client);
+    if (!ownerYtdNdr[owner]) ownerYtdNdr[owner] = { base: 0, curr: 0 };
+    const firstMk = months.find(m => cd.incomes[m] !== undefined);
+    const lastMk  = [...months].reverse().find(m => cd.incomes[m] !== undefined);
+    if (firstMk && lastMk && firstMk !== lastMk && cd.incomes[firstMk] > 0) {
+      ownerYtdNdr[owner].base += cd.incomes[firstMk];
+      ownerYtdNdr[owner].curr += cd.incomes[lastMk];
+    }
+  };
 
   // Group by owner
   const owners = {};
@@ -4064,17 +4465,19 @@ window.renderNdrOwnerAnalysis = function() {
     options: mrgOpts,
   });
 
-  // Summary table
+  // Summary table (with YTD NDR column)
   const tbl = document.getElementById('ndrOwnerTable');
   if (tbl) {
     const th = s => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;">${s}</th>`;
     const thL = s => `<th style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border);">${s}</th>`;
     const td = (s,bold) => `<td style="padding:7px 12px;font-size:12px;text-align:right;${bold?'font-weight:600;':''}color:var(--text);">${s}</td>`;
-    const tdL = s => `<td style="padding:7px 12px;font-size:12px;text-align:left;color:var(--text);">${s}</td>`;
-    tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${thL('Owner')}${th('Clients')}${th('Income')}${th('Cost')}${th('Profit')}${th('Margin %')}</tr></thead><tbody>${
+    tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr>${thL('Owner')}${th('Clients')}${th('Income')}${th('Cost')}${th('Profit')}${th('Margin %')}${th('YTD NDR')}</tr></thead><tbody>${
       ownerList.map(([owner, v], i) => {
         const margin = v.income > 0 ? (v.profit/v.income*100).toFixed(1) : '—';
         const mColor = parseFloat(margin) >= 60 ? '#95D600' : parseFloat(margin) >= 30 ? '#F4A261' : '#E4A8A0';
+        const ownerNdr = ownerYtdNdr[owner];
+        const ndrVal = ownerNdr && ownerNdr.base > 0 ? (ownerNdr.curr/ownerNdr.base*100).toFixed(1)+'%' : '—';
+        const ndrColor = ownerNdr && ownerNdr.base > 0 ? (ownerNdr.curr/ownerNdr.base*100 >= 100 ? '#95D600' : '#F4A261') : 'var(--text-secondary)';
         return `<tr style="border-bottom:1px solid var(--border);">
           <td style="padding:7px 12px;font-size:12px;text-align:left;"><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:${colors[i]};display:inline-block;flex-shrink:0;"></span>${escapeHtml(owner)}</span></td>
           ${td(v.clients.length)}
@@ -4082,6 +4485,7 @@ window.renderNdrOwnerAnalysis = function() {
           ${td(fmtMoney(v.cost))}
           ${td(fmtMoney(v.profit), true)}
           <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:600;color:${mColor};">${margin}%</td>
+          <td style="padding:7px 12px;font-size:12px;text-align:right;font-weight:700;color:${ndrColor};">${ndrVal}</td>
         </tr>`;
       }).join('')
     }</tbody></table>`;
