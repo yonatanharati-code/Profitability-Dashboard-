@@ -4424,8 +4424,10 @@ function initNdrTab() {
   const clientSel  = document.getElementById('ndrClientSel');
   if (clientSel) {
     const prev = clientSel.value;
-    clientSel.innerHTML = allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    clientSel.innerHTML = '<option value="__all__">— All clients —</option>'
+      + allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
     if (allClients.includes(prev)) clientSel.value = prev;
+    else if (prev === '__all__') clientSel.value = '__all__';
   }
 
   // ── Pre-compute per-client NDRs ───────────────────────────────────────────
@@ -5140,12 +5142,23 @@ window.renderNdrClientDrilldown = function() {
   if (!client) return;
 
   const months = _filteredNdrMonths();
+  const isAll = client === '__all__';
+
+  // Build clientData: per-month aggregated row (for All) or single-client row
   const clientData = months.map(mk => {
-    const r = (data[mk]||[]).find(x => x.client === client);
-    return r || null;
+    if (isAll) {
+      const rows = data[mk] || [];
+      if (!rows.length) return null;
+      return {
+        income: rows.reduce((s,r)=>s+r.income,0),
+        cost:   rows.reduce((s,r)=>s+r.cost,0),
+        profit: rows.reduce((s,r)=>s+r.profit,0),
+      };
+    }
+    return (data[mk]||[]).find(x => x.client === client) || null;
   });
 
-  // KPI cards for this client (latest month with data)
+  // KPI cards
   const lastIdx = clientData.map((d,i)=>[d,i]).filter(([d])=>d).slice(-1)[0];
   const kpiEl = document.getElementById('ndrClientKpis');
   if (kpiEl) {
@@ -5156,14 +5169,14 @@ window.renderNdrClientDrilldown = function() {
       const prevR = clientData.slice(0, idx).filter(Boolean).slice(-1)[0];
       const incChg = prevR && prevR.income > 0 ? ((r.income - prevR.income)/prevR.income*100) : null;
       const chgStr = incChg !== null ? ` <span style="font-size:11px;color:${incChg>=0?'#95D600':'#E4A8A0'}">${incChg>=0?'▲':'▼'}${Math.abs(incChg).toFixed(1)}% MoM</span>` : '';
-      const owner = getNdrOwner(client);
-      kpiEl.innerHTML = [
+      const kpis = [
         { label: `${_fmtMk(months[idx])} Income`, value: fmtMoney(r.income), sub: chgStr, color: '#219EBC' },
         { label: `${_fmtMk(months[idx])} Cost`,   value: fmtMoney(r.cost),   sub: '', color: '#E4A8A0' },
-        { label: `${_fmtMk(months[idx])} Profit`,  value: fmtMoney(r.profit), sub: '', color: r.profit>=0?'#95D600':'#E4A8A0' },
-        { label: 'Margin',   value: r.income > 0 ? (r.profit/r.income*100).toFixed(1)+'%' : '—', sub: '', color: '#F4A261' },
-        { label: 'Account Owner', value: escapeHtml(owner), sub: '', color: '#667085' },
-      ].map(k => `<div style="min-width:130px;background:var(--surface-subtle);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 16px;">
+        { label: `${_fmtMk(months[idx])} Profit`, value: fmtMoney(r.profit), sub: '', color: r.profit>=0?'#95D600':'#E4A8A0' },
+        { label: 'Margin', value: r.income > 0 ? (r.profit/r.income*100).toFixed(1)+'%' : '—', sub: '', color: '#F4A261' },
+      ];
+      if (!isAll) kpis.push({ label: 'Account Owner', value: escapeHtml(getNdrOwner(client)), sub: '', color: '#667085' });
+      kpiEl.innerHTML = kpis.map(k => `<div style="min-width:130px;background:var(--surface-subtle);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 16px;">
         <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:3px;">${k.label}</div>
         <div style="font-size:18px;font-weight:700;color:${k.color};">${k.value}${k.sub}</div>
       </div>`).join('');
@@ -5239,7 +5252,8 @@ window.renderNdrClientDrilldown = function() {
 
   // ── HubSpot Deals panel ────────────────────────────────────────────────────
   const dealsEl = document.getElementById('ndrClientDeals');
-  if (dealsEl) {
+  if (dealsEl && isAll) { dealsEl.innerHTML = ''; }
+  if (dealsEl && !isAll) {
     const hsCust = getNdrHsCustomer(client);
     const hsDeals = (hsCust?.hsDeals || []).slice().sort((a,b)=>{
       const da = new Date(a.d||''), db = new Date(b.d||'');
@@ -5299,7 +5313,7 @@ window.renderNdrClientDrilldown = function() {
       + '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px;">HubSpot Deals (CSM Pipeline)</div>'
       + dealsBody
       + '</div>';
-  }
+  } // end !isAll deals block
 };
 
 window.renderNdrRanking = function() {
