@@ -1110,9 +1110,17 @@ tr.selected-row{background:var(--teal-50) !important;}
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="caption muted" id="tableMeta">—</span>
-          <span id="excludedBadge" style="display:none;align-items:center;gap:5px;padding:3px 8px;border-radius:var(--r-md);background:var(--bad-bg);border:1px solid var(--bad);color:var(--bad);font-size:11px;font-weight:600;">
-            <span class="exc-count">0</span> excluded
-            <button onclick="clearExclusions()" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0 0 0 4px;font-size:12px;" title="Restore all">✕</button>
+          <span style="position:relative;">
+            <span id="excludedBadge" onclick="window.toggleExcludedPanel()" style="display:none;align-items:center;gap:5px;padding:3px 10px;border-radius:var(--r-md);background:var(--bad-bg);border:1px solid var(--bad);color:var(--bad);font-size:11px;font-weight:600;cursor:pointer;" title="Click to view excluded companies">
+              <span class="exc-count">0</span> excluded ▾
+            </span>
+            <div id="excludedPanel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:300;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-xl);box-shadow:var(--sh-lg);min-width:280px;max-width:340px;overflow:hidden;">
+              <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text);">Excluded companies</span>
+                <button onclick="clearExclusions();window.closeExcludedPanel();" style="font-size:11px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--bad);background:var(--bad-bg);color:var(--bad);cursor:pointer;font-family:inherit;font-weight:600;">Restore all</button>
+              </div>
+              <div id="excludedList" style="max-height:320px;overflow-y:auto;padding:6px 0;"></div>
+            </div>
           </span>
           <button id="excludeChurnBtn" class="import-btn" onclick="toggleExcludeChurn()" title="Exclude / restore all Churn customers">⊘ Churn</button>
           <button id="selectModeBtn" class="import-btn" onclick="toggleSelectMode()" title="Select multiple customers for bulk actions">☐ Select</button>
@@ -1343,6 +1351,46 @@ function toggleExclude(id){
   renderAll();
 }
 window.toggleExclude = toggleExclude;
+
+window._populateExcludedPanel = function() {
+  const list = document.getElementById('excludedList');
+  if (!list) return;
+  const excluded = DATA.filter(c => isExcluded(c));
+  if (!excluded.length) { list.innerHTML = '<p style="padding:12px 14px;font-size:12px;color:var(--text-secondary);">No excluded companies.</p>'; return; }
+  list.innerHTML = excluded.map(c => {
+    const stage = c.stage || 'Unknown';
+    const stageColor = stage === 'Churn' ? 'var(--bad)' : 'var(--text-secondary)';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border);">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHtml(c.name)+'">'+escapeHtml(c.name)+'</div>'
+      + '<div style="font-size:10px;color:'+stageColor+';margin-top:1px;">'+escapeHtml(stage)+(c.owner?' · '+escapeHtml(c.owner):'')+'</div>'
+      + '</div>'
+      + '<button onclick="toggleExclude(\''+c.id+'\');renderTable();" style="font-size:10px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--ok);background:var(--ok-bg);color:var(--ok);cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;">↩ Restore</button>'
+      + '</div>';
+  }).join('');
+};
+
+window.toggleExcludedPanel = function() {
+  const panel = document.getElementById('excludedPanel');
+  if (!panel) return;
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  if (opening) window._populateExcludedPanel();
+};
+
+window.closeExcludedPanel = function() {
+  const panel = document.getElementById('excludedPanel');
+  if (panel) panel.style.display = 'none';
+};
+
+// Close panel on outside click
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('excludedPanel');
+  const badge = document.getElementById('excludedBadge');
+  if (panel && panel.style.display !== 'none' && !panel.contains(e.target) && badge && !badge.contains(e.target)) {
+    panel.style.display = 'none';
+  }
+});
 window.clearExclusions = function(){
   state.excludedCustomers = [];
   try { localStorage.removeItem('pfd2_excluded'); } catch(e){}
@@ -3615,7 +3663,12 @@ function renderTable(){
       excEl.querySelector('.exc-count').textContent = state.excludedCustomers.length;
     } else {
       excEl.style.display = 'none';
+      window.closeExcludedPanel();
     }
+  }
+  // Refresh panel list if open
+  if (document.getElementById('excludedPanel')?.style.display !== 'none') {
+    window._populateExcludedPanel();
   }
 
   // Update "⊘ Churn" button state
