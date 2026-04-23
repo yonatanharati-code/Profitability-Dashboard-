@@ -780,11 +780,53 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section-head">
       <div>
         <div class="section-title">Monthly Income vs Cost vs Profit</div>
-        <div class="section-desc">All clients combined · USD</div>
+        <div class="section-desc" id="ndrTrendDesc">All clients combined · USD</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="position:relative;">
+          <button id="ndrTrendFilterBtn" onclick="window.toggleNdrTrendFilter()" style="font-size:11px;padding:4px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
+            <span id="ndrTrendFilterLabel">All clients</span> <span style="opacity:.5;">▾</span>
+          </button>
+          <div id="ndrTrendFilterPanel" style="display:none;position:absolute;right:0;top:calc(100% + 4px);z-index:200;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--sh-lg);padding:8px;min-width:220px;max-height:300px;overflow-y:auto;">
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <button onclick="window.ndrTrendSelectAll(true)" style="flex:1;font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;">All</button>
+              <button onclick="window.ndrTrendSelectAll(false)" style="flex:1;font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;">None</button>
+            </div>
+            <div id="ndrTrendFilterList"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="card"><div class="card-body">
       <div class="chart-wrap xl"><canvas id="cNdrTrend"></canvas></div>
+    </div></div>
+  </div>
+
+  <!-- Cost Breakdown -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Cost Component Breakdown &amp; Insights</div>
+        <div class="section-desc">Monthly stacked cost by component · spike detection and explanations</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="position:relative;">
+          <button id="ndrCostFilterBtn" onclick="window.toggleNdrCostFilter()" style="font-size:11px;padding:4px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
+            <span id="ndrCostFilterLabel">All clients</span> <span style="opacity:.5;">▾</span>
+          </button>
+          <div id="ndrCostFilterPanel" style="display:none;position:absolute;right:0;top:calc(100% + 4px);z-index:200;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--sh-lg);padding:8px;min-width:220px;max-height:300px;overflow-y:auto;">
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <button onclick="window.ndrCostSelectAll(true)" style="flex:1;font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;">All</button>
+              <button onclick="window.ndrCostSelectAll(false)" style="flex:1;font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;">None</button>
+            </div>
+            <div id="ndrCostFilterList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card"><div class="card-body">
+      <div class="chart-wrap xl"><canvas id="cNdrCostBreak"></canvas></div>
+      <div id="ndrCostInsights" style="margin-top:18px;"></div>
     </div></div>
   </div>
 
@@ -903,18 +945,6 @@ tr.selected-row{background:var(--teal-50) !important;}
     </div></div>
   </div>
 
-  <!-- Cost breakdown -->
-  <div class="section">
-    <div class="section-head">
-      <div>
-        <div class="section-title">Cost Component Breakdown</div>
-        <div class="section-desc">Top clients · Hours / Pricing / Partner / Stock / Competitor data costs</div>
-      </div>
-    </div>
-    <div class="card"><div class="card-body">
-      <div class="chart-wrap xl"><canvas id="cNdrCostBreak"></canvas></div>
-    </div></div>
-  </div>
 
 </div><!-- /pane-ndr -->
 
@@ -4383,6 +4413,7 @@ function initNdrTab() {
     </div>`).join('');
 
   renderNdrTrend(data, months);
+  renderNdrCostBreakdown(data, months);
   renderNdrInsights(data, months, clientNdrs);
   window.renderNdrTopBottom(null, null, data, months);
   renderNdrClientNdrTable(data, months, clientNdrs);
@@ -4390,7 +4421,6 @@ function initNdrTab() {
   window.renderNdrOwnerAnalysis(data, months, clientNdrs);
   window.renderNdrClientDrilldown();
   window.renderNdrRanking();
-  renderNdrCostBreak(data, months);
 }
 
 // ── Insights panel ────────────────────────────────────────────────────────────
@@ -4610,12 +4640,103 @@ function renderNdrSpikes(data, months) {
   }).join('');
 }
 
+// ── Trend chart client filter state ───────────────────────────────────────
+let _ndrTrendFilter = null; // null = all; Set of client names when filtered
+let _ndrCostFilter  = null;
+
+function _allNdrClients(data, months) {
+  const set = new Set();
+  months.forEach(mk => (data[mk]||[]).forEach(r => set.add(r.client)));
+  return [...set].sort();
+}
+
+function _buildFilterPanel(listElId, filterRef, onChange, data, months) {
+  const clients = _allNdrClients(data, months);
+  const el = document.getElementById(listElId);
+  if (!el) return;
+  const current = filterRef();
+  el.innerHTML = clients.map(c => {
+    const checked = current === null || current.has(c);
+    return '<label style="display:flex;align-items:center;gap:7px;padding:4px 2px;cursor:pointer;font-size:12px;">'
+      + '<input type="checkbox" data-client="'+escapeHtml(c)+'" '+(checked?'checked':'')
+      + ' onchange="'+onChange+'()" style="cursor:pointer;accent-color:#6366f1;">'
+      + '<span>'+escapeHtml(c)+'</span></label>';
+  }).join('');
+}
+
+function _readFilterFromPanel(listElId) {
+  const el = document.getElementById(listElId);
+  if (!el) return null;
+  const boxes = el.querySelectorAll('input[type=checkbox]');
+  const all = [...boxes];
+  if (all.every(b => b.checked)) return null; // all = no filter
+  return new Set(all.filter(b => b.checked).map(b => b.dataset.client));
+}
+
+// Trend filter
+window.toggleNdrTrendFilter = function() {
+  const panel = document.getElementById('ndrTrendFilterPanel');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (!open) _buildFilterPanel('ndrTrendFilterList', ()=>_ndrTrendFilter, '_ndrTrendFilterChanged', window.NDR_DATA, _filteredNdrMonths());
+};
+window._ndrTrendFilterChanged = function() {
+  _ndrTrendFilter = _readFilterFromPanel('ndrTrendFilterList');
+  const cnt = _ndrTrendFilter ? _ndrTrendFilter.size : null;
+  const lbl = document.getElementById('ndrTrendFilterLabel');
+  if (lbl) lbl.textContent = cnt === null ? 'All clients' : cnt + ' client' + (cnt!==1?'s':'') + ' selected';
+  renderNdrTrend(window.NDR_DATA, _filteredNdrMonths());
+};
+window.ndrTrendSelectAll = function(val) {
+  const el = document.getElementById('ndrTrendFilterList');
+  if (el) el.querySelectorAll('input').forEach(b => b.checked = val);
+  window._ndrTrendFilterChanged();
+};
+// Close panels on outside click
+document.addEventListener('click', function(e) {
+  ['ndrTrendFilterPanel','ndrCostFilterPanel'].forEach(id => {
+    const panel = document.getElementById(id);
+    const btn = document.getElementById(id.replace('Panel','Btn'));
+    if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) panel.style.display = 'none';
+  });
+});
+
+// Cost filter
+window.toggleNdrCostFilter = function() {
+  const panel = document.getElementById('ndrCostFilterPanel');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (!open) _buildFilterPanel('ndrCostFilterList', ()=>_ndrCostFilter, '_ndrCostFilterChanged', window.NDR_DATA, _filteredNdrMonths());
+};
+window._ndrCostFilterChanged = function() {
+  _ndrCostFilter = _readFilterFromPanel('ndrCostFilterList');
+  const cnt = _ndrCostFilter ? _ndrCostFilter.size : null;
+  const lbl = document.getElementById('ndrCostFilterLabel');
+  if (lbl) lbl.textContent = cnt === null ? 'All clients' : cnt + ' client' + (cnt!==1?'s':'') + ' selected';
+  renderNdrCostBreakdown(window.NDR_DATA, _filteredNdrMonths());
+};
+window.ndrCostSelectAll = function(val) {
+  const el = document.getElementById('ndrCostFilterList');
+  if (el) el.querySelectorAll('input').forEach(b => b.checked = val);
+  window._ndrCostFilterChanged();
+};
+
 function renderNdrTrend(data, months) {
   if (charts.ndrTrend) { charts.ndrTrend.destroy(); charts.ndrTrend = null; }
+  const filter = _ndrTrendFilter;
   const labels = months.map(_fmtMk);
-  const income = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.income,0)));
-  const cost   = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.cost,0)));
-  const profit = months.map(mk => Math.round(data[mk].reduce((s,r)=>s+r.profit,0)));
+  const rows = mk => (data[mk]||[]).filter(r => !filter || filter.has(r.client));
+  const income = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+r.income,0)));
+  const cost   = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+r.cost,0)));
+  const profit = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+r.profit,0)));
+
+  const descEl = document.getElementById('ndrTrendDesc');
+  if (descEl) descEl.textContent = filter
+    ? [...filter].slice(0,3).join(', ') + (filter.size>3?' +' +(filter.size-3)+' more':'') + ' · USD'
+    : 'All clients combined · USD';
+
   const opts = baseOpts();
   opts.scales.y.ticks = { callback: v => fmtMoney(v) };
   opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw)}` };
@@ -4628,6 +4749,196 @@ function renderNdrTrend(data, months) {
     ]},
     options: opts,
   });
+}
+
+// ── Cost Breakdown chart + insights ───────────────────────────────────────
+const COST_COMPONENTS = [
+  { key:'hours_cost',      label:'Hours',      color:'rgba(99,102,241,.8)'  },
+  { key:'pricing_cost',    label:'Pricing',    color:'rgba(33,158,188,.8)'  },
+  { key:'partner_cost',    label:'Partner',    color:'rgba(244,162,97,.8)'  },
+  { key:'stock_cost',      label:'Stock',      color:'rgba(228,168,160,.8)' },
+  { key:'competitor_cost', label:'Competitor data', color:'rgba(149,214,0,.8)' },
+];
+
+function renderNdrCostBreakdown(data, months) {
+  if (!data || !months.length) return;
+  if (charts.ndrCostBreak) { charts.ndrCostBreak.destroy(); charts.ndrCostBreak = null; }
+
+  const filter = _ndrCostFilter;
+  const rows = mk => (data[mk]||[]).filter(r => !filter || filter.has(r.client));
+  const labels = months.map(_fmtMk);
+
+  // Stacked datasets per component
+  const datasets = COST_COMPONENTS.map(comp => ({
+    label: comp.label,
+    data: months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r[comp.key]||0),0))),
+    backgroundColor: comp.color,
+    borderRadius: 3,
+    maxBarThickness: 55,
+  }));
+
+  // Total cost line overlay
+  const totalCost = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+r.cost,0)));
+  datasets.push({
+    label: 'Total Cost',
+    data: totalCost,
+    type: 'line',
+    borderColor: '#E4A8A0',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderDash: [5,3],
+    pointRadius: 4,
+    tension: 0.3,
+    order: -1,
+    yAxisID: 'y',
+  });
+
+  const opts = baseOpts();
+  opts.scales.y.stacked = true;
+  opts.scales.y.ticks = { callback: v => fmtMoney(v) };
+  opts.plugins.tooltip = {
+    mode: 'index',
+    callbacks: {
+      label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw)}`,
+      footer: items => {
+        const total = items.filter(i=>i.dataset.label!=='Total Cost').reduce((s,i)=>s+i.raw,0);
+        return 'Sum components: ' + fmtMoney(total);
+      }
+    }
+  };
+  opts.plugins.legend = { display: true, position: 'bottom', labels: { font:{ family:'Poppins', size:10 }, boxWidth:12 } };
+
+  charts.ndrCostBreak = new Chart(document.getElementById('cNdrCostBreak'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: opts,
+  });
+
+  // ── Cost Insights ──────────────────────────────────────────────────────
+  renderNdrCostInsights(data, months, rows, totalCost);
+}
+
+function renderNdrCostInsights(data, months, rowsFn, totalCostArr) {
+  const el = document.getElementById('ndrCostInsights');
+  if (!el || months.length < 2) return;
+
+  const insights = [];
+
+  // 1. Detect cost spikes (≥15% AND ≥$3K increase month-over-month)
+  for (let i = 1; i < months.length; i++) {
+    const curr = months[i], prev = months[i-1];
+    const cRows = rowsFn(curr), pRows = rowsFn(prev);
+    const cTotal = cRows.reduce((s,r)=>s+r.cost,0);
+    const pTotal = pRows.reduce((s,r)=>s+r.cost,0);
+    if (pTotal <= 0) continue;
+    const pct = (cTotal - pTotal) / pTotal;
+    const delta = cTotal - pTotal;
+    if (pct >= 0.15 && delta >= 3000) {
+      // Identify which components drove the spike
+      const compDeltas = COST_COMPONENTS.map(comp => {
+        const cVal = cRows.reduce((s,r)=>s+(r[comp.key]||0),0);
+        const pVal = pRows.reduce((s,r)=>s+(r[comp.key]||0),0);
+        return { label: comp.label, delta: cVal - pVal, cVal, pVal };
+      }).filter(c => c.delta > 500).sort((a,b)=>b.delta-a.delta);
+
+      // Identify which clients drove the spike
+      const clientDeltas = [];
+      const allClients = new Set([...cRows.map(r=>r.client), ...pRows.map(r=>r.client)]);
+      allClients.forEach(client => {
+        const cR = cRows.find(r=>r.client===client);
+        const pR = pRows.find(r=>r.client===client);
+        const cd = (cR?.cost||0) - (pR?.cost||0);
+        if (cd > 500) clientDeltas.push({ client, delta: cd });
+      });
+      clientDeltas.sort((a,b)=>b.delta-a.delta);
+
+      const compStr = compDeltas.slice(0,3).map(c=>`<strong>${c.label}</strong> +${fmtMoney(c.delta)}`).join(', ');
+      const clientStr = clientDeltas.slice(0,3).map(c=>'<strong>'+escapeHtml(c.client)+'</strong> +'+fmtMoney(c.delta)).join(', ');
+
+      insights.push({
+        type:'spike', icon:'🔺',
+        title: _fmtMk(prev) + ' → ' + _fmtMk(curr) + ': Cost spike +' + fmtMoney(delta) + ' (+' + (pct*100).toFixed(0) + '%)',
+        body: (compStr ? 'Driven by: ' + compStr + '. ' : '')
+            + (clientStr ? 'Top clients: ' + clientStr + '.' : ''),
+        color:'#E4A8A0', bg:'rgba(228,168,160,.1)'
+      });
+    }
+    // Detect cost drop (≥15% decrease — also worth flagging as positive)
+    if (pct <= -0.15 && Math.abs(delta) >= 3000) {
+      insights.push({
+        type:'drop', icon:'✅',
+        title: _fmtMk(prev) + ' → ' + _fmtMk(curr) + ': Cost reduced ' + fmtMoney(Math.abs(delta)) + ' (' + (pct*100).toFixed(0) + '%)',
+        body: 'Positive efficiency signal. Check if driven by scope reduction or genuine cost savings.',
+        color:'#95D600', bg:'rgba(149,214,0,.08)'
+      });
+    }
+  }
+
+  // 2. Dominant cost component insight (latest month)
+  const lastMk = months[months.length-1];
+  const lastRows = rowsFn(lastMk);
+  if (lastRows.length) {
+    const compTotals = COST_COMPONENTS.map(comp => ({
+      label: comp.label,
+      val: lastRows.reduce((s,r)=>s+(r[comp.key]||0),0)
+    })).sort((a,b)=>b.val-a.val);
+    const totalC = compTotals.reduce((s,c)=>s+c.val,0);
+    if (totalC > 0) {
+      const top = compTotals[0];
+      const topPct = (top.val/totalC*100).toFixed(0);
+      if (topPct > 50) {
+        insights.push({
+          type:'info', icon:'💡',
+          title: _fmtMk(lastMk) + ': ' + top.label + ' = ' + topPct + '% of total cost',
+          body: 'Hours cost dominates the cost structure. '
+            + compTotals.slice(1,3).map(c=>`${c.label}: ${fmtMoney(c.val)} (${(c.val/totalC*100).toFixed(0)}%)`).join(', ') + '.',
+          color:'#6366f1', bg:'rgba(99,102,241,.08)'
+        });
+      }
+    }
+  }
+
+  // 3. Trend: is cost growing faster than income?
+  if (months.length >= 3) {
+    const first = months[0], last2 = months[months.length-1];
+    const incFirst = rowsFn(first).reduce((s,r)=>s+r.income,0);
+    const incLast  = rowsFn(last2).reduce((s,r)=>s+r.income,0);
+    const costFirst = rowsFn(first).reduce((s,r)=>s+r.cost,0);
+    const costLast  = rowsFn(last2).reduce((s,r)=>s+r.cost,0);
+    if (incFirst > 0 && costFirst > 0) {
+      const incGrowth  = (incLast-incFirst)/incFirst;
+      const costGrowth = (costLast-costFirst)/costFirst;
+      if (costGrowth > incGrowth + 0.1) {
+        insights.push({
+          type:'warn', icon:'⚠️',
+          title: 'Costs growing faster than income over the period',
+          body: 'Income: ' + (incGrowth>=0?'+':'') + (incGrowth*100).toFixed(1) + '%  ·  Cost: ' + (costGrowth>=0?'+':'') + (costGrowth*100).toFixed(1) + '% from ' + _fmtMk(first) + ' to ' + _fmtMk(last2) + '. Margin compression risk.',
+          color:'#F4A261', bg:'rgba(244,162,97,.1)'
+        });
+      } else if (incGrowth > costGrowth + 0.05) {
+        insights.push({
+          type:'positive', icon:'📈',
+          title: 'Income growing faster than cost — margin expanding',
+          body: 'Income: ' + (incGrowth>=0?'+':'') + (incGrowth*100).toFixed(1) + '%  ·  Cost: ' + (costGrowth>=0?'+':'') + (costGrowth*100).toFixed(1) + '% from ' + _fmtMk(first) + ' to ' + _fmtMk(last2) + '. Healthy leverage.',
+          color:'#95D600', bg:'rgba(149,214,0,.08)'
+        });
+      }
+    }
+  }
+
+  if (!insights.length) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);">No significant cost events detected in the selected period.</p>';
+    return;
+  }
+
+  el.innerHTML = '<div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px;">Cost Insights</div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px;">'
+    + insights.map(ins => '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:var(--r-md);border:1px solid '+ins.color+'44;background:'+ins.bg+';">'
+      + '<span style="font-size:16px;flex-shrink:0;margin-top:1px;">'+ins.icon+'</span>'
+      + '<div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">'+ins.title+'</div>'
+      + '<div style="font-size:11.5px;color:var(--text-secondary);line-height:1.5;">'+ins.body+'</div></div>'
+      + '</div>').join('')
+    + '</div>';
 }
 
 // Owner analysis
@@ -4945,30 +5256,7 @@ window.renderNdrRanking = function() {
   });
 };
 
-function renderNdrCostBreak(data, months) {
-  if (charts.ndrCostBreak) { charts.ndrCostBreak.destroy(); charts.ndrCostBreak = null; }
-  const mk   = months[months.length - 1];
-  const rows = [...(data[mk] || [])].sort((a,b) => b.cost - a.cost).slice(0, 20);
-  const opts = baseOpts();
-  opts.scales.x.stacked = true; opts.scales.y.stacked = true;
-  opts.scales.y.ticks = { callback: v => fmtMoney(v) };
-  opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw)}` };
-  opts.plugins.legend = { display: true, position: 'bottom', labels: { font: { family:'Poppins', size: 10 }, boxWidth: 10 } };
-  charts.ndrCostBreak = new Chart(document.getElementById('cNdrCostBreak'), {
-    type: 'bar',
-    data: {
-      labels: rows.map(r => r.client),
-      datasets: [
-        { label: 'Hours cost',      data: rows.map(r => r.hours_cost),      backgroundColor: '#08173C', borderRadius: 2, maxBarThickness: 40 },
-        { label: 'Pricing cost',    data: rows.map(r => r.pricing_cost),    backgroundColor: '#219EBC', borderRadius: 2, maxBarThickness: 40 },
-        { label: 'Partner cost',    data: rows.map(r => r.partner_cost),    backgroundColor: '#F4A261', borderRadius: 2, maxBarThickness: 40 },
-        { label: 'Stock cost',      data: rows.map(r => r.stock_cost),      backgroundColor: '#E9C46A', borderRadius: 2, maxBarThickness: 40 },
-        { label: 'Competitor data', data: rows.map(r => r.competitor_cost), backgroundColor: '#E4A8A0', borderRadius: 2, maxBarThickness: 40 },
-      ]
-    },
-    options: opts,
-  });
-}
+// renderNdrCostBreak removed — replaced by renderNdrCostBreakdown above
 
 // Expose chart functions used by onchange="" attributes in HTML
 window.chartCustStack  = chartCustStack;
