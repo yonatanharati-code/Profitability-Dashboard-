@@ -106,6 +106,19 @@ body{min-height:100vh;transition:background .2s,color .2s;}
 .section-title{font-size:13.5px;font-weight:600;letter-spacing:-.005em;color:var(--text);}
 .section-desc{font-size:11.5px;color:var(--text-secondary);margin-top:1px;}
 
+/* ── Section collapse / drag-and-drop ── */
+.section-body{overflow:hidden;transition:max-height .22s ease,opacity .18s ease;}
+.section.sec-collapsed .section-body{max-height:0!important;opacity:0;pointer-events:none;}
+.section.sec-collapsed .section-head{margin-bottom:0;}
+.sec-controls{display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:8px;}
+.sec-toggle-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;transition:all .12s;}
+.sec-toggle-btn:hover{background:var(--surface-subtle);color:var(--text);}
+.sec-drag-handle{font-size:15px;color:var(--text-secondary);cursor:grab;opacity:.35;line-height:1;padding:2px 4px;border-radius:4px;user-select:none;transition:opacity .12s;}
+.sec-drag-handle:hover{opacity:.8;}
+.section.sec-dragging{opacity:.45;outline:2px dashed var(--border-strong);}
+.section.sec-drag-over{outline:2px solid #6366f1;outline-offset:2px;background:rgba(99,102,241,.04);}
+.section.sec-drag-over-after{box-shadow:0 4px 0 0 #6366f1;}
+
 /* ── Cards ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden;}
 .card-head{padding:14px var(--card-pad) 8px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
@@ -4987,5 +5000,262 @@ else init();
   <div class="cust-drawer-overlay" onclick="closeCustomerDetail()"></div>
   <div class="cust-panel" id="custPanel"></div>
 </div>
+
+<!-- ═══════════════════ SECTION COLLAPSE + DRAG-AND-DROP ═══════════════════ -->
+<script>
+(function(){
+'use strict';
+
+var COLL_PFX  = 'ql-sec-coll:';
+var ORDER_PFX = 'ql-sec-ord:';
+var _dragSrc  = null; // the section being dragged
+
+/* ── Stable section ID ──────────────────────────────────────────────────── */
+function secId(el) {
+  if (el._secId) return el._secId;
+  var pane = el.closest ? el.closest('.pane') : null;
+  var paneId = pane ? pane.id : 'root';
+  var title = (el.querySelector('.section-title') || {}).textContent || '';
+  title = title.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40) || 'sec';
+  el._secId = paneId + '__' + title;
+  return el._secId;
+}
+
+/* ── Collapse / expand ──────────────────────────────────────────────────── */
+function wrapBody(section) {
+  var head = section.querySelector(':scope > .section-head');
+  // Find all direct children that are NOT .section-head and NOT already .section-body
+  var children = Array.from(section.children).filter(function(c){
+    return !c.classList.contains('section-head') && !c.classList.contains('section-body');
+  });
+  if (!children.length) return null;
+  // Check if already wrapped
+  if (section.querySelector(':scope > .section-body')) return section.querySelector(':scope > .section-body');
+  var wrap = document.createElement('div');
+  wrap.className = 'section-body';
+  // Insert wrap after head (or at start if no head)
+  var ref = head ? head.nextSibling : section.firstChild;
+  section.insertBefore(wrap, ref);
+  children.forEach(function(c){ wrap.appendChild(c); });
+  return wrap;
+}
+
+function applyCollapsed(section, collapsed) {
+  var body = section.querySelector(':scope > .section-body');
+  if (body) body.style.maxHeight = collapsed ? '0' : (body.scrollHeight + 200) + 'px';
+  section.classList.toggle('sec-collapsed', !!collapsed);
+  var btn = section.querySelector('.sec-toggle-btn');
+  if (btn) btn.textContent = collapsed ? '+' : '−';
+}
+
+function toggleCollapse(section) {
+  var now = !section.classList.contains('sec-collapsed');
+  // If expanding, first remove max-height cap so it can measure
+  if (!now) {
+    var body = section.querySelector(':scope > .section-body');
+    if (body) body.style.maxHeight = body.scrollHeight + 200 + 'px';
+  }
+  section.classList.toggle('sec-collapsed', now);
+  var btn = section.querySelector('.sec-toggle-btn');
+  if (btn) btn.textContent = now ? '+' : '−';
+  try { localStorage.setItem(COLL_PFX + secId(section), now ? '1' : '0'); } catch(e){}
+}
+
+/* ── Drag-and-drop ──────────────────────────────────────────────────────── */
+function saveOrder(pane) {
+  var sections = Array.from(pane.querySelectorAll(':scope > .section'));
+  var ids = sections.map(function(s){ return secId(s); });
+  try { localStorage.setItem(ORDER_PFX + pane.id, JSON.stringify(ids)); } catch(e){}
+}
+
+function applyOrder(pane) {
+  var raw;
+  try { raw = localStorage.getItem(ORDER_PFX + pane.id); } catch(e){}
+  if (!raw) return;
+  var ids;
+  try { ids = JSON.parse(raw); } catch(e){ return; }
+  var sections = Array.from(pane.querySelectorAll(':scope > .section'));
+  if (!sections.length) return;
+  // Map id → element
+  var map = {};
+  sections.forEach(function(s){ map[secId(s)] = s; });
+  // Re-order according to saved ids (append to pane in order)
+  var ref = sections[0].parentNode;
+  var insertBefore = sections[sections.length-1].nextSibling; // anchor after last section
+  ids.forEach(function(id){
+    var el = map[id];
+    if (el) ref.insertBefore(el, insertBefore);
+  });
+  // Any sections not in saved order stay at end
+}
+
+function initDrag(section) {
+  if (section._dndReady) return;
+  section._dndReady = true;
+  section.setAttribute('draggable','false'); // only draggable via handle
+
+  var handle = section.querySelector('.sec-drag-handle');
+  if (!handle) return;
+
+  handle.addEventListener('mousedown', function(){
+    section.setAttribute('draggable','true');
+  });
+  document.addEventListener('mouseup', function(){
+    section.setAttribute('draggable','false');
+  });
+
+  section.addEventListener('dragstart', function(e){
+    if (section.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
+    _dragSrc = section;
+    section.classList.add('sec-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', secId(section));
+  });
+
+  section.addEventListener('dragend', function(){
+    section.classList.remove('sec-dragging');
+    section.setAttribute('draggable','false');
+    document.querySelectorAll('.sec-drag-over,.sec-drag-over-after').forEach(function(el){
+      el.classList.remove('sec-drag-over','sec-drag-over-after');
+    });
+    _dragSrc = null;
+  });
+
+  section.addEventListener('dragover', function(e){
+    if (!_dragSrc || _dragSrc === section) return;
+    var pane = section.closest('.pane');
+    var srcPane = _dragSrc.closest('.pane');
+    if (pane !== srcPane) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.sec-drag-over,.sec-drag-over-after').forEach(function(el){
+      el.classList.remove('sec-drag-over','sec-drag-over-after');
+    });
+    var rect = section.getBoundingClientRect();
+    var below = e.clientY > rect.top + rect.height / 2;
+    section.classList.add(below ? 'sec-drag-over-after' : 'sec-drag-over');
+  });
+
+  section.addEventListener('dragleave', function(){
+    section.classList.remove('sec-drag-over','sec-drag-over-after');
+  });
+
+  section.addEventListener('drop', function(e){
+    if (!_dragSrc || _dragSrc === section) return;
+    var pane = section.closest('.pane');
+    var srcPane = _dragSrc.closest('.pane');
+    if (pane !== srcPane) return;
+    e.preventDefault();
+    section.classList.remove('sec-drag-over','sec-drag-over-after');
+    var rect = section.getBoundingClientRect();
+    var below = e.clientY > rect.top + rect.height / 2;
+    if (below) {
+      section.parentNode.insertBefore(_dragSrc, section.nextSibling);
+    } else {
+      section.parentNode.insertBefore(_dragSrc, section);
+    }
+    saveOrder(pane);
+  });
+}
+
+/* ── Add controls to a section ─────────────────────────────────────────── */
+function addControls(section) {
+  // Ensure a section-head exists
+  var head = section.querySelector(':scope > .section-head');
+  if (!head) {
+    head = document.createElement('div');
+    head.className = 'section-head';
+    section.insertBefore(head, section.firstChild);
+  }
+  // Skip if already done
+  if (head.querySelector('.sec-controls')) return;
+
+  var wrap = wrapBody(section);
+  // Set initial max-height for transition to work
+  if (wrap) wrap.style.maxHeight = (wrap.scrollHeight + 200) + 'px';
+
+  // Controls container (drag handle + toggle)
+  var ctrl = document.createElement('div');
+  ctrl.className = 'sec-controls';
+
+  var handle = document.createElement('span');
+  handle.className = 'sec-drag-handle';
+  handle.textContent = '⠿';
+  handle.title = 'Drag to reorder';
+
+  var btn = document.createElement('button');
+  btn.className = 'sec-toggle-btn';
+  btn.title = 'Collapse / expand';
+  btn.textContent = '−';
+  btn.onclick = function(e){ e.stopPropagation(); toggleCollapse(section); };
+
+  ctrl.appendChild(handle);
+  ctrl.appendChild(btn);
+  head.appendChild(ctrl);
+
+  // Apply saved collapse state
+  var saved;
+  try { saved = localStorage.getItem(COLL_PFX + secId(section)); } catch(e){}
+  if (saved === '1') {
+    section.classList.add('sec-collapsed');
+    if (wrap) wrap.style.maxHeight = '0';
+    btn.textContent = '+';
+  }
+
+  initDrag(section);
+}
+
+/* ── Main init: process all panes ───────────────────────────────────────── */
+function initAll() {
+  document.querySelectorAll('.pane').forEach(function(pane){
+    pane.querySelectorAll(':scope > .section').forEach(addControls);
+    applyOrder(pane);
+  });
+}
+
+/* ── Re-init after NDR / dynamic tab re-renders ────────────────────────── */
+// Patch refreshNdrTab to re-apply controls after re-render
+var _origRefresh = window.refreshNdrTab;
+window.refreshNdrTab = function(){
+  if (_origRefresh) _origRefresh.apply(this, arguments);
+  setTimeout(function(){
+    var ndrPane = document.getElementById('pane-ndr');
+    if (ndrPane) {
+      ndrPane.querySelectorAll(':scope > .section').forEach(addControls);
+      applyOrder(ndrPane);
+    }
+  }, 50);
+};
+
+// Also patch tab switching to run initAll lazily
+var _origShowPane = window.showPane;
+window.showPane = function(id){
+  if (_origShowPane) _origShowPane.apply(this, arguments);
+  setTimeout(function(){
+    var pane = document.getElementById('pane-' + id);
+    if (pane) {
+      pane.querySelectorAll(':scope > .section').forEach(addControls);
+      applyOrder(pane);
+    }
+  }, 80);
+};
+
+// Initial run after page is painted
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAll);
+} else {
+  setTimeout(initAll, 100);
+}
+
+/* ── Expose reset helper ────────────────────────────────────────────────── */
+window.resetSectionLayout = function(){
+  Object.keys(localStorage).filter(function(k){
+    return k.startsWith(COLL_PFX) || k.startsWith(ORDER_PFX);
+  }).forEach(function(k){ localStorage.removeItem(k); });
+  location.reload();
+};
+
+})();
+</script>
 </body>
 </html>
