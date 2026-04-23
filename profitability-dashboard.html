@@ -920,8 +920,12 @@ tr.selected-row{background:var(--teal-50) !important;}
         <div class="section-title">Client Deep-Dive</div>
         <div class="section-desc">Month-over-month income, cost, profit &amp; margin for a specific client</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <label style="font-size:11px;color:var(--text-secondary);">Client</label>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:11px;color:var(--text-secondary);">Owner</label>
+        <select id="ndrDrillOwnerSel" onchange="window._ndrDrillOwnerChanged()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;min-width:150px;">
+          <option value="">All owners</option>
+        </select>
+        <label style="font-size:11px;color:var(--text-secondary);margin-left:4px;">Client</label>
         <select id="ndrClientSel" onchange="window.renderNdrClientDrilldown()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;min-width:200px;"></select>
       </div>
     </div>
@@ -4423,11 +4427,25 @@ function initNdrTab() {
   const allClients = [...new Set(months.flatMap(mk => (data[mk]||[]).map(r => r.client)))].sort();
   const clientSel  = document.getElementById('ndrClientSel');
   if (clientSel) {
+    // Populate owner selector (preserve selection)
+    const ownerSel = document.getElementById('ndrDrillOwnerSel');
+    if (ownerSel) {
+      const allOwners = [...new Set(allClients.map(c => getNdrOwner(c)))].filter(Boolean).sort();
+      const prevOwner = ownerSel.value;
+      ownerSel.innerHTML = '<option value="">All owners</option>'
+        + allOwners.map(o => `<option value="${escapeHtml(o)}"${o===prevOwner?' selected':''}>${escapeHtml(o)}</option>`).join('');
+    }
+
+    // Populate client selector filtered by selected owner
+    const ownerFilter = ownerSel?.value || '';
+    const visibleClients = ownerFilter ? allClients.filter(c => getNdrOwner(c) === ownerFilter) : allClients;
     const prev = clientSel.value;
-    clientSel.innerHTML = '<option value="__all__">— All clients —</option>'
-      + allClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    if (allClients.includes(prev)) clientSel.value = prev;
+    const allLabel = ownerFilter ? `— All (${escapeHtml(ownerFilter)}) —` : '— All clients —';
+    clientSel.innerHTML = `<option value="__all__">${allLabel}</option>`
+      + visibleClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    if (visibleClients.includes(prev)) clientSel.value = prev;
     else if (prev === '__all__') clientSel.value = '__all__';
+    else clientSel.value = '__all__'; // reset to All if prev client not in filtered list
   }
 
   // ── Pre-compute per-client NDRs ───────────────────────────────────────────
@@ -5134,6 +5152,24 @@ window.renderNdrOwnerAnalysis = function(dataArg, monthsArg, clientNdrsArg) {
 };
 
 // Client drill-down
+// When owner changes: re-filter the client dropdown then re-render
+window._ndrDrillOwnerChanged = function() {
+  const data = window.NDR_DATA;
+  if (!data) return;
+  const months = _filteredNdrMonths();
+  const allClients = [...new Set(months.flatMap(mk=>(data[mk]||[]).map(r=>r.client)))].sort();
+  const ownerSel = document.getElementById('ndrDrillOwnerSel');
+  const clientSel = document.getElementById('ndrClientSel');
+  if (!ownerSel || !clientSel) return;
+  const ownerFilter = ownerSel.value;
+  const visibleClients = ownerFilter ? allClients.filter(c => getNdrOwner(c) === ownerFilter) : allClients;
+  const allLabel = ownerFilter ? `— All (${escapeHtml(ownerFilter)}) —` : '— All clients —';
+  clientSel.innerHTML = `<option value="__all__">${allLabel}</option>`
+    + visibleClients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  clientSel.value = '__all__';
+  window.renderNdrClientDrilldown();
+};
+
 window.renderNdrClientDrilldown = function() {
   const data = window.NDR_DATA;
   if (!data) return;
@@ -5144,10 +5180,13 @@ window.renderNdrClientDrilldown = function() {
   const months = _filteredNdrMonths();
   const isAll = client === '__all__';
 
+  // For All view, respect the owner filter
+  const ownerFilter = document.getElementById('ndrDrillOwnerSel')?.value || '';
+
   // Build clientData: per-month aggregated row (for All) or single-client row
   const clientData = months.map(mk => {
     if (isAll) {
-      const rows = data[mk] || [];
+      const rows = (data[mk] || []).filter(r => !ownerFilter || getNdrOwner(r.client) === ownerFilter);
       if (!rows.length) return null;
       return {
         income: rows.reduce((s,r)=>s+r.income,0),
