@@ -865,6 +865,12 @@ tr.selected-row{background:var(--teal-50) !important;}
         <div class="section-title">Net Revenue Retention — Per Client</div>
         <div class="section-desc">Month-over-month income retention %. Green = growth, orange = mild contraction, red = decline</div>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:11px;color:var(--text-secondary);">Owner</label>
+        <select id="ndrCohortOwnerSel" onchange="window._filterCohortByOwner()" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;min-width:150px;">
+          <option value="">All owners</option>
+        </select>
+      </div>
     </div>
     <div class="card"><div class="card-body" style="overflow-x:auto;">
       <div id="ndrClientNdrTable"></div>
@@ -4521,6 +4527,25 @@ window.renderNdrTopBottom = function(btnEl, metric, dataArg, monthsArg) {
 
 // ── Per-client NDR heatmap table ─────────────────────────────────────────────
 let _clientNdrSort = { key: 'ytdNdr', dir: -1 };
+let _clientNdrOwnerFilter = '';
+
+window._filterCohortByOwner = function() {
+  const sel = document.getElementById('ndrCohortOwnerSel');
+  _clientNdrOwnerFilter = sel ? sel.value : '';
+  const data = window.NDR_DATA; if (!data) return;
+  const months = _filteredNdrMonths();
+  renderNdrClientNdrTable(data, months, calcClientNdrs(data, months));
+};
+
+function _populateCohortOwnerSel(rows) {
+  const sel = document.getElementById('ndrCohortOwnerSel');
+  if (!sel) return;
+  const owners = [...new Set(rows.map(r => r.owner))].filter(Boolean).sort();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All owners</option>'
+    + owners.map(o => '<option value="'+escapeHtml(o)+'"'+(o===cur?' selected':'')+'>'+escapeHtml(o)+'</option>').join('');
+}
+
 function renderNdrClientNdrTable(data, months, clientNdrs) {
   const el = document.getElementById('ndrClientNdrTable');
   if (!el) return;
@@ -4538,6 +4563,11 @@ function renderNdrClientNdrTable(data, months, clientNdrs) {
       return r;
     });
 
+  // Populate owner dropdown (preserve selection) then filter
+  _populateCohortOwnerSel(rows);
+  const ownerFilter = _clientNdrOwnerFilter;
+  const filteredRows = ownerFilter ? rows.filter(r => r.owner === ownerFilter) : rows;
+
   const cellColor = pct => pct >= 115 ? '#95D600' : pct >= 100 ? '#7AB800' : pct >= 85 ? '#F4A261' : '#E4A8A0';
   const cellBg   = pct => pct >= 115 ? 'rgba(149,214,0,.15)' : pct >= 100 ? 'rgba(122,184,0,.10)' : pct >= 85 ? 'rgba(244,162,97,.12)' : 'rgba(228,168,160,.15)';
 
@@ -4550,7 +4580,7 @@ function renderNdrClientNdrTable(data, months, clientNdrs) {
   const ytdCol = { key:'ytdNdr', label:'Period NDR' };
   const allCols = [...fixedCols, ...monthColKeys, ytdCol];
 
-  const sorted = [...rows].sort((a,b) => {
+  const sorted = [...filteredRows].sort((a,b) => {
     const sk = _clientNdrSort.key, d = _clientNdrSort.dir;
     const av = a[sk] ?? -9999, bv = b[sk] ?? -9999;
     return d < 0 ? bv - av : av - bv;
