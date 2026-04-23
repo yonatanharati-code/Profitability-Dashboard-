@@ -293,8 +293,10 @@ function injectData(html, cache, csvHours) {
   }
 
   // ── Replace NDR_DATA object ───────────────────────────────────────────────
-  const ndrData = readNdr();
-  if (ndrData) {
+  const ndrRaw = readNdr();
+  if (ndrRaw) {
+    // Strip internal metadata keys before injecting into client
+    const { _syncedAt: ndrSyncedAt, ...ndrData } = ndrRaw;
     const NDR_MARKER = 'const NDR_DATA={';
     const ndrStart = html.indexOf(NDR_MARKER);
     if (ndrStart !== -1) {
@@ -305,6 +307,13 @@ function injectData(html, cache, csvHours) {
                `const NDR_DATA=${JSON.stringify(ndrData)}` +
                html.slice(ndrEnd + 1);
       }
+    }
+    // Inject last-synced timestamp so UI can display it
+    if (ndrSyncedAt) {
+      html = html.replace(
+        'const NDR_DATA=',
+        `const NDR_SYNCED_AT=${JSON.stringify(ndrSyncedAt)};\nconst NDR_DATA=`
+      );
     }
   }
 
@@ -355,7 +364,8 @@ function injectData(html, cache, csvHours) {
       `\n  <button class="import-btn" id="ndrSyncBtn" onclick="_syncNdr()"
     style="background:rgba(250,204,21,.10);border-color:rgba(250,204,21,.3);color:#facc15;margin-left:6px;">
     ↻ Sync NDR
-  </button>`
+  </button>` +
+      `\n  <span id="ndrSyncedAtBadge" style="margin-left:6px;"></span>`
     );
   }
 
@@ -597,7 +607,8 @@ app.get('/', (req, res) => {
           `\n  <button class="import-btn" id="ndrSyncBtn" onclick="_syncNdr()"
     style="background:rgba(250,204,21,.10);border-color:rgba(250,204,21,.3);color:#facc15;margin-left:6px;">
     ↻ Sync NDR
-  </button>`
+  </button>` +
+          `\n  <span id="ndrSyncedAtBadge" style="margin-left:6px;"></span>`
         );
       }
       // Inject the _syncFromApis function so the button actually works
@@ -986,7 +997,13 @@ app.get('/api/ndr-status', (req, res) => {
 });
 
 /** Fetch fresh NDR data from published Google Sheets CSVs and update snapshot */
-let ndrSyncState = { running: false, step: 'idle', error: null };
+// Seed syncedAt from file if it exists
+let _ndrFileSyncedAt = null;
+try {
+  const _snap = JSON.parse(fs.readFileSync(NDR_FILE, 'utf8'));
+  if (_snap._syncedAt) _ndrFileSyncedAt = _snap._syncedAt;
+} catch {}
+let ndrSyncState = { running: false, step: 'idle', error: null, syncedAt: _ndrFileSyncedAt };
 
 app.get('/api/ndr-sync-status', (req, res) => res.json(ndrSyncState));
 
@@ -1002,10 +1019,11 @@ app.post('/api/sync-ndr', (req, res) => {
         ndrSyncState.step = msg;
       });
       fs.mkdirSync(path.dirname(NDR_FILE), { recursive: true });
-      fs.writeFileSync(NDR_FILE, JSON.stringify(snapshot, null, 2));
+      const syncedAt = new Date().toISOString();
+      fs.writeFileSync(NDR_FILE, JSON.stringify({ _syncedAt: syncedAt, ...snapshot }, null, 2));
       const months = Object.keys(snapshot).sort();
       console.log(`✓  NDR sync complete — ${months.length} months`);
-      ndrSyncState = { running: false, step: 'complete', error: null, months };
+      ndrSyncState = { running: false, step: 'complete', error: null, months, syncedAt };
     } catch (err) {
       const msg = err?.message || String(err);
       console.error('NDR sync failed:', msg);

@@ -1184,6 +1184,7 @@ tr.selected-row{background:var(--teal-50) !important;}
 const DATA = []
 const DEALS={}
 const USER_HOURS={}
+const NDR_SYNCED_AT=""
 const NDR_DATA={}
 const HS_PORTAL_ID=0
 const HS_PORTAL_DOMAIN=""
@@ -4270,6 +4271,22 @@ function initNdrTab() {
   if (!data || Object.keys(data).length === 0) {
     document.getElementById('ndrKpiRow').innerHTML = '<p style="color:var(--text-secondary);padding:20px;">No NDR data loaded. Click "↻ Sync NDR" to fetch from Google Sheets.</p>';
     return;
+  }
+
+  // ── Show last-synced timestamp ───────────────────────────────────────────
+  const syncedAtEl = document.getElementById('ndrSyncedAtBadge');
+  if (syncedAtEl) {
+    const sa = (typeof NDR_SYNCED_AT !== 'undefined' && NDR_SYNCED_AT) ? NDR_SYNCED_AT : null;
+    if (sa) {
+      const d = new Date(sa);
+      const now = new Date();
+      const diffH = Math.round((now - d) / 36e5);
+      const diffStr = diffH < 1 ? 'just now' : diffH < 24 ? diffH + 'h ago' : Math.round(diffH/24) + 'd ago';
+      const isStale = diffH > 12;
+      syncedAtEl.innerHTML = '<span style="font-size:10px;color:'+(isStale?'#E4A8A0':'var(--text-secondary)')+';font-weight:'+(isStale?'600':'400')+';">NDR data: '+diffStr+(isStale?' ⚠ stale':'')+' ('+d.toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+')</span>';
+    } else {
+      syncedAtEl.innerHTML = '<span style="font-size:10px;color:#E4A8A0;font-weight:600;">NDR data: never synced ⚠</span>';
+    }
   }
 
   const allMonths = _allNdrMonths();
