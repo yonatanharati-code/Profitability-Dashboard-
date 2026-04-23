@@ -782,6 +782,10 @@ tr.selected-row{background:var(--teal-50) !important;}
         <div class="section-desc" id="ndrTrendDesc">All clients combined · USD</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:11px;color:var(--text-secondary);">Owner</label>
+        <select id="ndrTrendOwnerSel" onchange="window._ndrTrendOwnerChanged()" style="font-size:11px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;min-width:130px;">
+          <option value="">All owners</option>
+        </select>
         <div style="position:relative;">
           <button id="ndrTrendFilterBtn" onclick="window.toggleNdrTrendFilter()" style="font-size:11px;padding:4px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
             <span id="ndrTrendFilterLabel">All clients</span> <span style="opacity:.5;">▾</span>
@@ -808,7 +812,11 @@ tr.selected-row{background:var(--teal-50) !important;}
         <div class="section-title">Cost Component Breakdown &amp; Insights</div>
         <div class="section-desc">Monthly stacked cost by component · spike detection and explanations</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:11px;color:var(--text-secondary);">Owner</label>
+        <select id="ndrCostOwnerSel" onchange="window._ndrCostOwnerChanged()" style="font-size:11px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;min-width:130px;">
+          <option value="">All owners</option>
+        </select>
         <div style="position:relative;">
           <button id="ndrCostFilterBtn" onclick="window.toggleNdrCostFilter()" style="font-size:11px;padding:4px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
             <span id="ndrCostFilterLabel">All clients</span> <span style="opacity:.5;">▾</span>
@@ -4490,6 +4498,7 @@ function initNdrTab() {
       <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">${k.sub||''}</div>
     </div>`).join('');
 
+  _populateChartOwnerSels(data, months);
   renderNdrTrend(data, months);
   renderNdrCostBreakdown(data, months);
   renderNdrInsights(data, months, clientNdrs);
@@ -4795,6 +4804,51 @@ window.ndrTrendSelectAll = function(val) {
   if (el) el.querySelectorAll('input').forEach(b => b.checked = val);
   window._ndrTrendFilterChanged();
 };
+
+// ── Owner dropdowns for Trend + Cost charts ───────────────────────────────
+function _populateChartOwnerSels(data, months) {
+  const allClients = _allNdrClients(data, months);
+  const owners = [...new Set(allClients.map(c => getNdrOwner(c)))].filter(Boolean).sort();
+  const opts = '<option value="">All owners</option>' + owners.map(o=>'<option value="'+escapeHtml(o)+'">'+escapeHtml(o)+'</option>').join('');
+  ['ndrTrendOwnerSel','ndrCostOwnerSel'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = opts;
+    if (owners.includes(cur)) sel.value = cur;
+  });
+}
+
+// Apply owner filter: check only that owner's clients in the given panel, then trigger change
+function _applyOwnerToFilter(ownerVal, listId, changedFn, data, months) {
+  const allClients = _allNdrClients(data, months);
+  const ownerClients = ownerVal ? new Set(allClients.filter(c => getNdrOwner(c) === ownerVal)) : null;
+  // Rebuild the panel with only relevant clients pre-checked
+  const el = document.getElementById(listId);
+  if (!el) return;
+  el.querySelectorAll('input[type=checkbox]').forEach(b => {
+    b.checked = !ownerClients || ownerClients.has(b.dataset.client);
+  });
+  window[changedFn]();
+}
+
+window._ndrTrendOwnerChanged = function() {
+  const ownerVal = document.getElementById('ndrTrendOwnerSel')?.value || '';
+  const data = window.NDR_DATA; if (!data) return;
+  const months = _filteredNdrMonths();
+  // Open panel + populate first (needed so checkboxes exist)
+  _buildFilterPanel('ndrTrendFilterList', ()=>_ndrTrendFilter, '_ndrTrendFilterChanged', data, months);
+  _applyOwnerToFilter(ownerVal, 'ndrTrendFilterList', '_ndrTrendFilterChanged', data, months);
+};
+
+window._ndrCostOwnerChanged = function() {
+  const ownerVal = document.getElementById('ndrCostOwnerSel')?.value || '';
+  const data = window.NDR_DATA; if (!data) return;
+  const months = _filteredNdrMonths();
+  _buildFilterPanel('ndrCostFilterList', ()=>_ndrCostFilter, '_ndrCostFilterChanged', data, months);
+  _applyOwnerToFilter(ownerVal, 'ndrCostFilterList', '_ndrCostFilterChanged', data, months);
+};
+
 // Close panels on outside click
 document.addEventListener('click', function(e) {
   ['ndrTrendFilterPanel','ndrCostFilterPanel'].forEach(id => {
