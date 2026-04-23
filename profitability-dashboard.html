@@ -5358,9 +5358,11 @@ function wrapBody(section) {
   return wrap;
 }
 
+var EXPANDED_MAX_H = '32000px'; // large enough for any section; avoids measuring scrollHeight
+
 function applyCollapsed(section, collapsed) {
   var body = section.querySelector(':scope > .section-body');
-  if (body) body.style.maxHeight = collapsed ? '0' : (body.scrollHeight + 200) + 'px';
+  if (body) body.style.maxHeight = collapsed ? '0' : EXPANDED_MAX_H;
   section.classList.toggle('sec-collapsed', !!collapsed);
   var btn = section.querySelector('.sec-toggle-btn');
   if (btn) btn.textContent = collapsed ? '+' : '−';
@@ -5368,12 +5370,9 @@ function applyCollapsed(section, collapsed) {
 
 function toggleCollapse(section) {
   var now = !section.classList.contains('sec-collapsed');
-  // If expanding, first remove max-height cap so it can measure
-  if (!now) {
-    var body = section.querySelector(':scope > .section-body');
-    if (body) body.style.maxHeight = body.scrollHeight + 200 + 'px';
-  }
   section.classList.toggle('sec-collapsed', now);
+  var body = section.querySelector(':scope > .section-body');
+  if (body) body.style.maxHeight = now ? '0' : EXPANDED_MAX_H;
   var btn = section.querySelector('.sec-toggle-btn');
   if (btn) btn.textContent = now ? '+' : '−';
   try { localStorage.setItem(COLL_PFX + secId(section), now ? '1' : '0'); } catch(e){}
@@ -5489,8 +5488,8 @@ function addControls(section) {
   if (head.querySelector('.sec-controls')) return;
 
   var wrap = wrapBody(section);
-  // Set initial max-height for transition to work
-  if (wrap) wrap.style.maxHeight = (wrap.scrollHeight + 200) + 'px';
+  // Set initial max-height (use large fixed value — never measure scrollHeight as content may not be rendered yet)
+  if (wrap) wrap.style.maxHeight = EXPANDED_MAX_H;
 
   // Controls container (drag handle + toggle)
   var ctrl = document.createElement('div');
