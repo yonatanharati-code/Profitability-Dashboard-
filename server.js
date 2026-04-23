@@ -308,13 +308,11 @@ function injectData(html, cache, csvHours) {
                html.slice(ndrEnd + 1);
       }
     }
-    // Inject last-synced timestamp so UI can display it
-    if (ndrSyncedAt) {
-      html = html.replace(
-        'const NDR_DATA=',
-        `const NDR_SYNCED_AT=${JSON.stringify(ndrSyncedAt)};\nconst NDR_DATA=`
-      );
-    }
+    // Update the existing NDR_SYNCED_AT placeholder (replace in-place to avoid duplicate const)
+    html = html.replace(
+      /const NDR_SYNCED_AT="[^"]*"/,
+      `const NDR_SYNCED_AT=${JSON.stringify(ndrSyncedAt || '')}`
+    );
   }
 
   // ── Intercept sendChat at its first line so ALL call paths use local engine ──
