@@ -3263,7 +3263,7 @@ window.editBudget = function(id, currentVal){
     </span>
     <span style="display:flex;gap:4px;align-items:center;">
       <span style="font-size:9px;color:var(--text-secondary);white-space:nowrap;">Count hrs from:</span>
-      <select id="bif_${id}" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-family:inherit;">${monthOpts}</select>
+      <select id="bif_${id}" onchange="applyBudgetFrom('${id}', this.value)" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-family:inherit;">${monthOpts}</select>
     </span>
   </span>`;
   const inp = document.getElementById(`bi_${id}`);
@@ -3305,6 +3305,53 @@ window.clearBudget = function(id){
   try { localStorage.setItem('pfd2_budgets', JSON.stringify(state.localBudgets)); } catch(e){}
   try { localStorage.setItem('pfd2_budget_from', JSON.stringify(state.localBudgetFrom)); } catch(e){}
   renderBudget();
+};
+
+// Apply per-client "count hours from" immediately on picker change (no ✓ needed)
+window.applyBudgetFrom = function(id, mk){
+  if (mk) {
+    state.localBudgetFrom[String(id)] = mk;
+  } else {
+    delete state.localBudgetFrom[String(id)];
+  }
+  try { localStorage.setItem('pfd2_budget_from', JSON.stringify(state.localBudgetFrom)); } catch(e){}
+  // Re-render without closing the edit dialog
+  // Recompute only the used cell + utilization in this row without full re-render
+  // so the edit dialog stays open
+  document.querySelectorAll('#budgetBody tr').forEach(tr => {
+    // identify the row by checking if any cell references this id
+    const budgetSpan = tr.querySelector('td:nth-child(4) .budget-set');
+    const inlineSpan = tr.querySelector('td:nth-child(4) .budget-inline');
+    if (!inlineSpan) return; // not the edit row
+    // found — update just the Used cell (3rd column)
+    const usedCell = tr.querySelector('td:nth-child(3)');
+    if (!usedCell) return;
+    // find the client
+    const c = AD().find(cx => String(cx.id) === String(id));
+    if (!c) return;
+    const clientFromMk = state.localBudgetFrom[String(id)] || '';
+    const used = gFrom(c, 'dev', clientFromMk);
+    const manualBudget = state.localBudgets[String(id)] ?? null;
+    const autoBudget   = c.devBudgetFromDeals ?? null;
+    const budget       = manualBudget !== null ? manualBudget : autoBudget;
+    const util = budget != null ? (used/budget)*100 : null;
+    const color = util==null?'var(--text-tertiary)':util>=100?'var(--bad)':util>=80?'var(--warn)':'var(--ok)';
+    const fromBadge = clientFromMk
+      ? `<span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:600;color:var(--accent);background:var(--info-bg);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;">from ${_fmtMk(clientFromMk)}</span>`
+      : '';
+    usedCell.innerHTML = `${used?fmtK(used)+'h':'—'}${fromBadge}`;
+    // update util cell (5th column)
+    const utilCell = tr.querySelector('td:nth-child(5)');
+    if (utilCell && budget != null) {
+      utilCell.innerHTML = `<div class="mini-bar"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${Math.min(100,util)}%;background:${color};"></div></div><div class="mini-bar-label" style="color:${color};">${Math.round(util)}%</div></div>`;
+    }
+    // update remaining cell (6th column)
+    const remCell = tr.querySelector('td:nth-child(6)');
+    if (remCell && budget != null) {
+      const remain = budget - used;
+      remCell.innerHTML = `<span style="color:${remain<0?'var(--bad)':'var(--text)'};font-weight:${remain<0?'600':'500'};">${remain>=0?'+':''}${Math.round(remain)}h</span>`;
+    }
+  });
 };
 
 // ── Customers tab ──────────────────────────────────────
