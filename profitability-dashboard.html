@@ -1533,6 +1533,17 @@ function gFrom(c, layer, fromMk) {
     .filter(([mk]) => mk >= fromMk)
     .reduce((s,[,v]) => s + (v||0), 0);
 }
+// Compute HS auto-budget, filtering by deal close date >= fromMk (YYYY-MM)
+// When fromMk is set, only deals that closed in that month or later count
+function autoBudgetFrom(c, fromMk) {
+  const deals = (c.hsDeals || []).filter(d => d.t === 'dev');
+  if (!deals.length) return null;
+  const filtered = fromMk
+    ? deals.filter(d => d.d && d.d >= fromMk + '-01')
+    : deals;
+  const hours = filtered.map(d => parseHoursFromDeal(d.n || '')).filter(h => h !== null && h > 0);
+  return hours.length > 0 ? hours.reduce((s, h) => s + h, 0) : null;
+}
 function gBug(c){ return g(c,'bug'); }
 function totalEffort(c){ return g(c,'cs')+g(c,'sa')+g(c,'dev')+gBug(c); }
 function hasContractDev(c){ return state.contractIncludes.includes(String(c.id)); }
@@ -3137,7 +3148,8 @@ function renderBudget(){
     const used = gFrom(c, 'dev', clientFromMk);
     const isContract = hasContractDev(c);
     const manualBudget = state.localBudgets[String(c.id)] ?? null;
-    const autoBudget   = c.devBudgetFromDeals ?? null;
+    // HS budget: when a from-date is set, only count deals closed on/after that month
+    const autoBudget   = autoBudgetFrom(c, clientFromMk);
     const budget       = manualBudget !== null ? manualBudget : autoBudget;
     const budgetSource = manualBudget !== null ? 'manual' : autoBudget !== null ? 'hs' : null;
     const util = budget != null ? (used/budget)*100 : null;
@@ -3332,7 +3344,8 @@ window.applyBudgetFrom = function(id, mk){
     const clientFromMk = state.localBudgetFrom[String(id)] || '';
     const used = gFrom(c, 'dev', clientFromMk);
     const manualBudget = state.localBudgets[String(id)] ?? null;
-    const autoBudget   = c.devBudgetFromDeals ?? null;
+    // Budget also filtered by from-date: only count deals closed on/after that month
+    const autoBudget   = autoBudgetFrom(c, clientFromMk);
     const budget       = manualBudget !== null ? manualBudget : autoBudget;
     const util = budget != null ? (used/budget)*100 : null;
     const color = util==null?'var(--text-tertiary)':util>=100?'var(--bad)':util>=80?'var(--warn)':'var(--ok)';
@@ -3340,6 +3353,11 @@ window.applyBudgetFrom = function(id, mk){
       ? `<span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:600;color:var(--accent);background:var(--info-bg);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;">from ${_fmtMk(clientFromMk)}</span>`
       : '';
     usedCell.innerHTML = `${used?fmtK(used)+'h':'—'}${fromBadge}`;
+    // Also update the Budget cell (4th) to show the filtered deal total
+    const budgetCell4 = tr.querySelector('td:nth-child(4)');
+    // Only update if it has the inline editor (the .budget-inline span)
+    // Budget label inside the inline editor is the input — leave it alone
+    // But update the remaining/util to reflect new budget
     // update util cell (5th column)
     const utilCell = tr.querySelector('td:nth-child(5)');
     if (utilCell && budget != null) {
