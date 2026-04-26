@@ -1062,7 +1062,13 @@ tr.selected-row{background:var(--teal-50) !important;}
             <button class="chip" data-f="ok">On track</button>
             <button class="chip" data-f="no">No budget</button>
           </div>
-          <span class="caption muted" style="margin-left:auto;" id="budgetCount">—</span>
+          <span class="caption muted" style="margin-left:auto;"></span>
+          <span class="filter-label" style="white-space:nowrap;">📅 Hours from</span>
+          <select id="budgetFromMk" onchange="renderBudget()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;">
+            <option value="">All time</option>
+          </select>
+          <button onclick="document.getElementById('budgetFromMk').value='';renderBudget();" style="font-size:10px;padding:2px 7px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;" title="Clear start date">✕</button>
+          <span class="caption muted" id="budgetCount">—</span>
         </div>
         <div class="table-wrap">
           <table>
@@ -1516,6 +1522,15 @@ function g(c, layer){
   }
   const k = w===1?'m1':w===3?'m3':'m6';
   return (c[layer]&&c[layer][k])||0;
+}
+// g() variant that only sums months >= fromMk (for Dev Budget start-date filter)
+function gFrom(c, layer, fromMk) {
+  if (!fromMk) return g(c, layer);
+  if (state.hiddenLayers.includes(layer)) return 0;
+  const monthly = c[layer]?.monthly || {};
+  return Object.entries(monthly)
+    .filter(([mk]) => mk >= fromMk)
+    .reduce((s,[,v]) => s + (v||0), 0);
 }
 function gBug(c){ return g(c,'bug'); }
 function totalEffort(c){ return g(c,'cs')+g(c,'sa')+g(c,'dev')+gBug(c); }
@@ -3096,8 +3111,27 @@ function renderChartsForPane(pane){
 
 // ── Dev Budget tab ─────────────────────────────────────
 function renderBudget(){
+  // Populate month picker from available monthly data
+  const fromSel = document.getElementById('budgetFromMk');
+  if (fromSel && fromSel.options.length <= 1) {
+    const allMks = new Set();
+    AD().forEach(c => { Object.keys(c.dev?.monthly||{}).forEach(mk => allMks.add(mk)); });
+    const sorted = [...allMks].sort();
+    const cur = fromSel.value;
+    fromSel.innerHTML = '<option value="">All time</option>'
+      + sorted.map(mk => `<option value="${mk}"${mk===cur?' selected':''}>${_fmtMk ? _fmtMk(mk) : mk}</option>`).join('');
+  }
+  const fromMk = fromSel?.value || '';
+
+  // Update column header to reflect active start month
+  const usedTh = document.querySelector('#budgetThead th[data-bsort="used"]');
+  if (usedTh) {
+    const label = fromMk ? `Used from ${_fmtMk ? _fmtMk(fromMk) : fromMk}` : 'Used (Dev h)';
+    usedTh.innerHTML = `${label} <span class="sort-ind">↕</span>`;
+  }
+
   const rows = AD().map(c => {
-    const used = g(c,'dev');
+    const used = gFrom(c, 'dev', fromMk);
     const isContract = hasContractDev(c);
     const manualBudget = state.localBudgets[String(c.id)] ?? null;
     const autoBudget   = c.devBudgetFromDeals ?? null;
@@ -3985,7 +4019,8 @@ function init(){
     if (card && seg && !seg.contains(e.target)) { card.style.display = 'none'; card.dataset.mode = ''; }
   });
 
-  document.querySelectorAll('#profSeg .seg-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#profSeg .seg-btn').forEach(b=>b.addEventListener('click', e => {
+    if (e.target.classList.contains('metric-info-icon')) return; // icon has its own handler
     state.profMode=b.dataset.mode;
     document.querySelectorAll('#profSeg .seg-btn').forEach(x=>x.classList.toggle('active',x===b));
     if (state.activeTab==='profit') { destroyCharts(); chartProfit(); chartRevVsEff(); chartNoReturn(); renderCsmTable(); }
