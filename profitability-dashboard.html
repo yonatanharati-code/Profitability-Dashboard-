@@ -3123,15 +3123,24 @@ function renderChartsForPane(pane){
 
 // ── Dev Budget tab ─────────────────────────────────────
 function renderBudget(){
-  // Populate month picker from available monthly data
+  // Populate month picker — past data months + next 12 months for future commitments
   const fromSel = document.getElementById('budgetFromMk');
   if (fromSel && fromSel.options.length <= 1) {
     const allMks = new Set();
     AD().forEach(c => { Object.keys(c.dev?.monthly||{}).forEach(mk => allMks.add(mk)); });
+    const _n = new Date();
+    const _todayMk = `${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}`;
+    for (let i = 0; i <= 12; i++) {
+      const d = new Date(_n.getFullYear(), _n.getMonth() + i, 1);
+      allMks.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
     const sorted = [...allMks].sort();
     const cur = fromSel.value;
     fromSel.innerHTML = '<option value="">All time</option>'
-      + sorted.map(mk => `<option value="${mk}"${mk===cur?' selected':''}>${_fmtMk ? _fmtMk(mk) : mk}</option>`).join('');
+      + sorted.map(mk => {
+          const isFuture = mk > _todayMk;
+          return `<option value="${mk}"${mk===cur?' selected':''}>${(_fmtMk ? _fmtMk(mk) : mk)}${isFuture?' →':''}</option>`;
+        }).join('');
   }
   const fromMk = fromSel?.value || '';
 
@@ -3217,9 +3226,11 @@ function renderBudget(){
       : r.remain==null ? `<td class="caption num">—</td>`
         : `<td class="num" style="color:${r.remain<0?'var(--bad)':'var(--text)'};font-weight:${r.remain<0?'600':'500'};">${r.remain>=0?'+':''}${Math.round(r.remain)}h</td>`;
     const oc = ownerColor(r.owner);
-    // "from" badge shown on Used cell when a per-client start date is set
+    // "from" badge — blue for past start, purple+arrow for future commitment
+    const _nowMk = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })();
+    const _isFutureFrom = r.clientFromMk && r.clientFromMk > _nowMk;
     const fromBadge = r.clientFromMk
-      ? `<span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:600;color:var(--accent);background:var(--info-bg);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;cursor:pointer;" onclick="editBudget('${r.c.id}',${r.budget??'null'})" title="Hours counted from ${_fmtMk(r.clientFromMk)} — click to change">from ${_fmtMk(r.clientFromMk)}</span>`
+      ? `<span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:600;color:${_isFutureFrom?'#7C3AED':'var(--accent)'};background:${_isFutureFrom?'#F5F3FF':'var(--info-bg)'};border:1px solid ${_isFutureFrom?'#7C3AED':'var(--accent)'};border-radius:3px;padding:0 4px;vertical-align:middle;cursor:pointer;" onclick="editBudget('${r.c.id}',${r.budget??'null'})" title="${_isFutureFrom?'Future commitment — hours start being tracked from ':'Hours counted from '}${_fmtMk(r.clientFromMk)} — click to change">${_isFutureFrom?'→ ':''}from ${_fmtMk(r.clientFromMk)}</span>`
       : '';
     return `<tr style="${r.isContract?'opacity:.75;':''}">
       <td class="name">${escapeHtml(r.name)}${r.isContract?` <span style="font-size:9px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok);border-radius:3px;padding:0 4px;">CONTRACT</span>`:''}</td>
@@ -3274,12 +3285,23 @@ window.editBudget = function(id, currentVal){
   const currentFromMk = state.localBudgetFrom[String(id)] || '';
   const manualBudget = state.localBudgets[String(id)] ?? null;
 
-  // Month picker options
+  // Month picker options — past (from data) + next 12 months for future commitments
   const allMks = new Set();
   AD().forEach(cx => { Object.keys(cx.dev?.monthly||{}).forEach(mk => allMks.add(mk)); });
+  // Add next 12 months so future start dates can be selected
+  const _now = new Date();
+  for (let i = 0; i <= 12; i++) {
+    const d = new Date(_now.getFullYear(), _now.getMonth() + i, 1);
+    allMks.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  const todayMk = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
   const sortedMks = [...allMks].sort();
   const monthOpts = '<option value="">All time</option>'
-    + sortedMks.map(mk => `<option value="${mk}"${mk===currentFromMk?' selected':''}>${_fmtMk(mk)}</option>`).join('');
+    + sortedMks.map(mk => {
+        const isFuture = mk > todayMk;
+        const label = _fmtMk(mk) + (isFuture ? ' →' : '');
+        return `<option value="${mk}"${mk===currentFromMk?' selected':''}${isFuture?' style="color:var(--accent);font-weight:600;"':''}>${label}</option>`;
+      }).join('');
 
   // Build deals list HTML
   const dealsHtml = devDeals.length > 0
