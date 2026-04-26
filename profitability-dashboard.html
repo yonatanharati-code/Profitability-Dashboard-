@@ -1307,6 +1307,7 @@ const state = {
   selectMode: false,
   selectedRows: [],   // customer IDs currently checked for bulk ops
   localBudgets: {},        // {customerId: hours} — user-set dev budgets
+  localBudgetFrom: {},     // {customerId: 'YYYY-MM'} — per-client "count hours from" date
   tableFilters: [],      // [{field, op, value}] active filters for customer table
   budgetFilters: [],     // [{field, op, value}] active filters for budget table
   budgetSortKey: 'util',
@@ -3131,7 +3132,9 @@ function renderBudget(){
   }
 
   const rows = AD().map(c => {
-    const used = gFrom(c, 'dev', fromMk);
+    // Per-client "count hours from" takes precedence over the global picker
+    const clientFromMk = state.localBudgetFrom[String(c.id)] || fromMk;
+    const used = gFrom(c, 'dev', clientFromMk);
     const isContract = hasContractDev(c);
     const manualBudget = state.localBudgets[String(c.id)] ?? null;
     const autoBudget   = c.devBudgetFromDeals ?? null;
@@ -3141,7 +3144,7 @@ function renderBudget(){
     const remain = budget != null ? budget-used : null;
     // CONTRACT customers are always 'ok' — dev hours are pre-paid, no billing needed
     const status = isContract ? 'contract' : budget==null ? 'no' : util>=100 ? 'over' : util>=80 ? 'near' : 'ok';
-    return {c, name:c.name, owner:c.owner, used, budget, budgetSource, util, remain, isContract, status};
+    return {c, name:c.name, owner:c.owner, used, budget, budgetSource, util, remain, isContract, clientFromMk, status};
   });
 
   const withBudget = rows.filter(r=>r.budget!=null);
@@ -3202,10 +3205,14 @@ function renderBudget(){
       : r.remain==null ? `<td class="caption num">—</td>`
         : `<td class="num" style="color:${r.remain<0?'var(--bad)':'var(--text)'};font-weight:${r.remain<0?'600':'500'};">${r.remain>=0?'+':''}${Math.round(r.remain)}h</td>`;
     const oc = ownerColor(r.owner);
+    // "from" badge shown on Used cell when a per-client start date is set
+    const fromBadge = r.clientFromMk
+      ? `<span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:600;color:var(--accent);background:var(--info-bg);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;cursor:pointer;" onclick="editBudget('${r.c.id}',${r.budget??'null'})" title="Hours counted from ${_fmtMk(r.clientFromMk)} — click to change">from ${_fmtMk(r.clientFromMk)}</span>`
+      : '';
     return `<tr style="${r.isContract?'opacity:.75;':''}">
       <td class="name">${escapeHtml(r.name)}${r.isContract?` <span style="font-size:9px;font-weight:700;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok);border-radius:3px;padding:0 4px;">CONTRACT</span>`:''}</td>
       <td>${r.owner?`<span class="owner"><span class="owner-avatar" style="background:${oc}">${ownerInit(r.owner)}</span>${r.owner}</span>`:'<span class="muted">—</span>'}</td>
-      <td class="num">${r.used?fmtK(r.used)+'h':'—'}</td>
+      <td class="num">${r.used?fmtK(r.used)+'h':'—'}${fromBadge}</td>
       <td class="num">${r.budget!=null
         ? `<span class="budget-set" onclick="editBudget('${r.c.id}',${r.budget})" title="${r.budgetSource==='hs'?'Parsed from HubSpot deal name — click to override':'Manually set — click to edit'}">${fmtK(r.budget)}h${r.budgetSource==='hs'?' <span style="font-size:9px;font-weight:600;color:var(--teal-600);letter-spacing:.4px;">HS</span>':' <span style="font-size:9px;color:var(--text-tertiary);">✎</span>'}</span>`
         : `<span class="budget-set" onclick="editBudget('${r.c.id}',null)">＋ Set budget</span>`
@@ -3228,22 +3235,36 @@ function renderBudget(){
 
 // ── Budget inline edit ─────────────────────────────────
 window.editBudget = function(id, currentVal){
-  // Find the budget cell for this row and replace with inline editor
-  const cells = document.querySelectorAll('#budgetBody tr td:nth-child(4)');
-  // Find the right row by looking for the span with onclick containing this id
-  let targetCell = null;
+  // Find the right row
+  let targetRow = null;
   document.querySelectorAll('#budgetBody tr').forEach(tr => {
     const span = tr.querySelector('td:nth-child(4) .budget-set');
     if (span && span.getAttribute('onclick') && span.getAttribute('onclick').includes(`'${id}'`)) {
-      targetCell = tr.querySelector('td:nth-child(4)');
+      targetRow = tr;
     }
   });
-  if (!targetCell) return;
+  if (!targetRow) return;
+
+  // Build month options for "count hours from" picker
+  const allMks = new Set();
+  AD().forEach(c => { Object.keys(c.dev?.monthly||{}).forEach(mk => allMks.add(mk)); });
+  const sortedMks = [...allMks].sort();
+  const currentFromMk = state.localBudgetFrom[String(id)] || '';
+  const monthOpts = '<option value="">All time</option>'
+    + sortedMks.map(mk => `<option value="${mk}"${mk===currentFromMk?' selected':''}>${_fmtMk(mk)}</option>`).join('');
+
   const initVal = currentVal != null ? currentVal : '';
-  targetCell.innerHTML = `<span class="budget-inline">
-    <input type="number" min="0" step="0.5" value="${initVal}" placeholder="hours" id="bi_${id}" style="width:64px;padding:2px 5px;border:1px solid var(--accent);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;font-family:var(--mono);text-align:right;outline:none;">
-    <button onclick="saveBudget('${id}')" style="padding:2px 7px;border-radius:4px;border:none;background:var(--accent);color:white;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">✓</button>
-    <button onclick="clearBudget('${id}')" title="Clear manual override (reverts to HubSpot value if available)" style="padding:2px 5px;border-radius:4px;border:none;background:var(--surface-hover);color:var(--text-secondary);font-size:10px;cursor:pointer;font-family:inherit;">✕</button>
+  const budgetCell = targetRow.querySelector('td:nth-child(4)');
+  budgetCell.innerHTML = `<span class="budget-inline" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+    <span style="display:flex;gap:4px;align-items:center;">
+      <input type="number" min="0" step="0.5" value="${initVal}" placeholder="hours" id="bi_${id}" style="width:64px;padding:2px 5px;border:1px solid var(--accent);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;font-family:var(--mono);text-align:right;outline:none;">
+      <button onclick="saveBudget('${id}')" style="padding:2px 7px;border-radius:4px;border:none;background:var(--accent);color:white;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">✓</button>
+      <button onclick="clearBudget('${id}')" title="Clear manual override (reverts to HubSpot value if available)" style="padding:2px 5px;border-radius:4px;border:none;background:var(--surface-hover);color:var(--text-secondary);font-size:10px;cursor:pointer;font-family:inherit;">✕</button>
+    </span>
+    <span style="display:flex;gap:4px;align-items:center;">
+      <span style="font-size:9px;color:var(--text-secondary);white-space:nowrap;">Count hrs from:</span>
+      <select id="bif_${id}" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-family:inherit;">${monthOpts}</select>
+    </span>
   </span>`;
   const inp = document.getElementById(`bi_${id}`);
   if (inp) {
@@ -3264,12 +3285,25 @@ window.saveBudget = function(id){
     state.localBudgets[String(id)] = v;
     try { localStorage.setItem('pfd2_budgets', JSON.stringify(state.localBudgets)); } catch(e){}
   }
+  // Also save the "count hours from" selection
+  const fromSel = document.getElementById(`bif_${id}`);
+  if (fromSel) {
+    const mk = fromSel.value;
+    if (mk) {
+      state.localBudgetFrom[String(id)] = mk;
+    } else {
+      delete state.localBudgetFrom[String(id)];
+    }
+    try { localStorage.setItem('pfd2_budget_from', JSON.stringify(state.localBudgetFrom)); } catch(e){}
+  }
   renderBudget();
 };
 
 window.clearBudget = function(id){
   delete state.localBudgets[String(id)];
+  delete state.localBudgetFrom[String(id)];
   try { localStorage.setItem('pfd2_budgets', JSON.stringify(state.localBudgets)); } catch(e){}
+  try { localStorage.setItem('pfd2_budget_from', JSON.stringify(state.localBudgetFrom)); } catch(e){}
   renderBudget();
 };
 
@@ -4086,6 +4120,11 @@ function init(){
   try {
     const savedBudgets = JSON.parse(localStorage.getItem('pfd2_budgets')||'{}');
     Object.assign(state.localBudgets, savedBudgets);
+  } catch(e){}
+  // Per-client "count hours from" — restore from localStorage
+  try {
+    const savedBudgetFrom = JSON.parse(localStorage.getItem('pfd2_budget_from')||'{}');
+    Object.assign(state.localBudgetFrom, savedBudgetFrom);
   } catch(e){}
 
   // Search inputs
