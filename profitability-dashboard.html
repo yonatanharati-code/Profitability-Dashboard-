@@ -1306,8 +1306,9 @@ const state = {
   excludedCustomers: [],
   selectMode: false,
   selectedRows: [],   // customer IDs currently checked for bulk ops
-  localBudgets: {},        // {customerId: hours} — user-set dev budgets
+  localBudgets: {},        // {customerId: hours} — manual budget override (takes precedence over deals)
   localBudgetFrom: {},     // {customerId: 'YYYY-MM'} — per-client "count hours from" date
+  localExcludedDeals: {},  // {customerId: [dealId, ...]} — deals excluded from budget
   tableFilters: [],      // [{field, op, value}] active filters for customer table
   budgetFilters: [],     // [{field, op, value}] active filters for budget table
   budgetSortKey: 'util',
@@ -1533,15 +1534,14 @@ function gFrom(c, layer, fromMk) {
     .filter(([mk]) => mk >= fromMk)
     .reduce((s,[,v]) => s + (v||0), 0);
 }
-// Compute HS auto-budget, filtering by deal close date >= fromMk (YYYY-MM)
-// When fromMk is set, only deals that closed in that month or later count
+// Compute HS auto-budget, respecting excluded deals and optional from-date filter
+// excludedDeals = Set or Array of deal IDs to skip
 function autoBudgetFrom(c, fromMk) {
-  const deals = (c.hsDeals || []).filter(d => d.t === 'dev');
+  const excluded = new Set(state.localExcludedDeals[String(c.id)] || []);
+  let deals = (c.hsDeals || []).filter(d => d.t === 'dev' && !excluded.has(d.id));
   if (!deals.length) return null;
-  const filtered = fromMk
-    ? deals.filter(d => d.d && d.d >= fromMk + '-01')
-    : deals;
-  const hours = filtered.map(d => parseHoursFromDeal(d.n || '')).filter(h => h !== null && h > 0);
+  if (fromMk) deals = deals.filter(d => d.d && d.d >= fromMk + '-01');
+  const hours = deals.map(d => parseHoursFromDeal(d.n || '')).filter(h => h !== null && h > 0);
   return hours.length > 0 ? hours.reduce((s, h) => s + h, 0) : null;
 }
 function gBug(c){ return g(c,'bug'); }
@@ -3247,76 +3247,191 @@ function renderBudget(){
 
 // ── Budget inline edit ─────────────────────────────────
 window.editBudget = function(id, currentVal){
-  // Find the right row
-  let targetRow = null;
+  // Remove any existing popup
+  const old = document.getElementById('budgetEditPopup');
+  if (old) old.remove();
+
+  // Find anchor row for positioning
+  let anchorEl = null;
   document.querySelectorAll('#budgetBody tr').forEach(tr => {
     const span = tr.querySelector('td:nth-child(4) .budget-set');
     if (span && span.getAttribute('onclick') && span.getAttribute('onclick').includes(`'${id}'`)) {
-      targetRow = tr;
+      anchorEl = tr.querySelector('td:nth-child(4)');
+    }
+    // also match the "from" badge which calls editBudget too
+    const badge = tr.querySelector('td:nth-child(3) span[onclick]');
+    if (badge && badge.getAttribute('onclick') && badge.getAttribute('onclick').includes(`'${id}'`)) {
+      anchorEl = anchorEl || tr.querySelector('td:nth-child(4)');
     }
   });
-  if (!targetRow) return;
 
-  // Build month options for "count hours from" picker
-  const allMks = new Set();
-  AD().forEach(c => { Object.keys(c.dev?.monthly||{}).forEach(mk => allMks.add(mk)); });
-  const sortedMks = [...allMks].sort();
+  const c = AD().find(cx => String(cx.id) === String(id));
+  if (!c) return;
+
+  // Dev deals from HubSpot
+  const devDeals = (c.hsDeals || []).filter(d => d.t === 'dev');
+  const excluded = new Set(state.localExcludedDeals[String(id)] || []);
   const currentFromMk = state.localBudgetFrom[String(id)] || '';
+  const manualBudget = state.localBudgets[String(id)] ?? null;
+
+  // Month picker options
+  const allMks = new Set();
+  AD().forEach(cx => { Object.keys(cx.dev?.monthly||{}).forEach(mk => allMks.add(mk)); });
+  const sortedMks = [...allMks].sort();
   const monthOpts = '<option value="">All time</option>'
     + sortedMks.map(mk => `<option value="${mk}"${mk===currentFromMk?' selected':''}>${_fmtMk(mk)}</option>`).join('');
 
-  const initVal = currentVal != null ? currentVal : '';
-  const budgetCell = targetRow.querySelector('td:nth-child(4)');
-  budgetCell.innerHTML = `<span class="budget-inline" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-    <span style="display:flex;gap:4px;align-items:center;">
-      <input type="number" min="0" step="0.5" value="${initVal}" placeholder="hours" id="bi_${id}" style="width:64px;padding:2px 5px;border:1px solid var(--accent);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;font-family:var(--mono);text-align:right;outline:none;">
-      <button onclick="saveBudget('${id}')" style="padding:2px 7px;border-radius:4px;border:none;background:var(--accent);color:white;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">✓</button>
-      <button onclick="clearBudget('${id}')" title="Clear manual override (reverts to HubSpot value if available)" style="padding:2px 5px;border-radius:4px;border:none;background:var(--surface-hover);color:var(--text-secondary);font-size:10px;cursor:pointer;font-family:inherit;">✕</button>
-    </span>
-    <span style="display:flex;gap:4px;align-items:center;">
-      <span style="font-size:9px;color:var(--text-secondary);white-space:nowrap;">Count hrs from:</span>
-      <select id="bif_${id}" onchange="applyBudgetFrom('${id}', this.value)" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-family:inherit;">${monthOpts}</select>
-    </span>
-  </span>`;
-  const inp = document.getElementById(`bi_${id}`);
-  if (inp) {
-    inp.focus();
-    inp.select();
-    inp.addEventListener('keydown', e => {
-      if (e.key === 'Enter') saveBudget(id);
-      if (e.key === 'Escape') renderBudget();
-    });
+  // Build deals list HTML
+  const dealsHtml = devDeals.length > 0
+    ? devDeals.map(d => {
+        const hrs = parseHoursFromDeal(d.n || '');
+        const isExcl = excluded.has(d.id);
+        const dateLabel = d.d ? _fmtMk(d.d.substring(0,7)) : '—';
+        return `<label style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+          <input type="checkbox" data-deal-id="${d.id}" ${isExcl?'':'checked'}
+            onchange="toggleBudgetDeal('${id}','${d.id}',this.checked)"
+            style="width:13px;height:13px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;">
+          <span style="flex:1;font-size:11px;color:var(--text);line-height:1.3;">${escapeHtml(d.n||'Unnamed deal')}</span>
+          <span style="font-size:10px;color:var(--text-secondary);white-space:nowrap;">${dateLabel}</span>
+          <span style="font-size:11px;font-weight:600;color:${hrs?'var(--text)':'var(--text-tertiary)'};white-space:nowrap;min-width:36px;text-align:right;">${hrs!=null?hrs+'h':'—'}</span>
+        </label>`;
+      }).join('')
+    : '<div style="font-size:11px;color:var(--text-secondary);padding:6px 0;">No HubSpot dev deals found for this client.</div>';
+
+  const popup = document.createElement('div');
+  popup.id = 'budgetEditPopup';
+  popup.style.cssText = 'position:fixed;z-index:9999;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:14px 16px;width:360px;max-height:480px;overflow-y:auto;';
+
+  popup.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:12px;font-weight:700;color:var(--text);">📦 Budget — ${escapeHtml(c.name)}</span>
+      <button onclick="document.getElementById('budgetEditPopup').remove();renderBudget();"
+        style="border:none;background:none;font-size:16px;cursor:pointer;color:var(--text-secondary);line-height:1;">×</button>
+    </div>
+
+    ${devDeals.length>0?`<div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">HubSpot dev deals — check to include in budget</div>`:''}
+    <div id="bdDealList_${id}">${dealsHtml}</div>
+
+    <div id="bdActiveBudget_${id}" style="margin-top:10px;padding:8px 10px;background:var(--surface-hover);border-radius:6px;font-size:12px;font-weight:600;color:var(--text);">
+      ${_budgetSummary(id)}
+    </div>
+
+    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+      <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Count hours from (used side)</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="bif_${id}" onchange="applyBudgetFrom('${id}', this.value)"
+          style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit;flex:1;">${monthOpts}</select>
+        <button onclick="applyBudgetFrom('${id}','')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;">All time</button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+      <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Manual budget override (overrides deals)</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" min="0" step="0.5" value="${manualBudget!=null?manualBudget:''}" placeholder="e.g. 40"
+          id="bi_${id}" style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;font-family:var(--mono);text-align:right;">
+        <button onclick="saveBudget('${id}')" style="padding:4px 10px;border-radius:6px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:600;cursor:pointer;">✓ Save</button>
+        ${manualBudget!=null?`<button onclick="clearBudget('${id}')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:10px;cursor:pointer;" title="Remove manual override">✕ Clear</button>`:''}
+      </div>
+      ${manualBudget!=null?'<div style="font-size:9px;color:var(--warn);margin-top:4px;">⚠ Manual override active — deal checkboxes have no effect</div>':''}
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+
+  // Position near anchor
+  if (anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const top = Math.min(rect.bottom + 4, window.innerHeight - 500);
+    const left = Math.max(4, Math.min(rect.left, window.innerWidth - 370));
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+  } else {
+    popup.style.top = '120px';
+    popup.style.left = '50%';
+    popup.style.transform = 'translateX(-50%)';
   }
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('mousedown', function _close(e) {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        renderBudget();
+        document.removeEventListener('mousedown', _close);
+      }
+    });
+  }, 50);
 };
+
+// Helper: compute budget summary line for the popup
+function _budgetSummary(id) {
+  const c = AD().find(cx => String(cx.id) === String(id));
+  if (!c) return '';
+  const manualBudget = state.localBudgets[String(id)] ?? null;
+  const fromMk = state.localBudgetFrom[String(id)] || '';
+  if (manualBudget !== null) {
+    return `Manual override: <span style="color:var(--accent);">${manualBudget}h</span>`;
+  }
+  const budget = autoBudgetFrom(c, fromMk);
+  const excluded = new Set(state.localExcludedDeals[String(id)] || []);
+  const active = (c.hsDeals||[]).filter(d => d.t==='dev' && !excluded.has(d.id));
+  const fromLabel = fromMk ? ` · from ${_fmtMk(fromMk)}` : '';
+  return budget != null
+    ? `Active budget: <span style="color:var(--ok);">${budget}h</span> from ${active.length} deal${active.length!==1?'s':''}${fromLabel}`
+    : `<span style="color:var(--text-secondary);">No active deals — budget unknown</span>`;
+}
 
 window.saveBudget = function(id){
   const inp = document.getElementById(`bi_${id}`);
   if (!inp) return;
-  const v = parseFloat(inp.value);
-  if (!isNaN(v) && v >= 0) {
-    state.localBudgets[String(id)] = v;
-    try { localStorage.setItem('pfd2_budgets', JSON.stringify(state.localBudgets)); } catch(e){}
-  }
-  // Also save the "count hours from" selection
-  const fromSel = document.getElementById(`bif_${id}`);
-  if (fromSel) {
-    const mk = fromSel.value;
-    if (mk) {
-      state.localBudgetFrom[String(id)] = mk;
-    } else {
-      delete state.localBudgetFrom[String(id)];
+  const raw = inp.value.trim();
+  if (raw !== '') {
+    const v = parseFloat(raw);
+    if (!isNaN(v) && v >= 0) {
+      state.localBudgets[String(id)] = v;
     }
-    try { localStorage.setItem('pfd2_budget_from', JSON.stringify(state.localBudgetFrom)); } catch(e){}
   }
+  try { localStorage.setItem('pfd2_budgets', JSON.stringify(state.localBudgets)); } catch(e){}
+  // Close popup and re-render
+  const popup = document.getElementById('budgetEditPopup');
+  if (popup) popup.remove();
   renderBudget();
 };
 
 window.clearBudget = function(id){
   delete state.localBudgets[String(id)];
-  delete state.localBudgetFrom[String(id)];
   try { localStorage.setItem('pfd2_budgets', JSON.stringify(state.localBudgets)); } catch(e){}
-  try { localStorage.setItem('pfd2_budget_from', JSON.stringify(state.localBudgetFrom)); } catch(e){}
+  // Refresh popup summary without closing it
+  const summaryEl = document.getElementById(`bdActiveBudget_${id}`);
+  if (summaryEl) summaryEl.innerHTML = _budgetSummary(id);
   renderBudget();
+  // Re-open popup to show updated state (no manual override warning)
+  const c = AD().find(cx => String(cx.id) === String(id));
+  if (c) editBudget(id, null);
+};
+
+// Toggle a specific deal in/out of the budget for a client
+window.toggleBudgetDeal = function(clientId, dealId, checked) {
+  const key = String(clientId);
+  if (!state.localExcludedDeals[key]) state.localExcludedDeals[key] = [];
+  if (checked) {
+    // Include: remove from excluded list
+    state.localExcludedDeals[key] = state.localExcludedDeals[key].filter(d => d !== dealId);
+  } else {
+    // Exclude: add to excluded list
+    if (!state.localExcludedDeals[key].includes(dealId)) {
+      state.localExcludedDeals[key].push(dealId);
+    }
+  }
+  // If excluded list is empty, clean up
+  if (state.localExcludedDeals[key].length === 0) delete state.localExcludedDeals[key];
+  try { localStorage.setItem('pfd2_excluded_deals', JSON.stringify(state.localExcludedDeals)); } catch(e){}
+  // Update popup summary live
+  const summaryEl = document.getElementById(`bdActiveBudget_${clientId}`);
+  if (summaryEl) summaryEl.innerHTML = _budgetSummary(clientId);
+  // Update table row live (Used/Util/Remaining) without closing popup
+  applyBudgetFrom(clientId, state.localBudgetFrom[String(clientId)] || '');
 };
 
 // Apply per-client "count hours from" immediately on picker change (no ✓ needed)
@@ -3333,31 +3448,34 @@ window.applyBudgetFrom = function(id, mk){
   document.querySelectorAll('#budgetBody tr').forEach(tr => {
     // identify the row by checking if any cell references this id
     const budgetSpan = tr.querySelector('td:nth-child(4) .budget-set');
-    const inlineSpan = tr.querySelector('td:nth-child(4) .budget-inline');
-    if (!inlineSpan) return; // not the edit row
-    // found — update just the Used cell (3rd column)
-    const usedCell = tr.querySelector('td:nth-child(3)');
-    if (!usedCell) return;
-    // find the client
+    // find the client — match any row that has this client's data
     const c = AD().find(cx => String(cx.id) === String(id));
     if (!c) return;
+    // Check if this is the right row by looking for any reference to this id
+    const hasRef = [...tr.querySelectorAll('[onclick]')].some(el => el.getAttribute('onclick').includes(`'${id}'`));
+    if (!hasRef) return;
+    // found — update cells
+    const usedCell = tr.querySelector('td:nth-child(3)');
+    if (!usedCell) return;
     const clientFromMk = state.localBudgetFrom[String(id)] || '';
     const used = gFrom(c, 'dev', clientFromMk);
     const manualBudget = state.localBudgets[String(id)] ?? null;
-    // Budget also filtered by from-date: only count deals closed on/after that month
     const autoBudget   = autoBudgetFrom(c, clientFromMk);
     const budget       = manualBudget !== null ? manualBudget : autoBudget;
     const util = budget != null ? (used/budget)*100 : null;
     const color = util==null?'var(--text-tertiary)':util>=100?'var(--bad)':util>=80?'var(--warn)':'var(--ok)';
     const fromBadge = clientFromMk
-      ? `<span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:600;color:var(--accent);background:var(--info-bg);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;">from ${_fmtMk(clientFromMk)}</span>`
+      ? `<span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:600;color:var(--accent);background:var(--info-bg);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;cursor:pointer;" onclick="editBudget('${id}',null)">from ${_fmtMk(clientFromMk)}</span>`
       : '';
     usedCell.innerHTML = `${used?fmtK(used)+'h':'—'}${fromBadge}`;
-    // Also update the Budget cell (4th) to show the filtered deal total
+    // Update Budget cell (4th) — only if no popup is open (popup manages its own state)
     const budgetCell4 = tr.querySelector('td:nth-child(4)');
-    // Only update if it has the inline editor (the .budget-inline span)
-    // Budget label inside the inline editor is the input — leave it alone
-    // But update the remaining/util to reflect new budget
+    if (budgetCell4 && !document.getElementById('budgetEditPopup')) {
+      const budgetSpan = budget != null
+        ? `<span class="budget-set" onclick="editBudget('${id}',${budget})">${fmtK(budget)}h${manualBudget!=null?' <span style="font-size:9px;color:var(--text-tertiary);">✎</span>':' <span style="font-size:9px;font-weight:600;color:var(--teal-600);">HS</span>'}</span>`
+        : `<span class="budget-set" onclick="editBudget('${id}',null)">＋ Set budget</span>`;
+      budgetCell4.innerHTML = budgetSpan;
+    }
     // update util cell (5th column)
     const utilCell = tr.querySelector('td:nth-child(5)');
     if (utilCell && budget != null) {
@@ -4190,6 +4308,11 @@ function init(){
   try {
     const savedBudgetFrom = JSON.parse(localStorage.getItem('pfd2_budget_from')||'{}');
     Object.assign(state.localBudgetFrom, savedBudgetFrom);
+  } catch(e){}
+  // Per-client excluded deals — restore from localStorage
+  try {
+    const savedExcluded = JSON.parse(localStorage.getItem('pfd2_excluded_deals')||'{}');
+    Object.assign(state.localExcludedDeals, savedExcluded);
   } catch(e){}
 
   // Search inputs
