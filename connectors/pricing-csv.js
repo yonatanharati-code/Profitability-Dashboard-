@@ -28,10 +28,14 @@ const PRICING_SKIP = new Set([
 // ─── Account-name aliases (raw lowercase → canonical) ────────────────────────
 // Keys must be lowercase-trimmed.  Values are the canonical display name.
 const PRICING_ALIASES = new Map([
-  ['arcelik',    'arçelik türkiye'],
-  ['phh group',  'pigu'],
-  ['logitech',   'logitech us'],
-  ['logitech us','logitech us'],
+  ['arcelik',                    'arçelik türkiye'],
+  ['phh group',                  'pigu'],
+  ['logitech',                   'logitech us'],
+  ['logitech us',                'logitech us'],
+  ['unito versand',              'otto austria group'],
+  ['phoenix pharma switzerland', 'health and life'],
+  ['hipercohen',                 'hippercohen'],
+  ['doc morris',                 'docmorris'],
 ]);
 
 // ─── CSV line parser (handles RFC-4180 quoted fields) ────────────────────────

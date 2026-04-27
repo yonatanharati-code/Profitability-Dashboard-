@@ -1072,7 +1072,11 @@ tr.selected-row{background:var(--teal-50) !important;}
             <option value="50">50</option>
             <option value="0">All</option>
           </select>
-          <button onclick="document.getElementById('pricingSearch').value='';document.getElementById('pricingFromMk').value='';document.getElementById('pricingToMk').value='';document.getElementById('pricingTopN').value='20';renderPricing();"
+          <span style="font-size:11px;color:var(--text-secondary);">Growth since</span>
+          <select id="pricingSinceMk" onchange="renderPricing()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;">
+            <option value="">—</option>
+          </select>
+          <button onclick="document.getElementById('pricingSearch').value='';document.getElementById('pricingFromMk').value='';document.getElementById('pricingToMk').value='';document.getElementById('pricingTopN').value='20';document.getElementById('pricingSinceMk').value='';renderPricing();"
             style="font-size:10px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;">✕ Reset</button>
           <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);" id="pricingCount"></span>
         </div>
@@ -3229,23 +3233,33 @@ function renderPricing() {
   const pd = window.PRICING_DATA || {};
   const allMonths = Object.keys(pd).sort();
 
-  // Populate From/To pickers once
-  const fromSel = document.getElementById('pricingFromMk');
-  const toSel   = document.getElementById('pricingToMk');
+  // Populate From/To pickers once (only when they have just the default option)
+  const fromSel  = document.getElementById('pricingFromMk');
+  const toSel    = document.getElementById('pricingToMk');
+  const sinceSel = document.getElementById('pricingSinceMk');
   if (fromSel && fromSel.options.length <= 1 && allMonths.length) {
     const opts = allMonths.map(mk => `<option value="${mk}">${_fmtMk(mk)}</option>`).join('');
     fromSel.innerHTML = '<option value="">All months</option>' + opts;
     toSel.innerHTML   = '<option value="">All months</option>' + opts;
-    // Default To to last month
     toSel.value = allMonths[allMonths.length - 1] || '';
+  }
+  // Keep sinceMk picker in sync with allMonths (always rebuild so months stay current)
+  if (sinceSel && allMonths.length) {
+    const curSince = sinceSel.value;
+    sinceSel.innerHTML = '<option value="">—</option>' +
+      allMonths.map(mk => `<option value="${mk}">${_fmtMk(mk)}</option>`).join('');
+    if (curSince && allMonths.includes(curSince)) sinceSel.value = curSince;
   }
 
   // Apply month range filter
-  const fromMk = fromSel?.value || allMonths[0] || '';
-  const toMk   = toSel?.value   || allMonths[allMonths.length-1] || '';
+  const fromMk   = fromSel?.value || allMonths[0] || '';
+  const toMk     = toSel?.value   || allMonths[allMonths.length-1] || '';
+  const sinceMk  = sinceSel?.value || '';
   const visMonths = allMonths.filter(mk => (!fromMk || mk >= fromMk) && (!toMk || mk <= toMk));
-  const lastMk  = visMonths[visMonths.length - 1] || null;
-  const prevMk  = visMonths[visMonths.length - 2] || null;
+  const lastMk   = visMonths[visMonths.length - 1] || null;
+
+  // Whether to show the "Growth since" column
+  const showSinceCol = !!(sinceMk && lastMk && sinceMk <= lastMk);
 
   // Collect all accounts across visible months
   const allAccounts = new Set();
@@ -3259,21 +3273,22 @@ function renderPricing() {
   const search = (document.getElementById('pricingSearch')?.value||'').toLowerCase();
   let rows = [...allAccounts].map(acct => {
     const thisMonth = lastMk ? (pd[lastMk]?.[acct]||0) : 0;
-    const prevMonth = prevMk ? (pd[prevMk]?.[acct]||0) : null;
-    const limit = pricingLimits[acct] ?? null;
-    const util  = limit ? thisMonth/limit*100 : null;
-    const trend = prevMonth != null && prevMonth > 0 ? (thisMonth-prevMonth)/prevMonth*100 : null;
-    const client = _pricingMatchClient(acct);
-    const history = visMonths.map(mk => pd[mk]?.[acct]||0);
-    const total = history.reduce((s,v)=>s+v,0);
-    return { acct, thisMonth, prevMonth, limit, util, trend, client, history, total };
+    const limit     = pricingLimits[acct] ?? null;
+    const util      = limit ? thisMonth/limit*100 : null;
+    const client    = _pricingMatchClient(acct);
+    const history   = visMonths.map(mk => pd[mk]?.[acct]||0);
+    const total     = history.reduce((s,v)=>s+v,0);
+    // Growth since sinceMk (pct vs last visible month)
+    const sinceVal  = sinceMk ? (pd[sinceMk]?.[acct]||0) : null;
+    const sinceGrowth = showSinceCol && sinceVal != null && sinceVal > 0
+      ? (thisMonth - sinceVal) / sinceVal * 100 : null;
+    return { acct, thisMonth, limit, util, client, history, total, sinceVal, sinceGrowth };
   }).filter(r => r.total > 0 || r.limit);
 
   if (search) rows = rows.filter(r => r.acct.includes(search) || (r.client?.name||'').toLowerCase().includes(search));
 
   // Apply Top N
   const topN = parseInt(document.getElementById('pricingTopN')?.value||'20', 10);
-  // Sort all rows by last month desc first to determine top N
   const sorted = [...rows].sort((a,b) => b.thisMonth - a.thisMonth);
   const topAccts = new Set((topN > 0 ? sorted.slice(0, topN) : sorted).map(r => r.acct));
   rows = rows.filter(r => topAccts.has(r.acct));
@@ -3285,6 +3300,7 @@ function renderPricing() {
     if (_pricingSortKey === '__last__')  { av = a.thisMonth; bv = b.thisMonth; }
     else if (_pricingSortKey === '__limit__') { av = a.limit??-1; bv = b.limit??-1; }
     else if (_pricingSortKey === '__util__')  { av = a.util??-1; bv = b.util??-1; }
+    else if (_pricingSortKey === '__since__') { av = a.sinceGrowth??-Infinity; bv = b.sinceGrowth??-Infinity; }
     else { av = pd[_pricingSortKey]?.[a.acct]||0; bv = pd[_pricingSortKey]?.[b.acct]||0; }
     return _pricingSortDir === 'asc' ? av-bv : bv-av;
   });
@@ -3342,6 +3358,21 @@ function renderPricing() {
     });
   }
 
+  // ── Helpers ────────────────────────────────────────────
+  // MoM badge: compares value v to prevV (may be 0 or null)
+  function momBadge(v, prevV) {
+    if (prevV == null || prevV === 0) return '';
+    const pct = (v - prevV) / prevV * 100;
+    const col = pct > 5 ? 'var(--ok)' : pct < -5 ? 'var(--bad)' : 'var(--text-secondary)';
+    return `<span style="font-size:9px;font-weight:600;color:${col};">${pct>0?'+':''}${pct.toFixed(0)}%</span>`;
+  }
+  // Growth-since badge
+  function sinceBadge(pct) {
+    if (pct == null) return '—';
+    const col = pct > 10 ? 'var(--ok)' : pct < -10 ? 'var(--bad)' : 'var(--text-secondary)';
+    return `<span style="font-size:11px;font-weight:700;color:${col};">${pct>0?'+':''}${pct.toFixed(0)}%</span>`;
+  }
+
   // ── Table header (sortable) ────────────────────────────
   function thSort(key, label, align='right') {
     const active = _pricingSortKey === key;
@@ -3349,27 +3380,56 @@ function renderPricing() {
     return `<th onclick="window._pricingSort('${key}')" style="text-align:${align};padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;white-space:nowrap;cursor:pointer;user-select:none;${active?'color:var(--accent);':''}">
       ${label} <span style="font-size:9px;">${arrow}</span></th>`;
   }
+  const sinceHeader = showSinceCol
+    ? thSort('__since__', `vs ${_fmtMk(sinceMk)}`)
+    : '';
   document.getElementById('pricingTheadRow').innerHTML =
     thSort('__name__','Client','left') +
     `<th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;">Owner</th>` +
     visMonths.map(mk => thSort(mk, _fmtMk(mk))).join('') +
     thSort('__limit__','Contract limit') +
-    thSort('__util__','Util %');
+    thSort('__util__','Util %') +
+    sinceHeader;
+
+  // ── TOTAL row values (sum per month across displayed rows) ──
+  const totalPerMonth = visMonths.map(mk => rows.reduce((s,r) => s+(pd[mk]?.[r.acct]||0), 0));
+  const totalSinceVal = showSinceCol ? rows.reduce((s,r) => s+(r.sinceVal||0), 0) : null;
+  const totalLastVal  = totalPerMonth[totalPerMonth.length-1] || 0;
+  const totalSinceGrowth = showSinceCol && totalSinceVal != null && totalSinceVal > 0
+    ? (totalLastVal - totalSinceVal) / totalSinceVal * 100 : null;
+
+  const totalMonthCells = visMonths.map((mk, i) => {
+    const v    = totalPerMonth[i];
+    const prev = i > 0 ? totalPerMonth[i-1] : null;
+    const badge = momBadge(v, prev);
+    return `<td style="text-align:right;padding:6px 10px;border-top:2px solid var(--border);font-weight:700;background:var(--surface-subtle);white-space:nowrap;">${_fmtEvents(v)}${badge?' '+badge:''}</td>`;
+  }).join('');
+
+  const totalLimitCell = `<td style="padding:6px 10px;border-top:2px solid var(--border);background:var(--surface-subtle);"></td>`;
+  const totalUtilCell  = `<td style="padding:6px 10px;border-top:2px solid var(--border);background:var(--surface-subtle);"></td>`;
+  const totalSinceCell = showSinceCol
+    ? `<td style="text-align:right;padding:6px 10px;border-top:2px solid var(--border);background:var(--surface-subtle);">${sinceBadge(totalSinceGrowth)}</td>`
+    : '';
+
+  const totalRow = `<tr>
+    <td colspan="2" style="padding:6px 10px;border-top:2px solid var(--border);font-weight:700;background:var(--surface-subtle);">TOTAL</td>
+    ${totalMonthCells}${totalLimitCell}${totalUtilCell}${totalSinceCell}</tr>`;
 
   // ── Table rows ─────────────────────────────────────────
-  document.getElementById('pricingBody').innerHTML = rows.map(r => {
+  const dataRows = rows.map(r => {
     const oc = r.client ? ownerColor(r.client.owner) : '#999';
     const ownerCell = r.client?.owner
       ? `<span class="owner"><span class="owner-avatar" style="background:${oc}">${ownerInit(r.client.owner)}</span>${r.client.owner}</span>`
       : '<span class="muted">—</span>';
-    const trendBadge = r.trend != null
-      ? `<span style="font-size:9px;font-weight:600;color:${r.trend>5?'var(--ok)':r.trend<-5?'var(--bad)':'var(--text-secondary)'};">${r.trend>0?'+':''}${r.trend.toFixed(0)}%</span>`
-      : '';
-    const monthCells = visMonths.map(mk => {
-      const v = pd[mk]?.[r.acct]||0;
+
+    const monthCells = visMonths.map((mk, i) => {
+      const v    = pd[mk]?.[r.acct]||0;
+      const prevV = i > 0 ? (pd[visMonths[i-1]]?.[r.acct]||0) : null;
+      const badge = momBadge(v, prevV);
       const isLast = mk === lastMk;
-      return `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;${isLast?'font-weight:600;':''}">${_fmtEvents(v)}${isLast&&trendBadge?' '+trendBadge:''}</td>`;
+      return `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;${isLast?'font-weight:600;':''}">${_fmtEvents(v)}${badge?' '+badge:''}</td>`;
     }).join('');
+
     const limitCell = `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);">
       <span class="budget-set" onclick="editPricingLimit('${r.acct}')" style="cursor:pointer;" title="Click to set/edit contract limit">
         ${r.limit!=null ? _fmtEvents(r.limit) : '<span style="color:var(--text-tertiary);font-size:11px;">＋ Set</span>'}
@@ -3380,11 +3440,18 @@ function renderPricing() {
           <div class="mini-bar"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${Math.min(100,r.util)}%;background:${utilColor};"></div></div>
           <div class="mini-bar-label" style="color:${utilColor};">${Math.round(r.util)}%</div></div></td>`
       : `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text-tertiary);">—</td>`;
+
+    const sinceCell = showSinceCol
+      ? `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);">${sinceBadge(r.sinceGrowth)}</td>`
+      : '';
+
     return `<tr>
       <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap;">${escapeHtml(r.client?.name||r.acct)}</td>
       <td style="padding:6px 10px;border-bottom:1px solid var(--border);">${ownerCell}</td>
-      ${monthCells}${limitCell}${utilCell}</tr>`;
+      ${monthCells}${limitCell}${utilCell}${sinceCell}</tr>`;
   }).join('');
+
+  document.getElementById('pricingBody').innerHTML = dataRows + totalRow;
 }
 
 window._pricingSort = function(key) {
