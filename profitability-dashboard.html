@@ -842,6 +842,19 @@ tr.selected-row{background:var(--teal-50) !important;}
     </div></div>
   </div>
 
+  <!-- Effort vs Income combo chart -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Effort Cost vs Income — Month over Month</div>
+        <div class="section-desc">Stacked cost components (CS · SA · Dev · Bug + platform) with income line &nbsp;·&nbsp; gap = gross profit</div>
+      </div>
+    </div>
+    <div class="card"><div class="card-body">
+      <div class="chart-wrap xl"><canvas id="cNdrEffortIncome"></canvas></div>
+    </div></div>
+  </div>
+
   <!-- Top 10 / Bottom 10 -->
   <div class="section">
     <div class="section-head">
@@ -5490,6 +5503,7 @@ function initNdrTab() {
   _populateChartOwnerSels(data, months);
   renderNdrTrend(data, months);
   renderNdrCostBreakdown(data, months);
+  renderNdrEffortVsIncome(data, months);
   renderNdrInsights(data, months, clientNdrs);
   window.renderNdrTopBottom(null, null, data, months);
   renderNdrClientNdrTable(data, months, clientNdrs);
@@ -5861,6 +5875,7 @@ window._ndrCostFilterChanged = function() {
   const lbl = document.getElementById('ndrCostFilterLabel');
   if (lbl) lbl.textContent = cnt === null ? 'All clients' : cnt + ' client' + (cnt!==1?'s':'') + ' selected';
   renderNdrCostBreakdown(window.NDR_DATA, _filteredNdrMonths());
+  renderNdrEffortVsIncome(window.NDR_DATA, _filteredNdrMonths());
 };
 window.ndrCostSelectAll = function(val) {
   const el = document.getElementById('ndrCostFilterList');
@@ -5969,6 +5984,100 @@ function renderNdrCostBreakdown(data, months) {
 
   // ── Cost Insights ──────────────────────────────────────────────────────
   renderNdrCostInsights(data, months, rows, totalCost);
+}
+
+// ── Effort vs Income combo chart ─────────────────────────────────────────────
+function renderNdrEffortVsIncome(data, months) {
+  if (charts.ndrEffort) { charts.ndrEffort.destroy(); charts.ndrEffort = null; }
+  if (!data || !months.length) return;
+
+  const filter = _ndrCostFilter;   // shares the same client filter as cost breakdown
+  const rows = mk => (data[mk]||[]).filter(r => !filter || filter.has(r.client));
+  const labels = months.map(_fmtMk);
+  const rt = state.rates;
+
+  // Try to compute per-layer labor costs from client monthly hours (DATA array)
+  const filteredClients = filter
+    ? DATA.filter(c => [...filter].some(f => f.toLowerCase() === c.name.toLowerCase()))
+    : DATA;
+
+  function layerCost(mk, layer, rate) {
+    return Math.round(filteredClients.reduce((s, c) => s + (c[layer]?.monthly?.[mk] || 0) * rate, 0));
+  }
+
+  const csData  = months.map(mk => layerCost(mk, 'cs',  rt.cs));
+  const saData  = months.map(mk => layerCost(mk, 'sa',  rt.sa));
+  const devData = months.map(mk => layerCost(mk, 'dev', rt.dev));
+  const bugData = months.map(mk => layerCost(mk, 'bug', rt.bug ?? rt.dev));
+
+  // If all monthly hours are zero fall back to NDR snapshot hours_cost as one bar
+  const hasLayerData = [...csData, ...saData, ...devData, ...bugData].some(v => v > 0);
+  const hoursFallback = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.hours_cost||0),0)));
+
+  // Non-labor costs from NDR snapshot
+  const pricingCost    = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.pricing_cost||0),0)));
+  const partnerCost    = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.partner_cost||0),0)));
+  const stockCost      = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.stock_cost||0),0)));
+  const competitorCost = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.competitor_cost||0),0)));
+
+  // Income line — same axis as bars so the gap = profit is visible
+  const incomeData = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+r.income,0)));
+
+  const bOpts = { borderRadius: 3, maxBarThickness: 55 };
+  const datasets = [];
+
+  if (hasLayerData) {
+    datasets.push({ label:'CS',      data: csData,  backgroundColor:'rgba(149,214,0,.85)',  ...bOpts });
+    datasets.push({ label:'SA',      data: saData,  backgroundColor:'rgba(33,158,188,.85)', ...bOpts });
+    datasets.push({ label:'Dev',     data: devData, backgroundColor:'rgba(8,23,60,.85)',    ...bOpts });
+    datasets.push({ label:'Bug/Esc', data: bugData, backgroundColor:'rgba(228,168,160,.9)', ...bOpts });
+  } else {
+    datasets.push({ label:'Labor (total)', data: hoursFallback, backgroundColor:'rgba(99,102,241,.8)', ...bOpts });
+  }
+
+  if (pricingCost.some(v=>v>0))    datasets.push({ label:'Platform',   data: pricingCost,    backgroundColor:'rgba(33,158,188,.45)',  ...bOpts });
+  if (partnerCost.some(v=>v>0))    datasets.push({ label:'Partner',    data: partnerCost,    backgroundColor:'rgba(244,162,97,.7)',   ...bOpts });
+  if (stockCost.some(v=>v>0))      datasets.push({ label:'Stock data', data: stockCost,      backgroundColor:'rgba(149,214,0,.45)',   ...bOpts });
+  if (competitorCost.some(v=>v>0)) datasets.push({ label:'Competitor', data: competitorCost, backgroundColor:'rgba(228,168,160,.55)', ...bOpts });
+
+  // Income as line on same left axis — visual gap between line and stack top = profit
+  datasets.push({
+    label: 'Income',
+    data: incomeData,
+    type: 'line',
+    borderColor: '#219EBC',
+    backgroundColor: 'rgba(33,158,188,.12)',
+    borderWidth: 3,
+    pointRadius: 5,
+    pointBackgroundColor: '#fff',
+    pointBorderColor: '#219EBC',
+    pointBorderWidth: 2.5,
+    tension: 0.3,
+    fill: false,
+    order: -1,
+  });
+
+  const opts = baseOpts();
+  opts.scales.y.stacked = true;
+  opts.scales.y.ticks = { callback: v => fmtMoney(v) };
+  opts.plugins.legend = { display: true, position: 'bottom', labels: { font:{ family:'Poppins', size:10 }, boxWidth:12 } };
+  opts.plugins.tooltip = {
+    mode: 'index',
+    callbacks: {
+      label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw ?? 0)}`,
+      footer: items => {
+        const costSum = items.filter(i => i.dataset.label !== 'Income').reduce((s,i) => s + (i.raw||0), 0);
+        const inc = items.find(i => i.dataset.label === 'Income')?.raw || 0;
+        const profit = inc - costSum;
+        const margin = inc > 0 ? ((profit/inc)*100).toFixed(1)+'%' : '—';
+        return [`Total cost: ${fmtMoney(costSum)}`, `Gross profit: ${fmtMoney(profit)}  (${margin})`];
+      }
+    }
+  };
+
+  const canvas = document.getElementById('cNdrEffortIncome');
+  if (!canvas) return;
+  charts.ndrEffort = new Chart(canvas, { type:'bar', data:{ labels, datasets }, options: opts });
 }
 
 function renderNdrCostInsights(data, months, rowsFn, totalCostArr) {
