@@ -847,12 +847,33 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section-head">
       <div>
         <div class="section-title">Effort Cost vs Income — Month over Month</div>
-        <div class="section-desc">Stacked cost components (CS · SA · Dev · Bug + platform) with income line &nbsp;·&nbsp; gap = gross profit</div>
+        <div class="section-desc">Stacked cost components with income line · dashed lines show MoM% growth comparison</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:11px;color:var(--text-secondary);">Owner</label>
+        <select id="ndrEffortOwnerSel" onchange="window._ndrEffortOwnerChanged()" style="font-size:11px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;min-width:130px;">
+          <option value="">All owners</option>
+        </select>
+        <input id="ndrEffortClientSearch" type="search" placeholder="Search client…" oninput="window._ndrEffortOwnerChanged()"
+          style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;width:140px;">
       </div>
     </div>
     <div class="card"><div class="card-body">
       <div class="chart-wrap xl"><canvas id="cNdrEffortIncome"></canvas></div>
     </div></div>
+    <!-- Top clients table -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;color:var(--text);">Top clients</span>
+        <div class="seg" id="ndrEffortTopSeg">
+          <button class="seg-btn active" data-efn="10"  onclick="window._ndrEffortTopN(this,10)">Top 10</button>
+          <button class="seg-btn"        data-efn="20"  onclick="window._ndrEffortTopN(this,20)">Top 20</button>
+          <button class="seg-btn"        data-efn="999" onclick="window._ndrEffortTopN(this,999)">All</button>
+        </div>
+        <span style="font-size:11px;color:var(--text-secondary);">Ranked by income · latest month</span>
+      </div>
+      <div id="ndrEffortTable" style="overflow-x:auto;"></div>
+    </div>
   </div>
 
   <!-- Top 10 / Bottom 10 -->
@@ -5986,23 +6007,77 @@ function renderNdrCostBreakdown(data, months) {
   renderNdrCostInsights(data, months, rows, totalCost);
 }
 
-// ── Effort vs Income combo chart ─────────────────────────────────────────────
+// ── Effort vs Income combo chart — state ─────────────────────────────────────
+let _ndrEffortOwner  = '';
+let _ndrEffortSearch = '';
+let _ndrEffortTopNVal = 10;
+
+window._ndrEffortOwnerChanged = function() {
+  _ndrEffortOwner  = (document.getElementById('ndrEffortOwnerSel')?.value  || '').trim();
+  _ndrEffortSearch = (document.getElementById('ndrEffortClientSearch')?.value || '').trim().toLowerCase();
+  renderNdrEffortVsIncome(window.NDR_DATA, _filteredNdrMonths());
+};
+window._ndrEffortTopN = function(btn, n) {
+  _ndrEffortTopNVal = n;
+  document.querySelectorAll('#ndrEffortTopSeg .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+  renderNdrEffortVsIncome(window.NDR_DATA, _filteredNdrMonths());
+};
+
+// Returns NDR snapshot rows filtered by owner + client search (in addition to cost filter)
+function _ndrEffortRows(data, mk) {
+  return (data[mk] || []).filter(r => {
+    if (_ndrCostFilter && !_ndrCostFilter.has(r.client)) return false;
+    if (_ndrEffortOwner) {
+      const cl = DATA.find(c => c.name.toLowerCase() === r.client.toLowerCase());
+      if (!cl || (cl.owner || '').trim() !== _ndrEffortOwner) return false;
+    }
+    if (_ndrEffortSearch && !r.client.toLowerCase().includes(_ndrEffortSearch)) return false;
+    return true;
+  });
+}
+
+// Populate the owner dropdown (keep current value if still valid)
+function _populateEffortOwnerSel(data, months) {
+  const sel = document.getElementById('ndrEffortOwnerSel');
+  if (!sel) return;
+  const owners = new Set();
+  months.forEach(mk => {
+    (data[mk] || []).forEach(r => {
+      const cl = DATA.find(c => c.name.toLowerCase() === r.client.toLowerCase());
+      if (cl && cl.owner) owners.add(cl.owner.trim());
+    });
+  });
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">All owners</option>';
+  [...owners].sort().forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o; opt.textContent = o;
+    if (o === prev) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
 function renderNdrEffortVsIncome(data, months) {
   if (charts.ndrEffort) { charts.ndrEffort.destroy(); charts.ndrEffort = null; }
   if (!data || !months.length) return;
 
-  const filter = _ndrCostFilter;   // shares the same client filter as cost breakdown
-  const rows = mk => (data[mk]||[]).filter(r => !filter || filter.has(r.client));
+  _populateEffortOwnerSel(data, months);
+
   const labels = months.map(_fmtMk);
   const rt = state.rates;
 
-  // Try to compute per-layer labor costs from client monthly hours (DATA array)
-  const filteredClients = filter
-    ? DATA.filter(c => [...filter].some(f => f.toLowerCase() === c.name.toLowerCase()))
-    : DATA;
+  // Clients passing all filters (for layer-level hour lookups)
+  const filteredClientNames = new Set();
+  months.forEach(mk => _ndrEffortRows(data, mk).forEach(r => filteredClientNames.add(r.client.toLowerCase())));
+  const filteredClients = DATA.filter(c => filteredClientNames.has(c.name.toLowerCase()));
 
   function layerCost(mk, layer, rate) {
-    return Math.round(filteredClients.reduce((s, c) => s + (c[layer]?.monthly?.[mk] || 0) * rate, 0));
+    // Only include clients that also pass the NDR row filter for this month
+    const validNames = new Set(_ndrEffortRows(data, mk).map(r => r.client.toLowerCase()));
+    return Math.round(
+      DATA.filter(c => validNames.has(c.name.toLowerCase()))
+          .reduce((s, c) => s + (c[layer]?.monthly?.[mk] || 0) * rate, 0)
+    );
   }
 
   const csData  = months.map(mk => layerCost(mk, 'cs',  rt.cs));
@@ -6010,20 +6085,34 @@ function renderNdrEffortVsIncome(data, months) {
   const devData = months.map(mk => layerCost(mk, 'dev', rt.dev));
   const bugData = months.map(mk => layerCost(mk, 'bug', rt.bug ?? rt.dev));
 
-  // If all monthly hours are zero fall back to NDR snapshot hours_cost as one bar
   const hasLayerData = [...csData, ...saData, ...devData, ...bugData].some(v => v > 0);
-  const hoursFallback = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.hours_cost||0),0)));
+  const hoursFallback = months.map(mk => Math.round(_ndrEffortRows(data, mk).reduce((s,r)=>s+(r.hours_cost||0),0)));
 
-  // Non-labor costs from NDR snapshot
-  const pricingCost    = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.pricing_cost||0),0)));
-  const partnerCost    = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.partner_cost||0),0)));
-  const stockCost      = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.stock_cost||0),0)));
-  const competitorCost = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+(r.competitor_cost||0),0)));
+  const pricingCost    = months.map(mk => Math.round(_ndrEffortRows(data, mk).reduce((s,r)=>s+(r.pricing_cost||0),0)));
+  const partnerCost    = months.map(mk => Math.round(_ndrEffortRows(data, mk).reduce((s,r)=>s+(r.partner_cost||0),0)));
+  const stockCost      = months.map(mk => Math.round(_ndrEffortRows(data, mk).reduce((s,r)=>s+(r.stock_cost||0),0)));
+  const competitorCost = months.map(mk => Math.round(_ndrEffortRows(data, mk).reduce((s,r)=>s+(r.competitor_cost||0),0)));
+  const incomeData     = months.map(mk => Math.round(_ndrEffortRows(data, mk).reduce((s,r)=>s+r.income,0)));
 
-  // Income line — same axis as bars so the gap = profit is visible
-  const incomeData = months.map(mk => Math.round(rows(mk).reduce((s,r)=>s+r.income,0)));
+  // Total cost per month (for MoM% lines)
+  const totalCostData = months.map((mk, i) => {
+    if (hasLayerData) return (csData[i]||0)+(saData[i]||0)+(devData[i]||0)+(bugData[i]||0)+(pricingCost[i]||0)+(partnerCost[i]||0)+(stockCost[i]||0)+(competitorCost[i]||0);
+    return (hoursFallback[i]||0)+(pricingCost[i]||0)+(partnerCost[i]||0)+(stockCost[i]||0)+(competitorCost[i]||0);
+  });
 
-  const bOpts = { borderRadius: 3, maxBarThickness: 55 };
+  // MoM% lines (null for first month)
+  function momPct(arr) {
+    return arr.map((v, i) => {
+      if (i === 0 || !arr[i-1]) return null;
+      const prev = arr[i-1];
+      if (prev === 0) return null;
+      return parseFloat(((v - prev) / prev * 100).toFixed(1));
+    });
+  }
+  const incomeMom = momPct(incomeData);
+  const costMom   = momPct(totalCostData);
+
+  const bOpts = { borderRadius: 3, maxBarThickness: 55, stack: 'cost' };
   const datasets = [];
 
   if (hasLayerData) {
@@ -6040,11 +6129,12 @@ function renderNdrEffortVsIncome(data, months) {
   if (stockCost.some(v=>v>0))      datasets.push({ label:'Stock data', data: stockCost,      backgroundColor:'rgba(149,214,0,.45)',   ...bOpts });
   if (competitorCost.some(v=>v>0)) datasets.push({ label:'Competitor', data: competitorCost, backgroundColor:'rgba(228,168,160,.55)', ...bOpts });
 
-  // Income as line on same left axis — visual gap between line and stack top = profit
+  // Income line (left axis, gap between it and stack top = profit)
   datasets.push({
     label: 'Income',
     data: incomeData,
     type: 'line',
+    yAxisID: 'y',
     borderColor: '#219EBC',
     backgroundColor: 'rgba(33,158,188,.12)',
     borderWidth: 3,
@@ -6055,18 +6145,68 @@ function renderNdrEffortVsIncome(data, months) {
     tension: 0.3,
     fill: false,
     order: -1,
+    stack: undefined,
+  });
+
+  // Income MoM% line (right axis)
+  datasets.push({
+    label: 'Income MoM%',
+    data: incomeMom,
+    type: 'line',
+    yAxisID: 'yMom',
+    borderColor: '#95D600',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderDash: [5, 4],
+    pointRadius: 4,
+    pointBackgroundColor: '#95D600',
+    tension: 0.3,
+    fill: false,
+    order: -2,
+    stack: undefined,
+  });
+
+  // Cost MoM% line (right axis)
+  datasets.push({
+    label: 'Cost MoM%',
+    data: costMom,
+    type: 'line',
+    yAxisID: 'yMom',
+    borderColor: '#E4A8A0',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderDash: [5, 4],
+    pointRadius: 4,
+    pointBackgroundColor: '#E4A8A0',
+    tension: 0.3,
+    fill: false,
+    order: -2,
+    stack: undefined,
   });
 
   const opts = baseOpts();
+  opts.scales.x.stacked = true;
   opts.scales.y.stacked = true;
   opts.scales.y.ticks = { callback: v => fmtMoney(v) };
+  opts.scales.yMom = {
+    type: 'linear',
+    position: 'right',
+    grid: { drawOnChartArea: false },
+    ticks: {
+      font: { family:'Poppins', size:10 },
+      callback: v => v + '%',
+    },
+  };
   opts.plugins.legend = { display: true, position: 'bottom', labels: { font:{ family:'Poppins', size:10 }, boxWidth:12 } };
   opts.plugins.tooltip = {
     mode: 'index',
     callbacks: {
-      label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw ?? 0)}`,
+      label: c => {
+        if (c.dataset.yAxisID === 'yMom') return ` ${c.dataset.label}: ${c.raw != null ? (c.raw > 0 ? '+':'') + c.raw + '%' : '—'}`;
+        return ` ${c.dataset.label}: ${fmtMoney(c.raw ?? 0)}`;
+      },
       footer: items => {
-        const costSum = items.filter(i => i.dataset.label !== 'Income').reduce((s,i) => s + (i.raw||0), 0);
+        const costSum = items.filter(i => i.dataset.yAxisID !== 'yMom' && i.dataset.label !== 'Income').reduce((s,i) => s + (i.raw||0), 0);
         const inc = items.find(i => i.dataset.label === 'Income')?.raw || 0;
         const profit = inc - costSum;
         const margin = inc > 0 ? ((profit/inc)*100).toFixed(1)+'%' : '—';
@@ -6078,6 +6218,82 @@ function renderNdrEffortVsIncome(data, months) {
   const canvas = document.getElementById('cNdrEffortIncome');
   if (!canvas) return;
   charts.ndrEffort = new Chart(canvas, { type:'bar', data:{ labels, datasets }, options: opts });
+
+  // ── Top-N table ──────────────────────────────────────────────────────────────
+  const tableEl = document.getElementById('ndrEffortTable');
+  if (!tableEl) return;
+
+  // Latest month for ranking; use prev month for MoM arrows
+  const latestMk = months[months.length - 1];
+  const prevMk   = months.length > 1 ? months[months.length - 2] : null;
+
+  // Gather all unique clients across filtered months
+  const clientMap = {};
+  months.forEach(mk => {
+    _ndrEffortRows(data, mk).forEach(r => {
+      if (!clientMap[r.client]) clientMap[r.client] = { income:0, cost:0, profit:0, latestIncome:0, latestCost:0, prevIncome:0, prevCost:0 };
+      clientMap[r.client].income += r.income;
+      clientMap[r.client].cost   += r.cost;
+      clientMap[r.client].profit += r.profit;
+      if (mk === latestMk) {
+        clientMap[r.client].latestIncome = r.income;
+        clientMap[r.client].latestCost   = r.cost;
+      }
+      if (mk === prevMk) {
+        clientMap[r.client].prevIncome = r.income;
+        clientMap[r.client].prevCost   = r.cost;
+      }
+    });
+  });
+
+  // Sort by latest-month income desc, then take top-N
+  const sorted = Object.entries(clientMap)
+    .sort((a,b) => b[1].latestIncome - a[1].latestIncome)
+    .slice(0, _ndrEffortTopNVal);
+
+  function momArrow(curr, prev) {
+    if (!prev) return '';
+    const pct = ((curr - prev) / prev * 100).toFixed(0);
+    const col = pct > 0 ? '#95D600' : pct < 0 ? '#E4A8A0' : '#aaa';
+    const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
+    return ` <span style="color:${col};font-size:9px;">${arrow}${Math.abs(pct)}%</span>`;
+  }
+
+  const ownerOf = name => {
+    const cl = DATA.find(c => c.name.toLowerCase() === name.toLowerCase());
+    return cl ? (cl.owner || '—') : '—';
+  };
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;">
+    <thead><tr style="background:var(--surface-2,#f5f5f5);text-align:left;">
+      <th style="padding:6px 8px;">#</th>
+      <th style="padding:6px 8px;">Client</th>
+      <th style="padding:6px 8px;">Owner</th>
+      <th style="padding:6px 8px;text-align:right;">Income (latest)</th>
+      <th style="padding:6px 8px;text-align:right;">Cost (latest)</th>
+      <th style="padding:6px 8px;text-align:right;">Profit (period)</th>
+      <th style="padding:6px 8px;text-align:right;">Margin</th>
+    </tr></thead><tbody>`;
+
+  sorted.forEach(([name, d], idx) => {
+    const margin = d.income > 0 ? ((d.profit / d.income) * 100).toFixed(1) + '%' : '—';
+    const mColor = d.profit >= 0 ? '#95D600' : '#E4A8A0';
+    const incArrow  = momArrow(d.latestIncome, d.prevIncome);
+    const costArrow = momArrow(d.latestCost,   d.prevCost);
+    const bg = idx % 2 === 0 ? '' : 'background:var(--surface-2,#f9f9f9);';
+    html += `<tr style="${bg}">
+      <td style="padding:5px 8px;color:var(--text-secondary);">${idx+1}</td>
+      <td style="padding:5px 8px;font-weight:600;">${name}</td>
+      <td style="padding:5px 8px;color:var(--text-secondary);">${ownerOf(name)}</td>
+      <td style="padding:5px 8px;text-align:right;">${fmtMoney(d.latestIncome)}${incArrow}</td>
+      <td style="padding:5px 8px;text-align:right;">${fmtMoney(d.latestCost)}${costArrow}</td>
+      <td style="padding:5px 8px;text-align:right;color:${mColor};font-weight:700;">${fmtMoney(d.profit)}</td>
+      <td style="padding:5px 8px;text-align:right;color:${mColor};">${margin}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  tableEl.innerHTML = html;
 }
 
 function renderNdrCostInsights(data, months, rowsFn, totalCostArr) {
