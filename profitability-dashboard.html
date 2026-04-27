@@ -589,14 +589,15 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section">
       <div class="section-head">
         <div>
-          <div class="section-title">Top 20 Customers by Hours</div>
-          <div class="section-desc">Stacked by division — selected window</div>
+          <div class="section-title">Top 20 Customers — Hours &amp; Cost</div>
+          <div class="section-desc">Hours (solid, left axis) + Cost $ (faded, right axis) stacked by division · selected window</div>
         </div>
         <div class="legend">
           <span class="legend-item"><span class="legend-dot" style="background:#95D600"></span>CS</span>
           <span class="legend-item"><span class="legend-dot" style="background:#219EBC"></span>SA</span>
           <span class="legend-item"><span class="legend-dot" style="background:#08173C"></span>Dev</span>
           <span class="legend-item"><span class="legend-dot" style="background:#E4A8A0"></span>Bug/Esc</span>
+          <span class="legend-item" style="margin-left:8px;"><span style="display:inline-block;width:22px;height:2px;background:#8B5CF6;border-top:2px dashed #8B5CF6;vertical-align:middle;margin-right:4px;"></span>ARR</span>
         </div>
       </div>
       <div class="card">
@@ -2248,53 +2249,95 @@ function chartOvDevRev(){
   });
 }
 
-// Effort: top 20 bar
+// Effort: top 20 bar — hours stack + cost stack + ARR line
 function chartTop20(){
-  const items = AD().map(c => ({c,
-    cs:g(c,'cs'), sa:g(c,'sa'), dev:g(c,'dev'), bug:gBug(c),
-    total:totalEffort(c)
-  })).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,20);
-  const opts=baseOpts();
-  opts.scales.x.stacked=true; opts.scales.y.stacked=true;
-  opts.scales.y.ticks.callback=v=>v+'h';
-  opts.scales.y1 = {
-    type:'linear', position:'right',
-    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback:v=>'$'+fmtK(v) },
-    grid:{ display:false }, border:{ display:false },
-    title:{ display:true, text:'ARR', color:'#8B5CF6', font:{family:'Poppins',size:10.5} }
+  const rt = state.rates;
+  const items = AD().map(c => {
+    const cs  = g(c,'cs'),  sa  = g(c,'sa'),  dev = g(c,'dev'), bug = gBug(c);
+    const cCS = cs  * rt.cs;
+    const cSA = sa  * rt.sa;
+    const cDev= dev * rt.dev;
+    const cBug= bug * (rt.bug ?? rt.dev);
+    return { c, cs, sa, dev, bug, total: cs+sa+dev+bug, cCS, cSA, cDev, cBug, totalCost: cCS+cSA+cDev+cBug };
+  }).filter(x => x.total > 0).sort((a,b) => b.total - a.total).slice(0, 20);
+
+  const opts = baseOpts();
+  opts.scales.x.stacked = true;
+
+  // Left axis — hours
+  opts.scales.y = {
+    type:'linear', position:'left', stacked: true,
+    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => v+'h' },
+    grid:{ color: col('--border') }, border:{ display:false },
   };
-  opts.plugins.legend = { display:true, position:'top', labels:{ color:col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:12 }};
-  opts.plugins.tooltip.callbacks = {
-    title: ctx => items[ctx[0].dataIndex].c.name,
-    label: ctx => {
-      if (ctx.dataset.yAxisID==='y1') return ' ARR: ' + fmt$(ctx.raw);
-      return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.raw) + 'h';
-    },
-    afterBody: ctx => {
-      const item = items[ctx[0].dataIndex];
-      const arr = item.c.arr || 0;
-      if (!arr || !item.total) return [];
-      const arrPerHr = Math.round(arr / item.total);
-      return ['', ' ARR/h: $' + arrPerHr + '/h invested'];
+
+  // Right axis — cost & ARR (both in $)
+  opts.scales.y1 = {
+    type:'linear', position:'right', stacked: true,
+    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
+    grid:{ drawOnChartArea:false }, border:{ display:false },
+    title:{ display:true, text:'Cost / ARR  ($)', color:col('--text-secondary'), font:{family:'Poppins',size:10} }
+  };
+
+  opts.plugins.legend = {
+    display: true, position:'top',
+    labels:{ color:col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:12 }
+  };
+  opts.plugins.tooltip = {
+    mode:'index', intersect:false,
+    callbacks:{
+      title: ctx => items[ctx[0].dataIndex].c.name,
+      label: ctx => {
+        const ds = ctx.dataset;
+        if (ds.label === 'ARR')    return ' ARR: '    + fmt$(ctx.raw);
+        if (ds.yAxisID === 'y1')   return ' ' + ds.label + ' cost: ' + fmt$(Math.round(ctx.raw));
+        return ' ' + ds.label + ': ' + Math.round(ctx.raw) + 'h';
+      },
+      afterBody: ctx => {
+        const item = items[ctx[0].dataIndex];
+        const arr  = item.c.arr || 0;
+        const lines = [];
+        lines.push('');
+        lines.push(' Total hours: ' + Math.round(item.total) + 'h');
+        lines.push(' Total cost:  ' + fmt$(Math.round(item.totalCost)));
+        if (arr) {
+          lines.push(' ARR:         ' + fmt$(arr));
+          const margin = arr - item.totalCost;
+          const pct    = arr > 0 ? ((margin / arr) * 100).toFixed(0) : '—';
+          lines.push(' Est. margin: ' + fmt$(Math.round(margin)) + ' (' + pct + '%)');
+        }
+        return lines;
+      }
     }
   };
-  charts.top20 = new Chart(document.getElementById('cTop20'),{
-    type:'bar', data:{
-      labels:items.map(x=>x.c.name.length>14?x.c.name.slice(0,13)+'…':x.c.name),
-      datasets:[
-        {label:'CS',      data:items.map(x=>x.cs),  backgroundColor:'#95D600', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
-        {label:'SA',      data:items.map(x=>x.sa),  backgroundColor:'#219EBC', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
-        {label:'Dev',     data:items.map(x=>x.dev), backgroundColor:'#08173C', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
-        {label:'Bug/Esc', data:items.map(x=>x.bug), backgroundColor:'#E4A8A0', borderRadius:2, maxBarThickness:26, yAxisID:'y', stack:'hours'},
-        {
-          label:'ARR', data:items.map(x=>x.c.arr||0),
-          type:'line', yAxisID:'y1',
-          borderColor:'#8B5CF6', backgroundColor:'#8B5CF622',
-          pointRadius:4, pointHoverRadius:6,
-          borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false,
-        },
-      ]
-    }, options:opts
+
+  const bOpts = { borderRadius:2, maxBarThickness:20 };
+  const labels = items.map(x => x.c.name.length > 14 ? x.c.name.slice(0,13)+'…' : x.c.name);
+
+  charts.top20 = new Chart(document.getElementById('cTop20'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      // ── Hours bars (left axis, stack='hours') ──────────────────────────────
+      { label:'CS',      data:items.map(x=>x.cs),  backgroundColor:'#95D600',   yAxisID:'y',  stack:'hours', ...bOpts },
+      { label:'SA',      data:items.map(x=>x.sa),  backgroundColor:'#219EBC',   yAxisID:'y',  stack:'hours', ...bOpts },
+      { label:'Dev',     data:items.map(x=>x.dev), backgroundColor:'#08173C',   yAxisID:'y',  stack:'hours', ...bOpts },
+      { label:'Bug/Esc', data:items.map(x=>x.bug), backgroundColor:'#E4A8A0',   yAxisID:'y',  stack:'hours', ...bOpts },
+      // ── Cost bars (right axis, stack='cost') ───────────────────────────────
+      { label:'CS $',      data:items.map(x=>x.cCS),  backgroundColor:'rgba(149,214,0,.55)',    yAxisID:'y1', stack:'cost', ...bOpts },
+      { label:'SA $',      data:items.map(x=>x.cSA),  backgroundColor:'rgba(33,158,188,.55)',   yAxisID:'y1', stack:'cost', ...bOpts },
+      { label:'Dev $',     data:items.map(x=>x.cDev), backgroundColor:'rgba(8,23,60,.55)',      yAxisID:'y1', stack:'cost', ...bOpts },
+      { label:'Bug/Esc $', data:items.map(x=>x.cBug), backgroundColor:'rgba(228,168,160,.65)',  yAxisID:'y1', stack:'cost', ...bOpts },
+      // ── ARR line (right axis) ──────────────────────────────────────────────
+      {
+        label:'ARR', data:items.map(x=>x.c.arr||0),
+        type:'line', yAxisID:'y1',
+        borderColor:'#8B5CF6', backgroundColor:'#8B5CF622',
+        pointRadius:4, pointHoverRadius:6,
+        borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false,
+        stack: undefined,
+      },
+    ]},
+    options: opts
   });
 }
 
