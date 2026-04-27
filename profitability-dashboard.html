@@ -1049,7 +1049,7 @@ tr.selected-row{background:var(--teal-50) !important;}
       <div class="section-body">
 
         <!-- Stats row -->
-        <div class="kpi-row" id="pricingStats" style="margin-bottom:16px;"></div>
+        <div id="pricingStats" style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-bottom:16px;"></div>
 
         <!-- Filters toolbar -->
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;padding:10px 14px;background:var(--surface-hover);border-radius:var(--r-md);border:1px solid var(--border);">
@@ -3309,17 +3309,42 @@ function renderPricing() {
   document.getElementById('pricingEmpty').style.display = allMonths.length === 0 ? '' : 'none';
 
   // Stats (use latest visible month)
-  const totalEvents = rows.reduce((s,r)=>s+r.thisMonth,0);
-  const overLimit   = rows.filter(r=>r.util!=null&&r.util>=100).length;
-  const nearLimit   = rows.filter(r=>r.util!=null&&r.util>=80&&r.util<100).length;
-  const withLimit   = rows.filter(r=>r.limit!=null).length;
-  document.getElementById('pricingStats').innerHTML = [
-    { label:'Total events', value:_fmtEvents(totalEvents), sub: lastMk?_fmtMk(lastMk):'—' },
-    { label:'Clients shown', value:rows.length, sub:`${withLimit} with limit` },
-    { label:'Over contract', value:overLimit, cls:overLimit>0?'bad':'' },
-    { label:'Near limit (>80%)', value:nearLimit, cls:nearLimit>0?'warn':'' },
-    { label:'Period', value:visMonths.length+'mo', sub: visMonths.length ? `${_fmtMk(visMonths[0])} → ${_fmtMk(lastMk)}` : '' },
-  ].map(s=>`<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value ${s.cls||''}">${s.value}</div>${s.sub?`<div class="stat-foot">${s.sub}</div>`:''}</div>`).join('');
+  const totalLastMonth  = rows.reduce((s,r)=>s+r.thisMonth, 0);
+  const prevMk2         = visMonths.length >= 2 ? visMonths[visMonths.length - 2] : null;
+  const totalPrevMonth  = prevMk2 ? rows.reduce((s,r)=>s+(pd[prevMk2]?.[r.acct]||0), 0) : null;
+  const overallMoM      = totalPrevMonth != null && totalPrevMonth > 0
+    ? (totalLastMonth - totalPrevMonth) / totalPrevMonth * 100 : null;
+  const momColor        = overallMoM == null ? '' : overallMoM > 5 ? 'var(--ok)' : overallMoM < -5 ? 'var(--bad)' : 'var(--text-secondary)';
+  const momStr          = overallMoM != null ? `${overallMoM>0?'+':''}${overallMoM.toFixed(0)}% MoM` : '';
+  const overLimit       = rows.filter(r=>r.util!=null&&r.util>=100).length;
+  const nearLimit       = rows.filter(r=>r.util!=null&&r.util>=80&&r.util<100).length;
+  const withLimit       = rows.filter(r=>r.limit!=null).length;
+  const activeLastMonth = rows.filter(r=>r.thisMonth>0).length;
+  const periodTotal     = rows.reduce((s,r)=>s+r.total, 0);
+
+  function _kpiCard(label, value, sub, subColor, accent) {
+    return `<div style="background:var(--surface);border:1px solid ${accent||'var(--border)'};border-radius:var(--r-lg);padding:10px 16px;min-width:110px;flex:1;">
+      <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;">${label}</div>
+      <div style="font-size:20px;font-weight:700;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums;color:var(--text);">${value}</div>
+      ${sub ? `<div style="font-size:11px;margin-top:2px;color:${subColor||'var(--text-secondary)'};">${sub}</div>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('pricingStats').innerHTML =
+    _kpiCard('Total events', _fmtEvents(totalLastMonth),
+      lastMk ? `${_fmtMk(lastMk)}${momStr ? ` · <span style="color:${momColor};">${momStr}</span>` : ''}` : '—', null, null) +
+    _kpiCard('Period total', _fmtEvents(periodTotal),
+      visMonths.length ? `${_fmtMk(visMonths[0])} → ${_fmtMk(lastMk)}` : '—', null, null) +
+    _kpiCard('Active clients', activeLastMonth,
+      `${withLimit} with limit`, null, null) +
+    _kpiCard('Over contract', overLimit,
+      overLimit > 0 ? 'Action needed' : 'All within limit',
+      overLimit > 0 ? 'var(--bad)' : 'var(--text-secondary)',
+      overLimit > 0 ? 'rgba(239,68,68,.3)' : null) +
+    _kpiCard('Near limit', nearLimit,
+      nearLimit > 0 ? '>80% utilisation' : 'None near limit',
+      nearLimit > 0 ? 'var(--warn)' : 'var(--text-secondary)',
+      nearLimit > 0 ? 'rgba(245,158,11,.3)' : null);
 
   document.getElementById('pricingCount').textContent = `${rows.length} clients · ${visMonths.length} months`;
 
@@ -3359,12 +3384,13 @@ function renderPricing() {
   }
 
   // ── Helpers ────────────────────────────────────────────
-  // MoM badge: compares value v to prevV (may be 0 or null)
+  // MoM badge: compares value v to prevV — returns a block div (own line)
   function momBadge(v, prevV) {
     if (prevV == null || prevV === 0) return '';
     const pct = (v - prevV) / prevV * 100;
     const col = pct > 5 ? 'var(--ok)' : pct < -5 ? 'var(--bad)' : 'var(--text-secondary)';
-    return `<span style="font-size:9px;font-weight:600;color:${col};">${pct>0?'+':''}${pct.toFixed(0)}%</span>`;
+    const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '▶';
+    return `<div style="font-size:10px;font-weight:700;color:${col};margin-top:1px;">${arrow} ${pct>0?'+':''}${pct.toFixed(0)}%</div>`;
   }
   // Growth-since badge
   function sinceBadge(pct) {
@@ -3402,7 +3428,7 @@ function renderPricing() {
     const v    = totalPerMonth[i];
     const prev = i > 0 ? totalPerMonth[i-1] : null;
     const badge = momBadge(v, prev);
-    return `<td style="text-align:right;padding:6px 10px;border-top:2px solid var(--border);font-weight:700;background:var(--surface-subtle);white-space:nowrap;">${_fmtEvents(v)}${badge?' '+badge:''}</td>`;
+    return `<td style="text-align:right;padding:5px 10px;border-top:2px solid var(--border);font-weight:700;background:var(--surface-subtle);white-space:nowrap;"><div>${_fmtEvents(v)}</div>${badge}</td>`;
   }).join('');
 
   const totalLimitCell = `<td style="padding:6px 10px;border-top:2px solid var(--border);background:var(--surface-subtle);"></td>`;
@@ -3427,7 +3453,7 @@ function renderPricing() {
       const prevV = i > 0 ? (pd[visMonths[i-1]]?.[r.acct]||0) : null;
       const badge = momBadge(v, prevV);
       const isLast = mk === lastMk;
-      return `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;${isLast?'font-weight:600;':''}">${_fmtEvents(v)}${badge?' '+badge:''}</td>`;
+      return `<td style="text-align:right;padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap;${isLast?'font-weight:600;':''}"><div>${_fmtEvents(v)}</div>${badge}</td>`;
     }).join('');
 
     const limitCell = `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);">

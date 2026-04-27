@@ -399,10 +399,10 @@ function injectData(html, cache, csvHours) {
         const pricingTip = months.length
           ? ` title="Pricing data: ${months.length} months stored (${months[0]} → ${months[months.length-1]})"`
           : '';
-        return `\n  <input type="file" id="pricingEuInput" accept=".csv" style="display:none" onchange="_importPricingCsv(this,'EU')">` +
+        return `\n  <input type="file" id="pricingEuInput" accept=".csv" multiple style="display:none" onchange="_importPricingCsv(this,'EU')">` +
                `\n  <label for="pricingEuInput" class="import-btn" style="background:rgba(139,92,246,.10);border-color:rgba(139,92,246,.3);color:#a78bfa;margin-left:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"${pricingTip}>` +
                `📊 EU Pricing${months.length ? ' ✓' : ''}</label>` +
-               `\n  <input type="file" id="pricingUsInput" accept=".csv" style="display:none" onchange="_importPricingCsv(this,'US')">` +
+               `\n  <input type="file" id="pricingUsInput" accept=".csv" multiple style="display:none" onchange="_importPricingCsv(this,'US')">` +
                `\n  <label for="pricingUsInput" class="import-btn" style="background:rgba(139,92,246,.10);border-color:rgba(139,92,246,.3);color:#a78bfa;margin-left:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">` +
                `📊 US Pricing</label>`;
       })()
@@ -598,27 +598,37 @@ async function _importCsvHours(input) {
 }
 
 async function _importPricingCsv(input, region) {
-  const file = input.files[0];
-  if (!file) return;
+  const files = Array.from(input.files);
+  if (!files.length) return;
   const inputId = region === 'EU' ? 'pricingEuInput' : 'pricingUsInput';
   const lblFor  = document.querySelector(\`label[for="\${inputId}"]\`);
   const origText = lblFor ? lblFor.textContent : '';
-  if (lblFor) { lblFor.style.opacity = '0.6'; lblFor.style.pointerEvents = 'none'; lblFor.textContent = '⏳ Uploading…'; }
+  if (lblFor) { lblFor.style.opacity = '0.6'; lblFor.style.pointerEvents = 'none'; }
+  let lastResult = null;
   try {
-    const text = await file.text();
-    const r = await fetch('/api/import-pricing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ csv: text, filename: file.name, region }),
-    });
-    const j = await r.json();
-    if (j.ok) {
-      if (lblFor) lblFor.textContent = \`✓ \${j.month} (\${j.accounts} clients) — reloading…\`;
-      setTimeout(() => location.reload(), 900);
-    } else {
-      alert('Pricing import failed: ' + (j.error || 'unknown'));
-      if (lblFor) { lblFor.textContent = origText; lblFor.style.opacity = ''; lblFor.style.pointerEvents = ''; }
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (lblFor) lblFor.textContent = files.length > 1
+        ? \`⏳ Uploading \${i+1}/\${files.length}…\`
+        : '⏳ Uploading…';
+      const text = await file.text();
+      const r = await fetch('/api/import-pricing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv: text, filename: file.name, region }),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        alert(\`Pricing import failed for \${file.name}: \${j.error || 'unknown'}\`);
+        if (lblFor) { lblFor.textContent = origText; lblFor.style.opacity = ''; lblFor.style.pointerEvents = ''; }
+        input.value = '';
+        return;
+      }
+      lastResult = j;
     }
+    const s = files.length > 1 ? \`\${files.length} files\` : \`\${lastResult?.month || files[0].name}\`;
+    if (lblFor) lblFor.textContent = \`✓ \${s} imported (\${lastResult?.totalMonths||'?'} months total) — reloading…\`;
+    setTimeout(() => location.reload(), 1100);
   } catch (e) {
     alert('Pricing import error: ' + e.message);
     if (lblFor) { lblFor.textContent = origText; lblFor.style.opacity = ''; lblFor.style.pointerEvents = ''; }
