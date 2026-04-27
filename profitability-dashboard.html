@@ -590,7 +590,7 @@ tr.selected-row{background:var(--teal-50) !important;}
       <div class="section-head">
         <div>
           <div class="section-title">Top 20 Customers — Hours &amp; Cost</div>
-          <div class="section-desc">Hours by division (left) · Total cost $K + ARR line (right) · window-normalised</div>
+          <div class="section-desc">CS/SA/Dev/Bug hours + Cost ($K segment, purple) in one bar · ARR line window-normalised</div>
         </div>
         <div class="legend">
           <span class="legend-item"><span class="legend-dot" style="background:#95D600"></span>CS</span>
@@ -2310,7 +2310,7 @@ function ndrCostForClient(hsName, months) {
   return total > 0 ? { labor, platform, partner, stock, competitor, total } : null;
 }
 
-// ── Top-20: hours stack + cost bar (grouped) + normalised ARR line ───────────
+// ── Top-20: ONE bar — hours stack + cost ($K segment) + ARR line ─────────────
 function chartTop20(){
   const rt        = state.rates;
   const wm        = windowMonths();
@@ -2330,25 +2330,28 @@ function chartTop20(){
     const totalCost = ndrCost
       ? Math.round(ndrCost.total)
       : Math.round(cs*rt.cs + sa*rt.sa + dev*rt.dev + bug*(rt.bug??rt.dev));
+    // Cost displayed on same axis as hours: divide by 1000 → $K units
+    const costK     = +(totalCost / 1000).toFixed(1);
     const periodARR = Math.round((c.arr||0) * arrFactor);
-    return { c, cs, sa, dev, bug, totalHours, totalCost, periodARR, fromNdr:!!ndrCost };
+    // ARR also in $K for the line
+    const periodARRk = +((c.arr||0) * arrFactor / 1000).toFixed(1);
+    return { c, cs, sa, dev, bug, totalHours, totalCost, costK, periodARR, periodARRk, fromNdr:!!ndrCost };
   }).filter(Boolean).sort((a,b) => b.totalHours - a.totalHours).slice(0, 20);
 
   const opts = baseOpts();
+  // Single axis — everything stacked together
+  // Hours in "h", cost segment in "$K" (÷1000), ARR line also in $K
+  // Y-axis tick shows both: hours for the bar segments, label clarifies cost is $K
   opts.scales.x.stacked = true;
+  opts.scales.y.stacked = true;
+  opts.scales.y.ticks.callback = v => v < 0 ? '' : v+'';  // plain numbers, legend explains units
 
-  // Left axis — hours
-  opts.scales.y = {
-    type:'linear', position:'left', stacked:true,
-    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => v+'h' },
-    grid:{ color:col('--border') }, border:{ display:false },
-  };
-  // Right axis — cost $ (formatted as $K) + ARR line
+  // ARR line on right axis — full $ with $K formatting
   opts.scales.y1 = {
     type:'linear', position:'right',
-    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
+    ticks:{ color:'#8B5CF6', font:{family:'Poppins',size:10}, callback: v => '$'+fmtK(v*1000) },
     grid:{ drawOnChartArea:false }, border:{ display:false },
-    title:{ display:true, text:`Cost / ${winLbl} ARR ($K)`, color:col('--text-secondary'), font:{family:'Poppins',size:10} }
+    title:{ display:true, text:`${winLbl} ARR`, color:'#8B5CF6', font:{family:'Poppins',size:10} }
   };
 
   opts.plugins.legend = {
@@ -2361,9 +2364,9 @@ function chartTop20(){
       title: ctx => items[ctx[0].dataIndex].c.name,
       label: ctx => {
         const ds = ctx.dataset;
-        if (ds.type === 'line')      return ` ${winLbl} ARR: ${fmt$(ctx.raw)}`;
-        if (ds.label === 'Cost')     return ` Cost: ${fmt$(ctx.raw)}`;
-        if (ctx.raw === 0)           return null;
+        if (ds.type === 'line') return ` ${winLbl} ARR: ${fmt$(ctx.raw * 1000)}`;
+        if (ds.label === 'Cost ($K)') return ` Cost: $${ctx.raw.toFixed(1)}K  (= ${fmt$(ctx.raw * 1000)})`;
+        if (!ctx.raw) return null;
         return ` ${ds.label}: ${Math.round(ctx.raw)}h`;
       },
       afterBody: ctx => {
@@ -2380,23 +2383,22 @@ function chartTop20(){
   };
 
   const labels = items.map(x => x.c.name.length>14 ? x.c.name.slice(0,13)+'…' : x.c.name);
-  const hO = { borderRadius:2, maxBarThickness:20, yAxisID:'y',  stack:'hours' };
-  const cO = { borderRadius:2, maxBarThickness:20, yAxisID:'y1', stack:'cost'  };
+  const bO = { borderRadius:2, maxBarThickness:34 };
 
   charts.top20 = new Chart(document.getElementById('cTop20'), {
     type:'bar',
     data:{ labels, datasets:[
-      // Hours stacked — left axis
-      { label:'CS',      data:items.map(x=>x.cs),  backgroundColor:'#95D600', ...hO },
-      { label:'SA',      data:items.map(x=>x.sa),  backgroundColor:'#219EBC', ...hO },
-      { label:'Dev',     data:items.map(x=>x.dev), backgroundColor:'#08173C', ...hO },
-      { label:'Bug/Esc', data:items.map(x=>x.bug), backgroundColor:'#E4A8A0', ...hO },
-      // Total cost — right axis ($K)
-      { label:'Cost', data:items.map(x=>x.totalCost), backgroundColor:'rgba(33,158,188,.35)', borderRadius:2, maxBarThickness:20, yAxisID:'y1', stack:'cost' },
-      // Period-normalised ARR line — right axis
-      { label:`${winLbl} ARR`, data:items.map(x=>x.periodARR), type:'line', yAxisID:'y1',
+      // ── Hours stacked (in h) ──────────────────────────────────────────────
+      { label:'CS',         data:items.map(x=>x.cs),    backgroundColor:'#95D600', ...bO },
+      { label:'SA',         data:items.map(x=>x.sa),    backgroundColor:'#219EBC', ...bO },
+      { label:'Dev',        data:items.map(x=>x.dev),   backgroundColor:'#08173C', ...bO },
+      { label:'Bug/Esc',    data:items.map(x=>x.bug),   backgroundColor:'#E4A8A0', ...bO },
+      // ── Cost segment (in $K, same axis) ──────────────────────────────────
+      { label:'Cost ($K)',  data:items.map(x=>x.costK),  backgroundColor:'rgba(139,92,246,.55)', borderRadius:2, maxBarThickness:34 },
+      // ── Period ARR line (right axis, in $K units) ─────────────────────────
+      { label:`${winLbl} ARR`, data:items.map(x=>x.periodARRk), type:'line', yAxisID:'y1',
         borderColor:'#8B5CF6', backgroundColor:'#8B5CF622', pointRadius:4, pointHoverRadius:6,
-        borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false, stack:undefined },
+        borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false },
     ]},
     options: opts
   });
