@@ -589,8 +589,8 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section">
       <div class="section-head">
         <div>
-          <div class="section-title">Top 20 Customers by Cost</div>
-          <div class="section-desc">Total cost per customer · ARR line normalised to selected window</div>
+          <div class="section-title">Top 20 Customers — Hours &amp; Cost</div>
+          <div class="section-desc">Hours by division (left) · Total cost $K + ARR line (right) · window-normalised</div>
         </div>
         <div class="legend">
           <span class="legend-item"><span class="legend-dot" style="background:#95D600"></span>CS</span>
@@ -2310,7 +2310,7 @@ function ndrCostForClient(hsName, months) {
   return total > 0 ? { labor, platform, partner, stock, competitor, total } : null;
 }
 
-// ── Top-20: one cost bar per customer + normalised ARR line ──────────────────
+// ── Top-20: hours stack + cost bar (grouped) + normalised ARR line ───────────
 function chartTop20(){
   const rt        = state.rates;
   const wm        = windowMonths();
@@ -2318,86 +2318,85 @@ function chartTop20(){
   const ndrMonths = ndrWindowMonths();
   const hasNdr    = ndrMonths.length > 0 && !!window.NDR_DATA;
 
-  const windowLabel = state.window === 'ytd'  ? 'YTD'
-                    : state.window === 'month' ? '1-mo'
-                    : `${state.window}-mo`;
+  const winLbl = state.window === 'ytd'  ? 'YTD'
+               : state.window === 'month' ? '1-mo'
+               : `${state.window}-mo`;
 
   const items = AD().map(c => {
-    const cs  = g(c,'cs'), sa = g(c,'sa'), dev = g(c,'dev'), bug = gBug(c);
+    const cs = g(c,'cs'), sa = g(c,'sa'), dev = g(c,'dev'), bug = gBug(c);
     const totalHours = cs + sa + dev + bug;
     if (totalHours === 0) return null;
-
-    // Total cost: prefer NDR actuals, fall back to hours × rate
     const ndrCost   = hasNdr ? ndrCostForClient(c.name, ndrMonths) : null;
     const totalCost = ndrCost
       ? Math.round(ndrCost.total)
-      : Math.round(cs * rt.cs + sa * rt.sa + dev * rt.dev + bug * (rt.bug ?? rt.dev));
-
-    const periodARR = Math.round((c.arr || 0) * arrFactor);
-    return { c, totalHours, totalCost, periodARR, fromNdr: !!ndrCost };
-  }).filter(Boolean).sort((a,b) => b.totalCost - a.totalCost).slice(0, 20);
+      : Math.round(cs*rt.cs + sa*rt.sa + dev*rt.dev + bug*(rt.bug??rt.dev));
+    const periodARR = Math.round((c.arr||0) * arrFactor);
+    return { c, cs, sa, dev, bug, totalHours, totalCost, periodARR, fromNdr:!!ndrCost };
+  }).filter(Boolean).sort((a,b) => b.totalHours - a.totalHours).slice(0, 20);
 
   const opts = baseOpts();
-  opts.scales.y.ticks = { callback: v => '$'+fmtK(v), color:col('--text-secondary'), font:{family:'Poppins',size:10.5} };
+  opts.scales.x.stacked = true;
 
+  // Left axis — hours
+  opts.scales.y = {
+    type:'linear', position:'left', stacked:true,
+    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => v+'h' },
+    grid:{ color:col('--border') }, border:{ display:false },
+  };
+  // Right axis — cost $ (formatted as $K) + ARR line
   opts.scales.y1 = {
     type:'linear', position:'right',
-    ticks:{ color:'#8B5CF6', font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
+    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
     grid:{ drawOnChartArea:false }, border:{ display:false },
-    title:{ display:true, text:`${windowLabel} ARR`, color:'#8B5CF6', font:{family:'Poppins',size:10.5} }
+    title:{ display:true, text:`Cost / ${winLbl} ARR ($K)`, color:col('--text-secondary'), font:{family:'Poppins',size:10} }
   };
 
   opts.plugins.legend = {
-    display: true, position:'top',
+    display:true, position:'top',
     labels:{ color:col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:12 }
   };
-
   opts.plugins.tooltip = {
     mode:'index', intersect:false,
     callbacks:{
       title: ctx => items[ctx[0].dataIndex].c.name,
       label: ctx => {
-        if (ctx.dataset.type === 'line') return ` ${windowLabel} ARR: ${fmt$(ctx.raw)}`;
-        return ` Cost: ${fmt$(ctx.raw)}`;
+        const ds = ctx.dataset;
+        if (ds.type === 'line')      return ` ${winLbl} ARR: ${fmt$(ctx.raw)}`;
+        if (ds.label === 'Cost')     return ` Cost: ${fmt$(ctx.raw)}`;
+        if (ctx.raw === 0)           return null;
+        return ` ${ds.label}: ${Math.round(ctx.raw)}h`;
       },
       afterBody: ctx => {
-        const item = items[ctx[0].dataIndex];
-        const lines = [
-          ``,
-          ` Total hours: ${Math.round(item.totalHours)}h`,
-          ` ${windowLabel} ARR: ${fmt$(item.periodARR)}`,
-        ];
-        if (item.periodARR) {
-          const margin = item.periodARR - item.totalCost;
-          const pct = item.periodARR > 0 ? ((margin / item.periodARR)*100).toFixed(0) : '—';
-          lines.push(` Est. margin: ${fmt$(Math.round(margin))} (${pct}%)`);
+        const it = items[ctx[0].dataIndex];
+        const lines = ['', ` Total hours: ${Math.round(it.totalHours)}h`, ` Total cost: ${fmt$(it.totalCost)}`, ` ${winLbl} ARR: ${fmt$(it.periodARR)}`];
+        if (it.periodARR) {
+          const m = it.periodARR - it.totalCost;
+          lines.push(` Est. margin: ${fmt$(Math.round(m))} (${it.periodARR>0?((m/it.periodARR)*100).toFixed(0):'—'}%)`);
         }
-        if (item.fromNdr) lines.push(` ⓘ Cost from NDR actuals`);
+        if (it.fromNdr) lines.push(' ⓘ Cost from NDR actuals');
         return lines;
       }
     }
   };
 
   const labels = items.map(x => x.c.name.length>14 ? x.c.name.slice(0,13)+'…' : x.c.name);
+  const hO = { borderRadius:2, maxBarThickness:20, yAxisID:'y',  stack:'hours' };
+  const cO = { borderRadius:2, maxBarThickness:20, yAxisID:'y1', stack:'cost'  };
 
   charts.top20 = new Chart(document.getElementById('cTop20'), {
     type:'bar',
     data:{ labels, datasets:[
-      {
-        label: 'Cost',
-        data: items.map(x => x.totalCost),
-        backgroundColor: '#219EBC',
-        borderRadius: 3,
-        maxBarThickness: 40,
-      },
-      {
-        label: `${windowLabel} ARR`,
-        data: items.map(x => x.periodARR),
-        type:'line', yAxisID:'y1',
-        borderColor:'#8B5CF6', backgroundColor:'#8B5CF622',
-        pointRadius:4, pointHoverRadius:6,
-        borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false,
-      },
+      // Hours stacked — left axis
+      { label:'CS',      data:items.map(x=>x.cs),  backgroundColor:'#95D600', ...hO },
+      { label:'SA',      data:items.map(x=>x.sa),  backgroundColor:'#219EBC', ...hO },
+      { label:'Dev',     data:items.map(x=>x.dev), backgroundColor:'#08173C', ...hO },
+      { label:'Bug/Esc', data:items.map(x=>x.bug), backgroundColor:'#E4A8A0', ...hO },
+      // Total cost — right axis ($K)
+      { label:'Cost', data:items.map(x=>x.totalCost), backgroundColor:'rgba(33,158,188,.35)', borderRadius:2, maxBarThickness:20, yAxisID:'y1', stack:'cost' },
+      // Period-normalised ARR line — right axis
+      { label:`${winLbl} ARR`, data:items.map(x=>x.periodARR), type:'line', yAxisID:'y1',
+        borderColor:'#8B5CF6', backgroundColor:'#8B5CF622', pointRadius:4, pointHoverRadius:6,
+        borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false, stack:undefined },
     ]},
     options: opts
   });
