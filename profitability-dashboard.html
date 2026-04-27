@@ -854,8 +854,18 @@ tr.selected-row{background:var(--teal-50) !important;}
         <select id="ndrEffortOwnerSel" onchange="window._ndrEffortOwnerChanged()" style="font-size:11px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;min-width:130px;">
           <option value="">All owners</option>
         </select>
-        <input id="ndrEffortClientSearch" type="search" placeholder="Search client…" oninput="window._ndrEffortOwnerChanged()"
-          style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;width:140px;">
+        <div style="position:relative;">
+          <button id="ndrEffortClientBtn" onclick="window._toggleEffortClientPanel()" style="font-size:11px;padding:4px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
+            <span id="ndrEffortClientLabel">All clients</span> <span style="font-size:9px;">▾</span>
+          </button>
+          <div id="ndrEffortClientPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:210px;max-height:260px;overflow-y:auto;padding:6px 0;">
+            <div style="padding:4px 10px;border-bottom:1px solid var(--border);display:flex;gap:6px;">
+              <button onclick="window._ndrEffortClientSelectAll(true)"  style="font-size:10px;padding:2px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit;">All</button>
+              <button onclick="window._ndrEffortClientSelectAll(false)" style="font-size:10px;padding:2px 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit;">None</button>
+            </div>
+            <div id="ndrEffortClientList" style="padding:4px 0;"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="card"><div class="card-body">
@@ -6008,30 +6018,95 @@ function renderNdrCostBreakdown(data, months) {
 }
 
 // ── Effort vs Income combo chart — state ─────────────────────────────────────
-let _ndrEffortOwner  = '';
-let _ndrEffortSearch = '';
+let _ndrEffortOwner   = '';
+let _ndrEffortClients = null;   // null = all; Set = selected client names
 let _ndrEffortTopNVal = 10;
 
 window._ndrEffortOwnerChanged = function() {
-  _ndrEffortOwner  = (document.getElementById('ndrEffortOwnerSel')?.value  || '').trim();
-  _ndrEffortSearch = (document.getElementById('ndrEffortClientSearch')?.value || '').trim().toLowerCase();
+  _ndrEffortOwner = (document.getElementById('ndrEffortOwnerSel')?.value || '').trim();
+  // When owner changes, rebuild client panel with only that owner's clients
+  _buildEffortClientPanel(window.NDR_DATA, _filteredNdrMonths());
   renderNdrEffortVsIncome(window.NDR_DATA, _filteredNdrMonths());
 };
+
 window._ndrEffortTopN = function(btn, n) {
   _ndrEffortTopNVal = n;
   document.querySelectorAll('#ndrEffortTopSeg .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
   renderNdrEffortVsIncome(window.NDR_DATA, _filteredNdrMonths());
 };
 
-// Returns NDR snapshot rows filtered by owner + client search (in addition to cost filter)
+window._toggleEffortClientPanel = function() {
+  const p = document.getElementById('ndrEffortClientPanel');
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+};
+
+window._ndrEffortClientSelectAll = function(all) {
+  const items = document.querySelectorAll('#ndrEffortClientList input[type=checkbox]');
+  items.forEach(cb => { cb.checked = all; });
+  _ndrEffortClients = null;
+  _updateEffortClientLabel();
+  renderNdrEffortVsIncome(window.NDR_DATA, _filteredNdrMonths());
+};
+
+window._ndrEffortClientToggle = function(name, cb) {
+  // Rebuild set from all checked boxes
+  const items = document.querySelectorAll('#ndrEffortClientList input[type=checkbox]');
+  const checked = [...items].filter(x => x.checked).map(x => x.dataset.client);
+  _ndrEffortClients = checked.length === items.length ? null : new Set(checked);
+  _updateEffortClientLabel();
+  renderNdrEffortVsIncome(window.NDR_DATA, _filteredNdrMonths());
+};
+
+function _updateEffortClientLabel() {
+  const lbl = document.getElementById('ndrEffortClientLabel');
+  if (!lbl) return;
+  if (!_ndrEffortClients) { lbl.textContent = 'All clients'; return; }
+  const n = _ndrEffortClients.size;
+  lbl.textContent = n === 1 ? [..._ndrEffortClients][0].split(' ').slice(0,2).join(' ') : n + ' clients';
+}
+
+// Build the client checkbox panel (called on owner change or init)
+function _buildEffortClientPanel(data, months) {
+  const listEl = document.getElementById('ndrEffortClientList');
+  if (!listEl || !data) return;
+
+  // Collect all clients visible under current owner filter
+  const allClients = new Set();
+  months.forEach(mk => {
+    (data[mk] || []).forEach(r => {
+      if (_ndrEffortOwner && getNdrOwner(r.client) !== _ndrEffortOwner) return;
+      allClients.add(r.client);
+    });
+  });
+  const sorted = [...allClients].sort();
+
+  // Reset selected if switching owner
+  _ndrEffortClients = null;
+  _updateEffortClientLabel();
+
+  listEl.innerHTML = sorted.map(name => `
+    <label style="display:flex;align-items:center;gap:7px;padding:4px 12px;cursor:pointer;font-size:11px;color:var(--text);" onmouseover="this.style.background='var(--surface-2,#f5f5f5)'" onmouseout="this.style.background=''">
+      <input type="checkbox" checked data-client="${escapeHtml(name)}" onchange="window._ndrEffortClientToggle('${escapeHtml(name)}',this)" style="accent-color:var(--accent,#95D600);cursor:pointer;">
+      ${escapeHtml(name)}
+    </label>`).join('');
+}
+
+// Close client panel when clicking outside
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('ndrEffortClientPanel');
+  const btn   = document.getElementById('ndrEffortClientBtn');
+  if (panel && btn && !panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.style.display = 'none';
+  }
+});
+
+// Returns NDR snapshot rows filtered by owner + client multi-select (+ cost filter)
 function _ndrEffortRows(data, mk) {
   return (data[mk] || []).filter(r => {
     if (_ndrCostFilter && !_ndrCostFilter.has(r.client)) return false;
-    if (_ndrEffortOwner) {
-      const cl = DATA.find(c => c.name.toLowerCase() === r.client.toLowerCase());
-      if (!cl || (cl.owner || '').trim() !== _ndrEffortOwner) return false;
-    }
-    if (_ndrEffortSearch && !r.client.toLowerCase().includes(_ndrEffortSearch)) return false;
+    if (_ndrEffortOwner && getNdrOwner(r.client) !== _ndrEffortOwner) return false;
+    if (_ndrEffortClients && !_ndrEffortClients.has(r.client)) return false;
     return true;
   });
 }
@@ -6043,8 +6118,8 @@ function _populateEffortOwnerSel(data, months) {
   const owners = new Set();
   months.forEach(mk => {
     (data[mk] || []).forEach(r => {
-      const cl = DATA.find(c => c.name.toLowerCase() === r.client.toLowerCase());
-      if (cl && cl.owner) owners.add(cl.owner.trim());
+      const o = getNdrOwner(r.client);
+      if (o && o !== '(Unassigned)') owners.add(o);
     });
   });
   const prev = sel.value;
@@ -6062,6 +6137,10 @@ function renderNdrEffortVsIncome(data, months) {
   if (!data || !months.length) return;
 
   _populateEffortOwnerSel(data, months);
+  // Only rebuild client panel on first call or owner change (panel may already have user selections)
+  if (document.getElementById('ndrEffortClientList')?.children.length === 0) {
+    _buildEffortClientPanel(data, months);
+  }
 
   const labels = months.map(_fmtMk);
   const rt = state.rates;
@@ -6251,18 +6330,27 @@ function renderNdrEffortVsIncome(data, months) {
     .sort((a,b) => b[1].latestIncome - a[1].latestIncome)
     .slice(0, _ndrEffortTopNVal);
 
-  function momArrow(curr, prev) {
-    if (!prev) return '';
-    const pct = ((curr - prev) / prev * 100).toFixed(0);
-    const col = pct > 0 ? '#95D600' : pct < 0 ? '#E4A8A0' : '#aaa';
-    const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
+  // incomeArrow: up = good (green), down = bad (pink)
+  function incomeArrow(curr, prev) {
+    if (!prev || prev === 0) return '';
+    const pct = Math.round((curr - prev) / prev * 100);
+    if (pct === 0) return ` <span style="color:#aaa;font-size:9px;">—0%</span>`;
+    const col   = pct > 0 ? '#95D600' : '#E4A8A0';
+    const arrow = pct > 0 ? '▲' : '▼';
+    return ` <span style="color:${col};font-size:9px;">${arrow}${Math.abs(pct)}%</span>`;
+  }
+  // costArrow: up = bad (pink), down = good (green) — inverted intent vs income
+  function costArrow(curr, prev) {
+    if (!prev || prev === 0) return '';
+    const pct = Math.round((curr - prev) / prev * 100);
+    if (pct === 0) return ` <span style="color:#aaa;font-size:9px;">—0%</span>`;
+    const col   = pct > 0 ? '#E4A8A0' : '#95D600';   // cost up = bad = pink
+    const arrow = pct > 0 ? '▲' : '▼';
     return ` <span style="color:${col};font-size:9px;">${arrow}${Math.abs(pct)}%</span>`;
   }
 
-  const ownerOf = name => {
-    const cl = DATA.find(c => c.name.toLowerCase() === name.toLowerCase());
-    return cl ? (cl.owner || '—') : '—';
-  };
+  // Use NDR_OWNER_MAP_RAW via getNdrOwner() for consistency across all tabs
+  const ownerOf = name => getNdrOwner(name);
 
   let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;">
     <thead><tr style="background:var(--surface-2,#f5f5f5);text-align:left;">
@@ -6278,15 +6366,17 @@ function renderNdrEffortVsIncome(data, months) {
   sorted.forEach(([name, d], idx) => {
     const margin = d.income > 0 ? ((d.profit / d.income) * 100).toFixed(1) + '%' : '—';
     const mColor = d.profit >= 0 ? '#95D600' : '#E4A8A0';
-    const incArrow  = momArrow(d.latestIncome, d.prevIncome);
-    const costArrow = momArrow(d.latestCost,   d.prevCost);
+    const iArrow = incomeArrow(d.latestIncome, d.prevIncome);
+    const cArrow = costArrow(d.latestCost,   d.prevCost);
     const bg = idx % 2 === 0 ? '' : 'background:var(--surface-2,#f9f9f9);';
+    const ownerName = ownerOf(name);
+    const ownerDisplay = (ownerName && ownerName !== '(Unassigned)') ? ownerName : '<span style="color:var(--text-secondary);">—</span>';
     html += `<tr style="${bg}">
       <td style="padding:5px 8px;color:var(--text-secondary);">${idx+1}</td>
-      <td style="padding:5px 8px;font-weight:600;">${name}</td>
-      <td style="padding:5px 8px;color:var(--text-secondary);">${ownerOf(name)}</td>
-      <td style="padding:5px 8px;text-align:right;">${fmtMoney(d.latestIncome)}${incArrow}</td>
-      <td style="padding:5px 8px;text-align:right;">${fmtMoney(d.latestCost)}${costArrow}</td>
+      <td style="padding:5px 8px;font-weight:600;">${escapeHtml(name)}</td>
+      <td style="padding:5px 8px;">${ownerDisplay}</td>
+      <td style="padding:5px 8px;text-align:right;">${fmtMoney(d.latestIncome)}${iArrow}</td>
+      <td style="padding:5px 8px;text-align:right;">${fmtMoney(d.latestCost)}${cArrow}</td>
       <td style="padding:5px 8px;text-align:right;color:${mColor};font-weight:700;">${fmtMoney(d.profit)}</td>
       <td style="padding:5px 8px;text-align:right;color:${mColor};">${margin}</td>
     </tr>`;
