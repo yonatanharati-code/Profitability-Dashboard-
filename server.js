@@ -1047,12 +1047,22 @@ app.post('/api/import-hours', (req, res) => {
   }
 });
 
-/** Import a pricing events CSV (EU or US region) — accumulates months, never overwrites past data */
+/**
+ * Import a pricing events CSV (EU or US region).
+ *
+ * Storage model — prevents double-counting on re-upload:
+ *   stored.regions[REGION][YYYY-MM] = { account: count, … }
+ *
+ * Each upload REPLACES the region+month slice it covers, then the merged
+ * `stored.months` view is rebuilt from scratch by summing all regions.
+ * Re-uploading the same region+month is therefore always idempotent.
+ * Uploading EU for December never touches US data for December (and vice versa).
+ */
 app.post('/api/import-pricing', (req, res) => {
   try {
     const csv      = req.body?.csv || req.body;
     const filename = req.body?.filename || 'pricing.csv';
-    const region   = req.body?.region || 'EU';
+    const region   = (req.body?.region || 'EU').toUpperCase();
     if (!csv || typeof csv !== 'string') {
       return res.status(400).json({ ok: false, error: 'No CSV text provided' });
     }
@@ -1061,25 +1071,44 @@ app.post('/api/import-pricing', (req, res) => {
     const { month } = meta;
     if (!month) return res.status(400).json({ ok: false, error: 'Could not determine month from CSV dates' });
 
-    // Load existing data and MERGE — never overwrite previous months
     const stored = readPricing();
-    if (!stored.months) stored.months = {};
+    if (!stored.regions) stored.regions = {};
     if (!stored.imports) stored.imports = [];
 
-    // Merge this month's events into stored data (sum if both have data for same account)
-    if (!stored.months[month]) stored.months[month] = {};
+    // Determine which month-keys this file contains
+    const monthsInFile = new Set();
+    for (const monthData of Object.values(events)) {
+      for (const mk of Object.keys(monthData)) monthsInFile.add(mk);
+    }
+
+    // REPLACE this region's data for those months (clear first, then write)
+    if (!stored.regions[region]) stored.regions[region] = {};
+    for (const mk of monthsInFile) {
+      stored.regions[region][mk] = {};          // wipe previous upload for same region+month
+    }
     for (const [account, monthData] of Object.entries(events)) {
       for (const [mk, count] of Object.entries(monthData)) {
-        stored.months[mk] = stored.months[mk] || {};
-        stored.months[mk][account] = (stored.months[mk][account] || 0) + count;
+        stored.regions[region][mk][account] = (stored.regions[region][mk][account] || 0) + count;
       }
     }
+
+    // Rebuild merged months view (EU + US summed together)
+    const merged = {};
+    for (const regionData of Object.values(stored.regions)) {
+      for (const [mk, accounts] of Object.entries(regionData)) {
+        if (!merged[mk]) merged[mk] = {};
+        for (const [account, count] of Object.entries(accounts)) {
+          merged[mk][account] = (merged[mk][account] || 0) + count;
+        }
+      }
+    }
+    stored.months = merged;
 
     // Record import log
     stored.imports.push({ month, region, filename, accounts: meta.accounts, parsed: meta.parsed, importedAt: meta.importedAt });
 
     writePricing(stored);
-    console.log(`✓  Pricing import done — month=${month}, ${meta.accounts} accounts, ${meta.parsed} rows`);
+    console.log(`✓  Pricing import done — region=${region}, month=${month}, ${meta.accounts} accounts, ${meta.parsed} rows`);
     res.json({ ok: true, month, accounts: meta.accounts, parsed: meta.parsed, totalMonths: Object.keys(stored.months).length });
   } catch (err) {
     console.error('Pricing import failed:', err.message);
