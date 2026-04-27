@@ -589,8 +589,8 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section">
       <div class="section-head">
         <div>
-          <div class="section-title">Top 20 Customers by Cost</div>
-          <div class="section-desc">Labor cost ($) stacked by division · selected window · sorted by total cost</div>
+          <div class="section-title">Top 20 Customers — Hours &amp; Cost</div>
+          <div class="section-desc">Hours (left) + Cost $ (right) by division · ARR line normalised to selected window</div>
         </div>
         <div class="legend">
           <span class="legend-item"><span class="legend-dot" style="background:#95D600"></span>CS</span>
@@ -2249,80 +2249,113 @@ function chartOvDevRev(){
   });
 }
 
-// Effort: top 20 — one stacked cost bar per customer + ARR line
+// Returns how many months the selected window covers (for ARR normalisation)
+function windowMonths() {
+  const w = state.window;
+  if (w === 'ytd')   return new Date().getMonth() + 1;  // Jan=1 … Dec=12
+  if (w === 'month') return 1;
+  return w;  // 1, 3 or 6
+}
+
+// Effort: top 20 — hours bar (left) + cost bar (right) per customer, period-normalised ARR line
 function chartTop20(){
-  const rt = state.rates;
+  const rt  = state.rates;
+  const wm  = windowMonths();                        // months in selected window
+  const arrFactor = wm / 12;                        // e.g. 3M → 0.25 of annual ARR
+
   const items = AD().map(c => {
-    const cs  = g(c,'cs'), sa  = g(c,'sa'), dev = g(c,'dev'), bug = gBug(c);
+    const cs  = g(c,'cs'), sa = g(c,'sa'), dev = g(c,'dev'), bug = gBug(c);
     const cCS = Math.round(cs  * rt.cs);
     const cSA = Math.round(sa  * rt.sa);
     const cDev= Math.round(dev * rt.dev);
     const cBug= Math.round(bug * (rt.bug ?? rt.dev));
     const totalHours = cs + sa + dev + bug;
     const totalCost  = cCS + cSA + cDev + cBug;
-    return { c, cs, sa, dev, bug, totalHours, cCS, cSA, cDev, cBug, totalCost };
-  }).filter(x => x.totalHours > 0).sort((a,b) => b.totalCost - a.totalCost).slice(0, 20);
+    const periodARR  = Math.round((c.arr || 0) * arrFactor);  // ARR for this window
+    return { c, cs, sa, dev, bug, totalHours, cCS, cSA, cDev, cBug, totalCost, periodARR };
+  }).filter(x => x.totalHours > 0).sort((a,b) => b.totalHours - a.totalHours).slice(0, 20);
+
+  const windowLabel = state.window === 'ytd'   ? 'YTD ARR'
+                    : state.window === 'month'  ? '1-mo ARR'
+                    : `${state.window}-mo ARR`;
 
   const opts = baseOpts();
   opts.scales.x.stacked = true;
-  opts.scales.y.stacked = true;
-  opts.scales.y.ticks = { callback: v => '$' + fmtK(v), color: col('--text-secondary'), font:{family:'Poppins',size:10.5} };
 
-  // Right axis for ARR line
+  // Left axis — hours
+  opts.scales.y = {
+    type:'linear', position:'left', stacked: true,
+    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => v+'h' },
+    grid:{ color:col('--border') }, border:{ display:false },
+  };
+
+  // Right axis — cost $ + period ARR line (same $ scale → gap = margin)
   opts.scales.y1 = {
-    type:'linear', position:'right',
-    ticks:{ color:'#8B5CF6', font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
+    type:'linear', position:'right', stacked: true,
+    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
     grid:{ drawOnChartArea:false }, border:{ display:false },
-    title:{ display:true, text:'ARR', color:'#8B5CF6', font:{family:'Poppins',size:10.5} }
+    title:{ display:true, text:'Cost / '+windowLabel+' ($)', color:col('--text-secondary'), font:{family:'Poppins',size:10} }
   };
 
   opts.plugins.legend = {
     display: true, position:'top',
     labels:{ color:col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:12 }
   };
+
   opts.plugins.tooltip = {
     mode:'index', intersect:false,
     callbacks:{
       title: ctx => items[ctx[0].dataIndex].c.name,
       label: ctx => {
-        if (ctx.dataset.label === 'ARR') return ' ARR: ' + fmt$(ctx.raw);
-        return ' ' + ctx.dataset.label + ': ' + fmt$(ctx.raw);
+        const ds = ctx.dataset;
+        if (ds.yAxisID === 'y1' && ds.type === 'line') return ` ${windowLabel}: ${fmt$(ctx.raw)}`;
+        if (ds.yAxisID === 'y1') return ` ${ds.label}: ${fmt$(ctx.raw)}`;
+        return ` ${ds.label}: ${Math.round(ctx.raw)}h`;
       },
       afterBody: ctx => {
         const item = items[ctx[0].dataIndex];
-        const arr  = item.c.arr || 0;
         const lines = [
           '',
-          ' Total hours: ' + Math.round(item.totalHours) + 'h',
-          ' Total cost:  ' + fmt$(item.totalCost),
+          ` Total hours: ${Math.round(item.totalHours)}h`,
+          ` Total cost:  ${fmt$(item.totalCost)}`,
+          ` ${windowLabel}: ${fmt$(item.periodARR)}`,
         ];
-        if (arr) {
-          const margin = arr - item.totalCost;
-          const pct = arr > 0 ? ((margin / arr) * 100).toFixed(0) + '%' : '—';
-          lines.push(' ARR:         ' + fmt$(arr));
-          lines.push(' Est. margin: ' + fmt$(Math.round(margin)) + ' (' + pct + ')');
+        if (item.periodARR) {
+          const margin = item.periodARR - item.totalCost;
+          const pct = ((margin / item.periodARR) * 100).toFixed(0);
+          lines.push(` Est. margin: ${fmt$(Math.round(margin))} (${pct}%)`);
         }
         return lines;
       }
     }
   };
 
-  const bOpts = { borderRadius:2, maxBarThickness:34 };
+  const hOpts = { borderRadius:2, maxBarThickness:20, yAxisID:'y',  stack:'hours' };
+  const cOpts = { borderRadius:2, maxBarThickness:20, yAxisID:'y1', stack:'cost'  };
   const labels = items.map(x => x.c.name.length > 14 ? x.c.name.slice(0,13)+'…' : x.c.name);
 
   charts.top20 = new Chart(document.getElementById('cTop20'), {
     type:'bar',
     data:{ labels, datasets:[
-      { label:'CS',      data:items.map(x=>x.cCS),  backgroundColor:'#95D600',   yAxisID:'y', ...bOpts },
-      { label:'SA',      data:items.map(x=>x.cSA),  backgroundColor:'#219EBC',   yAxisID:'y', ...bOpts },
-      { label:'Dev',     data:items.map(x=>x.cDev), backgroundColor:'#08173C',   yAxisID:'y', ...bOpts },
-      { label:'Bug/Esc', data:items.map(x=>x.cBug), backgroundColor:'#E4A8A0',   yAxisID:'y', ...bOpts },
+      // Hours bars — left axis
+      { label:'CS',      data:items.map(x=>x.cs),   backgroundColor:'#95D600',  ...hOpts },
+      { label:'SA',      data:items.map(x=>x.sa),   backgroundColor:'#219EBC',  ...hOpts },
+      { label:'Dev',     data:items.map(x=>x.dev),  backgroundColor:'#08173C',  ...hOpts },
+      { label:'Bug/Esc', data:items.map(x=>x.bug),  backgroundColor:'#E4A8A0',  ...hOpts },
+      // Cost bars — right axis
+      { label:'CS $',      data:items.map(x=>x.cCS),  backgroundColor:'rgba(149,214,0,.55)',   ...cOpts },
+      { label:'SA $',      data:items.map(x=>x.cSA),  backgroundColor:'rgba(33,158,188,.55)',  ...cOpts },
+      { label:'Dev $',     data:items.map(x=>x.cDev), backgroundColor:'rgba(8,23,60,.55)',     ...cOpts },
+      { label:'Bug/Esc $', data:items.map(x=>x.cBug), backgroundColor:'rgba(228,168,160,.65)', ...cOpts },
+      // Period-normalised ARR line — right axis (gap between line and cost bar top = margin)
       {
-        label:'ARR', data:items.map(x=>x.c.arr||0),
+        label: windowLabel,
+        data: items.map(x => x.periodARR),
         type:'line', yAxisID:'y1',
         borderColor:'#8B5CF6', backgroundColor:'#8B5CF622',
         pointRadius:4, pointHoverRadius:6,
         borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false,
+        stack: undefined,
       },
     ]},
     options: opts
