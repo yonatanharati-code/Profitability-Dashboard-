@@ -479,6 +479,7 @@ tr.selected-row{background:var(--teal-50) !important;}
     <button class="tab" data-pane="effort">Effort</button>
     <button class="tab" data-pane="profit">Profitability</button>
     <button class="tab" data-pane="ndr">NDR</button>
+    <button class="tab" data-pane="pricing">Pricing Usage</button>
     <button class="tab" data-pane="budget">Dev Budget</button>
     <button class="tab" data-pane="customers">Customers <span class="tab-count" id="custCount">—</span></button>
   </div>
@@ -1042,6 +1043,50 @@ tr.selected-row{background:var(--teal-50) !important;}
 
   </div><!-- /pane-profit -->
 
+  <!-- ══ PRICING USAGE pane ══ -->
+  <div class="pane" id="pane-pricing">
+    <div class="section">
+      <div class="section-body">
+
+        <!-- Stats row -->
+        <div class="kpi-row" id="pricingStats" style="margin-bottom:16px;"></div>
+
+        <!-- Toolbar -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <input id="pricingSearch" type="search" placeholder="Search client…"
+            style="padding:5px 10px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-size:12px;width:180px;font-family:inherit;"
+            oninput="renderPricing()">
+          <span style="font-size:11px;color:var(--text-secondary);" id="pricingCount"></span>
+          <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);" id="pricingMonthsLabel"></span>
+        </div>
+
+        <!-- Table -->
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead id="pricingThead" style="position:sticky;top:0;background:var(--surface);z-index:2;">
+              <tr id="pricingTheadRow">
+                <th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;white-space:nowrap;">Client</th>
+                <th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;">Owner</th>
+                <!-- month columns injected by renderPricing() -->
+                <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;white-space:nowrap;">Contract limit</th>
+                <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;">Util %</th>
+              </tr>
+            </thead>
+            <tbody id="pricingBody"></tbody>
+          </table>
+        </div>
+
+        <!-- No data state -->
+        <div id="pricingEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--text-secondary);">
+          <div style="font-size:32px;margin-bottom:12px;">📊</div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px;">No pricing data yet</div>
+          <div style="font-size:12px;">Upload EU and US monthly pricing CSVs using the toolbar buttons above.</div>
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /pane-pricing -->
+
   <!-- ══ DEV BUDGET pane ══ -->
   <div class="pane" id="pane-budget">
 
@@ -1268,9 +1313,10 @@ const DEALS={}
 const USER_HOURS={}
 const NDR_SYNCED_AT=""
 const NDR_DATA={}
+const PRICING_DATA={}
 const HS_PORTAL_ID=0
 const HS_PORTAL_DOMAIN=""
-window.DATA = DATA; window.DEALS = DEALS; window.USER_HOURS = USER_HOURS; window.NDR_DATA = NDR_DATA;
+window.DATA = DATA; window.DEALS = DEALS; window.USER_HOURS = USER_HOURS; window.NDR_DATA = NDR_DATA; window.PRICING_DATA = PRICING_DATA;
 
 /* ═══════════════════════════════════════════════════════════════
    Profitability Dashboard v2 — tabs, executive summary, restrained palette
@@ -3115,11 +3161,191 @@ function renderChartsForPane(pane){
     renderMonthToggles(); chartTop20(); chartRateTrend(); chartStageDonut(); chartMonthlyStack(); chartCustStack(); initPersonSelect(); renderInvestedPills(); chartInvestedVsBilled();
   } else if (pane==='ndr'){
     initNdrTab();
+  } else if (pane==='pricing'){
+    renderPricing();
   } else if (pane==='profit'){
     chartProfit(); chartRevVsEff(); chartNoReturn();
     renderCsmTable();
   }
 }
+
+// ── Pricing Usage tab ──────────────────────────────────
+// Contract limits stored per client in localStorage: { clientKey: number }
+// clientKey = canonical lowercase name from pricing CSV
+function _pricingKey(name) { return (name||'').toLowerCase().trim(); }
+
+function renderPricing() {
+  const pd = window.PRICING_DATA || {};
+  const months = Object.keys(pd).sort();
+  const lastMk  = months[months.length - 1] || null;
+  const prevMk  = months[months.length - 2] || null;
+
+  // Collect all accounts across all months
+  const allAccounts = new Set();
+  months.forEach(mk => Object.keys(pd[mk]).forEach(a => allAccounts.add(a)));
+
+  // Match to dashboard clients for owner lookup
+  function matchClient(accountKey) {
+    return DATA.find(c => _pricingKey(c.name) === accountKey
+      || _pricingKey(c.name).includes(accountKey)
+      || accountKey.includes(_pricingKey(c.name)));
+  }
+
+  // Contract limits
+  let pricingLimits = {};
+  try { pricingLimits = JSON.parse(localStorage.getItem('pfd2_pricing_limits')||'{}'); } catch(e){}
+
+  // Build rows
+  const search = (document.getElementById('pricingSearch')?.value||'').toLowerCase();
+  let rows = [...allAccounts].map(acct => {
+    const thisMonth = lastMk ? (pd[lastMk][acct]||0) : 0;
+    const prevMonth = prevMk ? (pd[prevMk][acct]||0) : null;
+    const limit = pricingLimits[acct] ?? null;
+    const util  = limit ? thisMonth/limit*100 : null;
+    const trend = prevMonth != null && prevMonth > 0 ? (thisMonth-prevMonth)/prevMonth*100 : null;
+    const client = matchClient(acct);
+    const history = months.map(mk => pd[mk][acct]||0);
+    return { acct, thisMonth, prevMonth, limit, util, trend, client, history };
+  }).filter(r => r.thisMonth > 0 || r.limit);
+
+  if (search) rows = rows.filter(r => r.acct.includes(search) || (r.client?.name||'').toLowerCase().includes(search));
+
+  // Sort by this month desc
+  rows.sort((a,b) => b.thisMonth - a.thisMonth);
+
+  // Show/hide empty state
+  const isEmpty = months.length === 0;
+  document.getElementById('pricingEmpty').style.display = isEmpty ? '' : 'none';
+
+  // Stats
+  const totalEvents  = rows.reduce((s,r) => s+r.thisMonth, 0);
+  const overLimit    = rows.filter(r => r.util != null && r.util >= 100).length;
+  const nearLimit    = rows.filter(r => r.util != null && r.util >= 80 && r.util < 100).length;
+  const withLimit    = rows.filter(r => r.limit != null).length;
+  document.getElementById('pricingStats').innerHTML = [
+    { label: 'Total events', value: _fmtEvents(totalEvents), sub: lastMk ? _fmtMk(lastMk) : '—' },
+    { label: 'Clients tracked', value: rows.length, sub: `${withLimit} with limit` },
+    { label: 'Over contract', value: overLimit, cls: overLimit>0?'bad':'' },
+    { label: 'Near limit (>80%)', value: nearLimit, cls: nearLimit>0?'warn':'' },
+    { label: 'Months stored', value: months.length, sub: months.length ? `${_fmtMk(months[0])} → ${_fmtMk(lastMk)}` : '' },
+  ].map(s => `<div class="stat"><div class="stat-label">${s.label}</div><div class="stat-value ${s.cls||''}">${s.value}</div>${s.sub?`<div class="stat-foot">${s.sub}</div>`:''}</div>`).join('');
+
+  document.getElementById('pricingCount').textContent = `${rows.length} clients`;
+  document.getElementById('pricingMonthsLabel').textContent = months.length ? `${months.length} months: ${months.map(mk=>_fmtMk(mk)).join(' · ')}` : '';
+
+  // Build dynamic month column headers
+  const thead = document.getElementById('pricingTheadRow');
+  if (thead) {
+    // Keep first 2 static cols, rebuild month cols, keep last 2
+    thead.innerHTML = `
+      <th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;white-space:nowrap;">Client</th>
+      <th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;">Owner</th>
+      ${months.map(mk => `<th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;white-space:nowrap;${mk===lastMk?'color:var(--accent);':''}">${_fmtMk(mk)}</th>`).join('')}
+      <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;white-space:nowrap;">Contract limit</th>
+      <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;">Util %</th>
+    `;
+  }
+
+  // Rows
+  document.getElementById('pricingBody').innerHTML = rows.map(r => {
+    const oc = r.client ? ownerColor(r.client.owner) : '#999';
+    const ownerCell = r.client?.owner
+      ? `<span class="owner"><span class="owner-avatar" style="background:${oc}">${ownerInit(r.client.owner)}</span>${r.client.owner}</span>`
+      : '<span class="muted">—</span>';
+    const trendBadge = r.trend != null
+      ? `<span style="font-size:9px;font-weight:600;color:${r.trend>5?'var(--ok)':r.trend<-5?'var(--bad)':'var(--text-secondary)'};">${r.trend>0?'+':''}${r.trend.toFixed(0)}%</span>`
+      : '';
+    const monthCells = months.map((mk,i) => {
+      const v = pd[mk][r.acct]||0;
+      const isLast = mk === lastMk;
+      return `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;${isLast?'font-weight:600;':''}">${_fmtEvents(v)}${isLast&&trendBadge?' '+trendBadge:''}</td>`;
+    }).join('');
+    const limitCell = `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);">
+      <span class="budget-set" onclick="editPricingLimit('${r.acct}')" style="cursor:pointer;" title="Click to set contract limit">
+        ${r.limit!=null ? _fmtEvents(r.limit) : '<span style="color:var(--text-tertiary);font-size:11px;">＋ Set limit</span>'}
+      </span>
+    </td>`;
+    const utilColor = r.util==null?'var(--text-tertiary)':r.util>=100?'var(--bad)':r.util>=80?'var(--warn)':'var(--ok)';
+    const utilCell = r.util != null
+      ? `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);">
+          <div class="mini-bar"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${Math.min(100,r.util)}%;background:${utilColor};"></div></div>
+          <div class="mini-bar-label" style="color:${utilColor};">${Math.round(r.util)}%</div></div>
+         </td>`
+      : `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text-tertiary);">—</td>`;
+    const displayName = r.client?.name || r.acct;
+    return `<tr>
+      <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap;">${escapeHtml(displayName)}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid var(--border);">${ownerCell}</td>
+      ${monthCells}
+      ${limitCell}
+      ${utilCell}
+    </tr>`;
+  }).join('');
+}
+
+function _fmtEvents(n) {
+  if (!n && n !== 0) return '—';
+  if (n >= 1e9) return (n/1e9).toFixed(1)+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+  return String(n);
+}
+
+window.editPricingLimit = function(acct) {
+  // Inline edit: find the cell and replace with input
+  let pricingLimits = {};
+  try { pricingLimits = JSON.parse(localStorage.getItem('pfd2_pricing_limits')||'{}'); } catch(e){}
+  const cur = pricingLimits[acct];
+
+  // Remove any existing popup
+  const old = document.getElementById('pricingLimitPopup');
+  if (old) old.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'pricingLimitPopup';
+  popup.style.cssText = 'position:fixed;z-index:9999;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:14px 16px;width:280px;';
+  popup.innerHTML = `
+    <div style="font-size:12px;font-weight:700;margin-bottom:10px;">📊 Contract limit — ${escapeHtml(acct)}</div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">Monthly pricing events (e.g. 50000000 for 50M)</div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input type="number" id="pricingLimitInput" min="0" step="1000000" value="${cur||''}" placeholder="e.g. 50000000"
+        style="flex:1;padding:5px 8px;border:1px solid var(--accent);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;font-family:var(--mono);">
+      <button onclick="savePricingLimit('${acct}')" style="padding:5px 12px;border-radius:6px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:600;cursor:pointer;">✓</button>
+      ${cur!=null?`<button onclick="clearPricingLimit('${acct}')" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:10px;cursor:pointer;">✕</button>`:''}
+    </div>
+  `;
+  document.body.appendChild(popup);
+  // Center on screen
+  popup.style.top = '30%';
+  popup.style.left = '50%';
+  popup.style.transform = 'translateX(-50%)';
+  const inp = document.getElementById('pricingLimitInput');
+  if (inp) { inp.focus(); inp.select(); inp.addEventListener('keydown', e => { if(e.key==='Enter') savePricingLimit(acct); if(e.key==='Escape'){popup.remove();} }); }
+  setTimeout(() => {
+    document.addEventListener('mousedown', function _c(e){ if(!popup.contains(e.target)){popup.remove(); document.removeEventListener('mousedown',_c);} });
+  }, 50);
+};
+
+window.savePricingLimit = function(acct) {
+  const inp = document.getElementById('pricingLimitInput');
+  if (!inp) return;
+  const v = parseInt(inp.value.replace(/[^0-9]/g,''), 10);
+  let limits = {};
+  try { limits = JSON.parse(localStorage.getItem('pfd2_pricing_limits')||'{}'); } catch(e){}
+  if (!isNaN(v) && v > 0) limits[acct] = v;
+  try { localStorage.setItem('pfd2_pricing_limits', JSON.stringify(limits)); } catch(e){}
+  document.getElementById('pricingLimitPopup')?.remove();
+  renderPricing();
+};
+
+window.clearPricingLimit = function(acct) {
+  let limits = {};
+  try { limits = JSON.parse(localStorage.getItem('pfd2_pricing_limits')||'{}'); } catch(e){}
+  delete limits[acct];
+  try { localStorage.setItem('pfd2_pricing_limits', JSON.stringify(limits)); } catch(e){}
+  document.getElementById('pricingLimitPopup')?.remove();
+  renderPricing();
+};
 
 // ── Dev Budget tab ─────────────────────────────────────
 function renderBudget(){
@@ -5829,6 +6055,7 @@ window.renderNdrRanking = function() {
 window.chartCustStack  = chartCustStack;
 window.chartByPerson   = chartByPerson;
 window.renderBudget    = renderBudget;
+window.renderPricing   = renderPricing;
 
 // Make init callable globally (for YTD patch + safety net)
 window._pfdInit = init;

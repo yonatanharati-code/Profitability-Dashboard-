@@ -6,6 +6,7 @@ const path    = require('path');
 const fs      = require('fs');
 const { refreshAll } = require('./transform');
 const { parseCsvHours } = require('./connectors/csv-hours');
+const { parsePricingCsv } = require('./connectors/pricing-csv');
 const { fetchNdrSnapshot } = require('./connectors/ndr');
 
 const app  = express();
@@ -52,10 +53,11 @@ const DASHBOARD_HTML = process.env.DASHBOARD_HTML
     : path.join(__dirname, '..', 'profitability-dashboard.html');     // parent dir (local dev)
 
 // Cached data paths
-const CACHE_FILE     = path.join(__dirname, 'data', 'cache.json');
-const CSV_HOURS_FILE = path.join(__dirname, 'data', 'csv-hours.json');
-const OVERRIDES_FILE = path.join(__dirname, 'data', 'overrides.json');
-const NDR_FILE       = path.join(__dirname, 'data', 'ndr-snapshot.json');
+const CACHE_FILE      = path.join(__dirname, 'data', 'cache.json');
+const CSV_HOURS_FILE  = path.join(__dirname, 'data', 'csv-hours.json');
+const OVERRIDES_FILE  = path.join(__dirname, 'data', 'overrides.json');
+const NDR_FILE        = path.join(__dirname, 'data', 'ndr-snapshot.json');
+const PRICING_FILE    = path.join(__dirname, 'data', 'pricing-events.json');
 
 app.use(express.json({ limit: '50mb' }));      // CSV text can be large
 app.use(express.text({ limit: '50mb', type: 'text/csv' }));
@@ -81,6 +83,18 @@ function readNdr() {
     if (!fs.existsSync(NDR_FILE)) return null;
     return JSON.parse(fs.readFileSync(NDR_FILE, 'utf8'));
   } catch { return null; }
+}
+
+function readPricing() {
+  try {
+    if (!fs.existsSync(PRICING_FILE)) return { months: {}, imports: [] };
+    return JSON.parse(fs.readFileSync(PRICING_FILE, 'utf8'));
+  } catch { return { months: {}, imports: [] }; }
+}
+
+function writePricing(data) {
+  fs.mkdirSync(path.dirname(PRICING_FILE), { recursive: true });
+  fs.writeFileSync(PRICING_FILE, JSON.stringify(data, null, 2));
 }
 
 // ─── Fuzzy match (same as transform.js) ──────────────────────────────────────
@@ -315,6 +329,20 @@ function injectData(html, cache, csvHours) {
     );
   }
 
+  // ── Replace PRICING_DATA object ───────────────────────────────────────────────
+  const pricingRaw = readPricing();
+  const PRICING_MARKER = 'const PRICING_DATA={';
+  const pricingStart = html.indexOf(PRICING_MARKER);
+  if (pricingStart !== -1) {
+    const pricingOpen = pricingStart + PRICING_MARKER.length - 1;
+    const pricingEnd  = findBlockEnd(html, pricingOpen, '{', '}');
+    if (pricingEnd !== -1) {
+      html = html.slice(0, pricingStart) +
+             `const PRICING_DATA=${JSON.stringify(pricingRaw.months || {})}` +
+             html.slice(pricingEnd + 1);
+    }
+  }
+
   // ── Intercept sendChat at its first line so ALL call paths use local engine ──
   // This covers: onclick button, Enter key, askQuick preset buttons — everything.
   html = html.replace(
@@ -363,7 +391,21 @@ function injectData(html, cache, csvHours) {
     style="background:rgba(250,204,21,.10);border-color:rgba(250,204,21,.3);color:#facc15;margin-left:6px;">
     ↻ Sync NDR
   </button>` +
-      `\n  <span id="ndrSyncedAtBadge" style="margin-left:6px;"></span>`
+      `\n  <span id="ndrSyncedAtBadge" style="margin-left:6px;"></span>` +
+      // ── Import Pricing CSVs (EU + US) ─────────────────────────────────────
+      (() => {
+        const pr = readPricing();
+        const months = Object.keys(pr.months || {}).sort();
+        const pricingTip = months.length
+          ? ` title="Pricing data: ${months.length} months stored (${months[0]} → ${months[months.length-1]})"`
+          : '';
+        return `\n  <input type="file" id="pricingEuInput" accept=".csv" style="display:none" onchange="_importPricingCsv(this,'EU')">` +
+               `\n  <label for="pricingEuInput" class="import-btn" style="background:rgba(139,92,246,.10);border-color:rgba(139,92,246,.3);color:#a78bfa;margin-left:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"${pricingTip}>` +
+               `📊 EU Pricing${months.length ? ' ✓' : ''}</label>` +
+               `\n  <input type="file" id="pricingUsInput" accept=".csv" style="display:none" onchange="_importPricingCsv(this,'US')">` +
+               `\n  <label for="pricingUsInput" class="import-btn" style="background:rgba(139,92,246,.10);border-color:rgba(139,92,246,.3);color:#a78bfa;margin-left:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">` +
+               `📊 US Pricing</label>`;
+      })()
     );
   }
 
@@ -551,6 +593,35 @@ async function _importCsvHours(input) {
   } catch (e) {
     alert('Import error: ' + e.message);
     if (lbl) { lbl.textContent = orig; lbl.style.pointerEvents = ''; lbl.style.opacity = ''; }
+  }
+  input.value = '';
+}
+
+async function _importPricingCsv(input, region) {
+  const file = input.files[0];
+  if (!file) return;
+  const inputId = region === 'EU' ? 'pricingEuInput' : 'pricingUsInput';
+  const lblFor  = document.querySelector(\`label[for="\${inputId}"]\`);
+  const origText = lblFor ? lblFor.textContent : '';
+  if (lblFor) { lblFor.style.opacity = '0.6'; lblFor.style.pointerEvents = 'none'; lblFor.textContent = '⏳ Uploading…'; }
+  try {
+    const text = await file.text();
+    const r = await fetch('/api/import-pricing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csv: text, filename: file.name, region }),
+    });
+    const j = await r.json();
+    if (j.ok) {
+      if (lblFor) lblFor.textContent = \`✓ \${j.month} (\${j.accounts} clients) — reloading…\`;
+      setTimeout(() => location.reload(), 900);
+    } else {
+      alert('Pricing import failed: ' + (j.error || 'unknown'));
+      if (lblFor) { lblFor.textContent = origText; lblFor.style.opacity = ''; lblFor.style.pointerEvents = ''; }
+    }
+  } catch (e) {
+    alert('Pricing import error: ' + e.message);
+    if (lblFor) { lblFor.textContent = origText; lblFor.style.opacity = ''; lblFor.style.pointerEvents = ''; }
   }
   input.value = '';
 }
@@ -964,6 +1035,53 @@ app.post('/api/import-hours', (req, res) => {
     console.error('CSV import failed:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+/** Import a pricing events CSV (EU or US region) — accumulates months, never overwrites past data */
+app.post('/api/import-pricing', (req, res) => {
+  try {
+    const csv      = req.body?.csv || req.body;
+    const filename = req.body?.filename || 'pricing.csv';
+    const region   = req.body?.region || 'EU';
+    if (!csv || typeof csv !== 'string') {
+      return res.status(400).json({ ok: false, error: 'No CSV text provided' });
+    }
+    console.log(`\n📊  Importing pricing CSV (${region}): ${filename} (${(csv.length/1024).toFixed(1)} KB)`);
+    const { events, meta } = parsePricingCsv(csv);
+    const { month } = meta;
+    if (!month) return res.status(400).json({ ok: false, error: 'Could not determine month from CSV dates' });
+
+    // Load existing data and MERGE — never overwrite previous months
+    const stored = readPricing();
+    if (!stored.months) stored.months = {};
+    if (!stored.imports) stored.imports = [];
+
+    // Merge this month's events into stored data (sum if both have data for same account)
+    if (!stored.months[month]) stored.months[month] = {};
+    for (const [account, monthData] of Object.entries(events)) {
+      for (const [mk, count] of Object.entries(monthData)) {
+        stored.months[mk] = stored.months[mk] || {};
+        stored.months[mk][account] = (stored.months[mk][account] || 0) + count;
+      }
+    }
+
+    // Record import log
+    stored.imports.push({ month, region, filename, accounts: meta.accounts, parsed: meta.parsed, importedAt: meta.importedAt });
+
+    writePricing(stored);
+    console.log(`✓  Pricing import done — month=${month}, ${meta.accounts} accounts, ${meta.parsed} rows`);
+    res.json({ ok: true, month, accounts: meta.accounts, parsed: meta.parsed, totalMonths: Object.keys(stored.months).length });
+  } catch (err) {
+    console.error('Pricing import failed:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/** Return pricing status */
+app.get('/api/pricing-status', (req, res) => {
+  const pr = readPricing();
+  const months = Object.keys(pr.months || {}).sort();
+  res.json({ loaded: months.length > 0, months, imports: pr.imports || [] });
 });
 
 /** Return raw cached data as JSON */
