@@ -613,7 +613,7 @@ tr.selected-row{background:var(--teal-50) !important;}
           <div class="card-head">
             <div class="card-head-text">
               <div class="card-title">Monthly Hours by Division</div>
-              <div class="card-sub">All customers · Oct 25 – Apr 26</div>
+              <div class="card-sub" id="monthlyStackSub">All customers</div>
             </div>
           </div>
           <div class="month-toggles" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 16px 10px;"></div>
@@ -1802,11 +1802,16 @@ function rollup(){
   return {active,all,totalARR,totalCS,totalSA,totalDev,totalBug,totalDevPaid,totalUpsell,totalPipe,totalLabor,totalDevCost,devRecap,netTotal,bugPctOfDev};
 }
 
-// Trend deltas: compare last 4 months vs prior 3 months
+// Trend deltas: compare last 4 months vs prior 3 months (dynamic)
 function deltas(){
-  const months = ['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04'];
+  const months = ALL_MONTHS;
+  if (months.length < 2) return { cs:null, sa:null, dev:null, bug:null };
   const sumLayer = (layer, idxs) => idxs.reduce((s,i) => s + AD().reduce((t,c) => t + (c[layer]?.monthly?.[months[i]]||0), 0), 0);
-  const curIdxs = [3,4,5,6], prevIdxs = [0,1,2];
+  const n = months.length;
+  const curCount  = Math.min(4, Math.ceil(n/2));
+  const prevCount = Math.min(3, n - curCount);
+  const curIdxs  = Array.from({length:curCount},  (_,k) => n - curCount + k);
+  const prevIdxs = Array.from({length:prevCount}, (_,k) => n - curCount - prevCount + k);
   const d = layer => {
     const cur = sumLayer(layer, curIdxs) / curIdxs.length;
     const prev = sumLayer(layer, prevIdxs) / prevIdxs.length;
@@ -1967,24 +1972,68 @@ const MAX_TREND_CUSTS = 5;
 let trendSelectedIds = []; // [] = show all (stacked by division)
 
 // ── Month exclusion (shared by monthly trend + invested chart) ────────────────
-const ALL_MONTHS  = ['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04'];
-const ALL_MLABELS = ['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26'];
-let excludedMonthKeys = []; // month keys to hide (e.g. '2026-04')
+// Derived dynamically from DATA — expands automatically as new months arrive
+function computeAllMonths() {
+  const s = new Set();
+  for (const c of (window.DATA || [])) {
+    for (const layer of ['cs','sa','dev','bug']) {
+      Object.keys(c[layer]?.monthly || {}).forEach(mk => s.add(mk));
+    }
+  }
+  return [...s].sort();
+}
+function mkLabel(mk) {
+  const [y, m] = mk.split('-').map(Number);
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] + ' ' + String(y).slice(2);
+}
+let ALL_MONTHS  = computeAllMonths();
+let ALL_MLABELS = ALL_MONTHS.map(mkLabel);
+let excludedMonthKeys = [];
+let _activeYear = null;  // null = all years; '2026' = filter to that year
+
+function _allYears() {
+  return [...new Set(ALL_MONTHS.map(mk => mk.slice(0,4)))].sort();
+}
+function refreshAllMonths() {
+  ALL_MONTHS  = computeAllMonths();
+  ALL_MLABELS = ALL_MONTHS.map(mkLabel);
+  const yrs = _allYears();
+  if (_activeYear && !yrs.includes(_activeYear)) _activeYear = yrs[yrs.length-1] || null;
+}
 
 function renderMonthToggles(){
-  const html = ALL_MONTHS.map((mk, i) => {
-    const excluded = excludedMonthKeys.includes(mk);
-    return `<button onclick="window.toggleMonth('${mk}')" style="
-      padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;
-      border:1px solid ${excluded ? 'var(--border)' : 'var(--border-strong)'};
-      background:${excluded ? 'var(--surface-subtle)' : 'var(--surface-hover)'};
-      color:${excluded ? 'var(--text-tertiary)' : 'var(--text-secondary)'};
-      text-decoration:${excluded ? 'line-through' : 'none'};
-      font-family:inherit;transition:all .12s;
-    ">${ALL_MLABELS[i]}</button>`;
+  const years     = _allYears();
+  const multiYear = years.length > 1;
+  if (multiYear && !_activeYear) _activeYear = years[years.length-1];
+  if (!multiYear) _activeYear = null;
+
+  const visMonths = _activeYear ? ALL_MONTHS.filter(mk => mk.startsWith(_activeYear)) : ALL_MONTHS;
+
+  const yearRow = multiYear ? `<div style="display:flex;gap:4px;margin-bottom:5px;align-items:center;flex-wrap:wrap;">
+    <span style="font-size:10px;font-weight:600;color:var(--text-secondary);margin-right:2px;">Year</span>
+    ${years.map(yr=>`<button onclick="window._setActiveYear('${yr}')" style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:${_activeYear===yr?'var(--accent,#95D600)':'var(--surface)'};color:${_activeYear===yr?'#000':'var(--text-secondary)'};font-family:inherit;">${yr}</button>`).join('')}
+    <button onclick="window._setActiveYear(null)" style="padding:2px 9px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:${!_activeYear?'var(--accent,#95D600)':'var(--surface)'};color:${!_activeYear?'#000':'var(--text-secondary)'};font-family:inherit;">All</button>
+  </div>` : '';
+
+  const monthRow = visMonths.map(mk => {
+    const excl = excludedMonthKeys.includes(mk);
+    return `<button onclick="window.toggleMonth('${mk}')" style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid ${excl?'var(--border)':'var(--border-strong)'};background:${excl?'var(--surface-subtle)':'var(--surface-hover)'};color:${excl?'var(--text-tertiary)':'var(--text-secondary)'};text-decoration:${excl?'line-through':'none'};font-family:inherit;transition:all .12s;">${mkLabel(mk)}</button>`;
   }).join('');
-  document.querySelectorAll('.month-toggles').forEach(el => el.innerHTML = html);
+
+  document.querySelectorAll('.month-toggles').forEach(el => {
+    el.innerHTML = yearRow + `<div style="display:flex;flex-wrap:wrap;gap:4px;">${monthRow}</div>`;
+  });
 }
+
+window._setActiveYear = function(yr) {
+  _activeYear = yr;
+  renderMonthToggles();
+  if (charts.ovMonthly)       { charts.ovMonthly.destroy();       delete charts.ovMonthly;       chartOvMonthly(); }
+  if (charts.monthlyStack)    { charts.monthlyStack.destroy();     delete charts.monthlyStack;     chartMonthlyStack(); }
+  if (charts.custStack)       { charts.custStack.destroy();        delete charts.custStack;        chartCustStack(); }
+  if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; chartInvestedVsBilled(); }
+};
+
 function renderMonthTogglesInvested(){ renderMonthToggles(); }
 
 window.toggleMonth = function(mk){
@@ -2110,7 +2159,7 @@ window.filterTrendDropdown = function(val){
 // Overview: monthly stacked bar (with optional per-customer mode)
 function chartOvMonthly(){
   // Respect month exclusions
-  const monthIdxs = ALL_MONTHS.map((mk,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const monthIdxs = ALL_MONTHS.map((mk,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i])&&(!_activeYear||ALL_MONTHS[i].startsWith(_activeYear)));
   const months = monthIdxs.map(i=>ALL_MONTHS[i]);
   const labels = monthIdxs.map(i=>ALL_MLABELS[i]);
   const opts = baseOpts();
@@ -2447,7 +2496,7 @@ function chartStageDonut(){
 
 // Effort: monthly stacked (full)
 function chartMonthlyStack(){
-  const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i])&&(!_activeYear||ALL_MONTHS[i].startsWith(_activeYear)));
   const months = monthIdxs.map(i=>ALL_MONTHS[i]);
   const labels  = monthIdxs.map(i=>ALL_MLABELS[i]);
   const sum = l => state.hiddenLayers.includes(l) ? months.map(()=>0) : months.map(m => AD().reduce((s,c)=>s+(c[l]?.monthly?.[m]||0),0));
@@ -2474,7 +2523,7 @@ const CUSTOMER_PALETTE = [
 ];
 function chartCustStack(){
   if (charts.custStack) { charts.custStack.destroy(); charts.custStack = null; }
-  const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i])&&(!_activeYear||ALL_MONTHS[i].startsWith(_activeYear)));
   const months    = monthIdxs.map(i=>ALL_MONTHS[i]);
   const labels    = monthIdxs.map(i=>ALL_MLABELS[i]);
   const N = parseInt(document.getElementById('custStackTop')?.value || '15');
@@ -2586,7 +2635,7 @@ function chartByPerson(){
   let labels, datasets;
 
   if (viewMode === 'monthly') {
-    const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+    const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i])&&(!_activeYear||ALL_MONTHS[i].startsWith(_activeYear)));
     const months  = monthIdxs.map(i => ALL_MONTHS[i]);
     labels = monthIdxs.map(i => ALL_MLABELS[i]);
     opts.scales.x.stacked = true; opts.scales.y.stacked = true;
@@ -2990,7 +3039,7 @@ window.filterInvestedDropdown = function(val){
 function chartInvestedVsBilled(){
   const BILL_RATE = 120; // €120/h assumed average billing rate
   // Respect month exclusions (shared with monthly trend chart)
-  const monthIdxs = ALL_MONTHS.map((mk,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i]));
+  const monthIdxs = ALL_MONTHS.map((mk,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i])&&(!_activeYear||ALL_MONTHS[i].startsWith(_activeYear)));
   const months = monthIdxs.map(i=>ALL_MONTHS[i]);
   const labels  = monthIdxs.map(i=>ALL_MLABELS[i]);
 
