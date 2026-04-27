@@ -589,8 +589,8 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section">
       <div class="section-head">
         <div>
-          <div class="section-title">Top 20 Customers — Hours &amp; Cost</div>
-          <div class="section-desc">Hours (left) + Cost $ (right) by division · ARR line normalised to selected window</div>
+          <div class="section-title">Top 20 Customers by Cost</div>
+          <div class="section-desc">Total cost per customer · ARR line normalised to selected window</div>
         </div>
         <div class="legend">
           <span class="legend-item"><span class="legend-dot" style="background:#95D600"></span>CS</span>
@@ -2310,7 +2310,7 @@ function ndrCostForClient(hsName, months) {
   return total > 0 ? { labor, platform, partner, stock, competitor, total } : null;
 }
 
-// ── Top-20: hours bar (left) + cost bar from NDR (right) + normalised ARR line ──
+// ── Top-20: one cost bar per customer + normalised ARR line ──────────────────
 function chartTop20(){
   const rt        = state.rates;
   const wm        = windowMonths();
@@ -2318,49 +2318,38 @@ function chartTop20(){
   const ndrMonths = ndrWindowMonths();
   const hasNdr    = ndrMonths.length > 0 && !!window.NDR_DATA;
 
-  const windowLabel = state.window === 'ytd'  ? 'YTD ARR'
-                    : state.window === 'month' ? '1-mo ARR'
-                    : `${state.window}-mo ARR`;
+  const windowLabel = state.window === 'ytd'  ? 'YTD'
+                    : state.window === 'month' ? '1-mo'
+                    : `${state.window}-mo`;
 
   const items = AD().map(c => {
     const cs  = g(c,'cs'), sa = g(c,'sa'), dev = g(c,'dev'), bug = gBug(c);
     const totalHours = cs + sa + dev + bug;
     if (totalHours === 0) return null;
 
-    // Cost: prefer NDR actuals, fall back to hours × rate
-    let ndrCost = hasNdr ? ndrCostForClient(c.name, ndrMonths) : null;
-    const cCS  = ndrCost ? 0 : Math.round(cs  * rt.cs);
-    const cSA  = ndrCost ? 0 : Math.round(sa  * rt.sa);
-    const cDev = ndrCost ? 0 : Math.round(dev * rt.dev);
-    const cBug = ndrCost ? 0 : Math.round(bug * (rt.bug ?? rt.dev));
-    const totalCost = ndrCost ? ndrCost.total
-                    : cCS + cSA + cDev + cBug;
+    // Total cost: prefer NDR actuals, fall back to hours × rate
+    const ndrCost   = hasNdr ? ndrCostForClient(c.name, ndrMonths) : null;
+    const totalCost = ndrCost
+      ? Math.round(ndrCost.total)
+      : Math.round(cs * rt.cs + sa * rt.sa + dev * rt.dev + bug * (rt.bug ?? rt.dev));
 
     const periodARR = Math.round((c.arr || 0) * arrFactor);
-    return { c, cs, sa, dev, bug, totalHours, cCS, cSA, cDev, cBug, ndrCost, totalCost, periodARR };
-  }).filter(Boolean).sort((a,b) => b.totalHours - a.totalHours).slice(0, 20);
+    return { c, totalHours, totalCost, periodARR, fromNdr: !!ndrCost };
+  }).filter(Boolean).sort((a,b) => b.totalCost - a.totalCost).slice(0, 20);
 
   const opts = baseOpts();
-  opts.scales.x.stacked = true;
+  opts.scales.y.ticks = { callback: v => '$'+fmtK(v), color:col('--text-secondary'), font:{family:'Poppins',size:10.5} };
 
-  // Left axis — hours
-  opts.scales.y = {
-    type:'linear', position:'left', stacked: true,
-    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => v+'h' },
-    grid:{ color:col('--border') }, border:{ display:false },
-  };
-  // Right axis — cost $ and period ARR (same $scale → gap = margin)
   opts.scales.y1 = {
-    type:'linear', position:'right', stacked: true,
-    ticks:{ color:col('--text-secondary'), font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
+    type:'linear', position:'right',
+    ticks:{ color:'#8B5CF6', font:{family:'Poppins',size:10.5}, callback: v => '$'+fmtK(v) },
     grid:{ drawOnChartArea:false }, border:{ display:false },
-    title:{ display:true, text:`Cost / ${windowLabel} ($)`, color:col('--text-secondary'), font:{family:'Poppins',size:10} }
+    title:{ display:true, text:`${windowLabel} ARR`, color:'#8B5CF6', font:{family:'Poppins',size:10.5} }
   };
 
   opts.plugins.legend = {
     display: true, position:'top',
-    labels:{ color:col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:10,
-             filter: item => !['CS $','SA $','Dev $','Bug $'].includes(item.text) }
+    labels:{ color:col('--text-secondary'), font:{family:'Poppins',size:11}, boxWidth:12, boxHeight:12, padding:12 }
   };
 
   opts.plugins.tooltip = {
@@ -2368,70 +2357,49 @@ function chartTop20(){
     callbacks:{
       title: ctx => items[ctx[0].dataIndex].c.name,
       label: ctx => {
-        const ds = ctx.dataset;
-        if (ds.type === 'line') return ` ${windowLabel}: ${fmt$(ctx.raw)}`;
-        if (ds.yAxisID === 'y1') {
-          if (ctx.raw === 0) return null;
-          return ` ${ds.label}: ${fmt$(Math.round(ctx.raw))}`;
-        }
-        if (ctx.raw === 0) return null;
-        return ` ${ds.label}: ${Math.round(ctx.raw)}h`;
+        if (ctx.dataset.type === 'line') return ` ${windowLabel} ARR: ${fmt$(ctx.raw)}`;
+        return ` Cost: ${fmt$(ctx.raw)}`;
       },
       afterBody: ctx => {
         const item = items[ctx[0].dataIndex];
-        const lines = ['', ` Total hours: ${Math.round(item.totalHours)}h`, ` Total cost:  ${fmt$(Math.round(item.totalCost))}`, ` ${windowLabel}: ${fmt$(item.periodARR)}`];
+        const lines = [
+          ``,
+          ` Total hours: ${Math.round(item.totalHours)}h`,
+          ` ${windowLabel} ARR: ${fmt$(item.periodARR)}`,
+        ];
         if (item.periodARR) {
           const margin = item.periodARR - item.totalCost;
           const pct = item.periodARR > 0 ? ((margin / item.periodARR)*100).toFixed(0) : '—';
           lines.push(` Est. margin: ${fmt$(Math.round(margin))} (${pct}%)`);
         }
-        if (item.ndrCost) lines.push(' ⓘ Cost from NDR actuals');
+        if (item.fromNdr) lines.push(` ⓘ Cost from NDR actuals`);
         return lines;
       }
     }
   };
 
-  const hOpts = { borderRadius:2, maxBarThickness:22, yAxisID:'y',  stack:'hours' };
-  const cOpts = { borderRadius:2, maxBarThickness:22, yAxisID:'y1', stack:'cost'  };
   const labels = items.map(x => x.c.name.length>14 ? x.c.name.slice(0,13)+'…' : x.c.name);
 
-  // ── Build datasets ──────────────────────────────────────────────────────────
-  const datasets = [
-    // Hours stack — left axis (always from HubSpot monthly data)
-    { label:'CS',      data:items.map(x=>x.cs),  backgroundColor:'#95D600', ...hOpts },
-    { label:'SA',      data:items.map(x=>x.sa),  backgroundColor:'#219EBC', ...hOpts },
-    { label:'Dev',     data:items.map(x=>x.dev), backgroundColor:'#08173C', ...hOpts },
-    { label:'Bug/Esc', data:items.map(x=>x.bug), backgroundColor:'#E4A8A0', ...hOpts },
-  ];
-
-  if (hasNdr && items.some(x=>x.ndrCost)) {
-    // NDR cost breakdown — right axis
-    datasets.push({ label:'Labor',      data:items.map(x=>x.ndrCost?.labor      ?? (x.cCS+x.cSA+x.cDev+x.cBug)), backgroundColor:'rgba(8,23,60,.7)',     ...cOpts });
-    datasets.push({ label:'Platform',   data:items.map(x=>x.ndrCost?.platform   ?? 0), backgroundColor:'rgba(33,158,188,.55)', ...cOpts });
-    datasets.push({ label:'Partner',    data:items.map(x=>x.ndrCost?.partner    ?? 0), backgroundColor:'rgba(244,162,97,.7)',  ...cOpts });
-    datasets.push({ label:'Stock data', data:items.map(x=>x.ndrCost?.stock      ?? 0), backgroundColor:'rgba(149,214,0,.45)', ...cOpts });
-    datasets.push({ label:'Competitor', data:items.map(x=>x.ndrCost?.competitor ?? 0), backgroundColor:'rgba(228,168,160,.6)',...cOpts });
-  } else {
-    // Fallback: cost from hours × rate, division breakdown
-    datasets.push({ label:'CS $',      data:items.map(x=>x.cCS),  backgroundColor:'rgba(149,214,0,.55)',   ...cOpts });
-    datasets.push({ label:'SA $',      data:items.map(x=>x.cSA),  backgroundColor:'rgba(33,158,188,.55)',  ...cOpts });
-    datasets.push({ label:'Dev $',     data:items.map(x=>x.cDev), backgroundColor:'rgba(8,23,60,.55)',     ...cOpts });
-    datasets.push({ label:'Bug $',     data:items.map(x=>x.cBug), backgroundColor:'rgba(228,168,160,.65)', ...cOpts });
-  }
-
-  // Period-normalised ARR line — right axis
-  datasets.push({
-    label: windowLabel,
-    data: items.map(x => x.periodARR),
-    type:'line', yAxisID:'y1',
-    borderColor:'#8B5CF6', backgroundColor:'#8B5CF622',
-    pointRadius:4, pointHoverRadius:6,
-    borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false,
-    stack: undefined,
-  });
-
   charts.top20 = new Chart(document.getElementById('cTop20'), {
-    type:'bar', data:{ labels, datasets }, options: opts
+    type:'bar',
+    data:{ labels, datasets:[
+      {
+        label: 'Cost',
+        data: items.map(x => x.totalCost),
+        backgroundColor: '#219EBC',
+        borderRadius: 3,
+        maxBarThickness: 40,
+      },
+      {
+        label: `${windowLabel} ARR`,
+        data: items.map(x => x.periodARR),
+        type:'line', yAxisID:'y1',
+        borderColor:'#8B5CF6', backgroundColor:'#8B5CF622',
+        pointRadius:4, pointHoverRadius:6,
+        borderWidth:2.5, borderDash:[6,4], tension:0.2, fill:false,
+      },
+    ]},
+    options: opts
   });
 }
 
