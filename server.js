@@ -404,7 +404,8 @@ function injectData(html, cache, csvHours) {
                `📊 EU Pricing${months.length ? ' ✓' : ''}</label>` +
                `\n  <input type="file" id="pricingUsInput" accept=".csv" multiple style="display:none" onchange="_importPricingCsv(this,'US')">` +
                `\n  <label for="pricingUsInput" class="import-btn" style="background:rgba(139,92,246,.10);border-color:rgba(139,92,246,.3);color:#a78bfa;margin-left:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">` +
-               `📊 US Pricing</label>`;
+               `📊 US Pricing</label>` +
+               `\n  <a href="/api/export-pricing" class="import-btn" style="background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3);color:#34d399;margin-left:4px;display:inline-flex;align-items:center;gap:4px;text-decoration:none;" title="Download pricing data backup (commit to git to preserve across deploys)">⬇ Backup</a>`;
       })()
     );
   }
@@ -1121,6 +1122,14 @@ app.get('/api/pricing-status', (req, res) => {
   const pr = readPricing();
   const months = Object.keys(pr.months || {}).sort();
   res.json({ loaded: months.length > 0, months, imports: pr.imports || [] });
+});
+
+/** Export / download pricing-events.json (for backup / git commit) */
+app.get('/api/export-pricing', (req, res) => {
+  const pr = readPricing();
+  res.setHeader('Content-Disposition', 'attachment; filename="pricing-events.json"');
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify(pr, null, 2));
 });
 
 /** Return raw cached data as JSON */

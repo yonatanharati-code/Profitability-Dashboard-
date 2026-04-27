@@ -1072,11 +1072,15 @@ tr.selected-row{background:var(--teal-50) !important;}
             <option value="50">50</option>
             <option value="0">All</option>
           </select>
+          <span style="font-size:11px;color:var(--text-secondary);">Owner</span>
+          <select id="pricingOwner" onchange="renderPricing()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;">
+            <option value="">All owners</option>
+          </select>
           <span style="font-size:11px;color:var(--text-secondary);">Growth since</span>
           <select id="pricingSinceMk" onchange="renderPricing()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;">
             <option value="">—</option>
           </select>
-          <button onclick="document.getElementById('pricingSearch').value='';document.getElementById('pricingFromMk').value='';document.getElementById('pricingToMk').value='';document.getElementById('pricingTopN').value='20';document.getElementById('pricingSinceMk').value='';renderPricing();"
+          <button onclick="['pricingSearch','pricingFromMk','pricingToMk','pricingSinceMk','pricingOwner'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('pricingTopN').value='20';renderPricing();"
             style="font-size:10px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;">✕ Reset</button>
           <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);" id="pricingCount"></span>
         </div>
@@ -1092,6 +1096,26 @@ tr.selected-row{background:var(--teal-50) !important;}
           </div>
           <div style="position:relative;height:280px;">
             <canvas id="pricingChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Trend combo chart (events + MoM% + hours) -->
+        <div style="margin-bottom:20px;padding:14px;background:var(--surface-hover);border-radius:var(--r-md);border:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <span style="font-size:12px;font-weight:700;color:var(--text);">Pricing trend &amp; hours</span>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <select id="pricingTrendClient" onchange="renderPricingTrend()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text);font-family:inherit;max-width:180px;">
+                <option value="">All clients</option>
+              </select>
+              <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="trendMom" onchange="renderPricingTrend()" checked> <span style="color:#f59e0b;font-weight:600;">MoM%</span></label>
+              <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="trendDev" onchange="renderPricingTrend()" checked> <span style="color:#10b981;font-weight:600;">Dev</span></label>
+              <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="trendSa" onchange="renderPricingTrend()"> <span style="color:#3b82f6;font-weight:600;">SA</span></label>
+              <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="trendBug" onchange="renderPricingTrend()"> <span style="color:#ef4444;font-weight:600;">Bug/Esc</span></label>
+              <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="trendCs" onchange="renderPricingTrend()"> <span style="color:#8b5cf6;font-weight:600;">CS</span></label>
+            </div>
+          </div>
+          <div style="position:relative;height:280px;">
+            <canvas id="pricingTrendChart"></canvas>
           </div>
         </div>
 
@@ -3213,6 +3237,7 @@ let _pricingSortKey = '__last__';  // '__last__' | '__name__' | '__limit__' | '_
 let _pricingSortDir = 'desc';
 let _pricingChartType = 'bar';
 let _pricingChartInst = null;
+let _pricingTrendChartInst = null;
 
 window.setPricingChartType = function(t) {
   _pricingChartType = t;
@@ -3258,6 +3283,10 @@ function renderPricing() {
   const visMonths = allMonths.filter(mk => (!fromMk || mk >= fromMk) && (!toMk || mk <= toMk));
   const lastMk   = visMonths[visMonths.length - 1] || null;
 
+  // Owner filter — populated after rows are built (see below)
+  const ownerSel = document.getElementById('pricingOwner');
+  const selectedOwner = ownerSel?.value || '';
+
   // Whether to show the "Growth since" column
   const showSinceCol = !!(sinceMk && lastMk && sinceMk <= lastMk);
 
@@ -3286,6 +3315,15 @@ function renderPricing() {
   }).filter(r => r.total > 0 || r.limit);
 
   if (search) rows = rows.filter(r => r.acct.includes(search) || (r.client?.name||'').toLowerCase().includes(search));
+
+  // Populate owner dropdown from all accounts (before top-N cut)
+  if (ownerSel) {
+    const owners = [...new Set(rows.map(r => r.client?.owner).filter(Boolean))].sort();
+    const cur = ownerSel.value;
+    ownerSel.innerHTML = '<option value="">All owners</option>' +
+      owners.map(o => `<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('');
+  }
+  if (selectedOwner) rows = rows.filter(r => r.client?.owner === selectedOwner);
 
   // Apply Top N
   const topN = parseInt(document.getElementById('pricingTopN')?.value||'20', 10);
@@ -3478,6 +3516,9 @@ function renderPricing() {
   }).join('');
 
   document.getElementById('pricingBody').innerHTML = dataRows + totalRow;
+
+  // Render the trend combo chart with same month range
+  renderPricingTrend();
 }
 
 window._pricingSort = function(key) {
@@ -3485,6 +3526,173 @@ window._pricingSort = function(key) {
   else { _pricingSortKey = key; _pricingSortDir = key==='__name__' ? 'asc' : 'desc'; }
   renderPricing();
 };
+
+// ── Pricing trend combo chart ──────────────────────────────────────────────
+function renderPricingTrend() {
+  const pd = window.PRICING_DATA || {};
+  const allMonths = Object.keys(pd).sort();
+  if (!allMonths.length) return;
+
+  // Re-use the same From/To filter as the main table
+  const fromMk = document.getElementById('pricingFromMk')?.value || allMonths[0] || '';
+  const toMk   = document.getElementById('pricingToMk')?.value   || allMonths[allMonths.length-1] || '';
+  const visMonths = allMonths.filter(mk => (!fromMk || mk >= fromMk) && (!toMk || mk <= toMk));
+  if (!visMonths.length) return;
+
+  // Populate client selector (keep selection across calls)
+  const clientSel = document.getElementById('pricingTrendClient');
+  if (clientSel) {
+    const allAccts = new Set();
+    allMonths.forEach(mk => Object.keys(pd[mk]||{}).forEach(a => allAccts.add(a)));
+    const sortedAccts = [...allAccts].sort((a,b) => {
+      const na = _pricingMatchClient(a)?.name || a;
+      const nb = _pricingMatchClient(b)?.name || b;
+      return na.localeCompare(nb);
+    });
+    const curAcct = clientSel.value;
+    clientSel.innerHTML = '<option value="">All clients</option>' +
+      sortedAccts.map(a => {
+        const name = _pricingMatchClient(a)?.name || a;
+        return `<option value="${a}"${a===curAcct?' selected':''}>${name}</option>`;
+      }).join('');
+  }
+  const selectedAcct = clientSel?.value || '';
+
+  // Toggle states
+  const showMom = document.getElementById('trendMom')?.checked !== false;
+  const showDev = document.getElementById('trendDev')?.checked;
+  const showSa  = document.getElementById('trendSa')?.checked;
+  const showBug = document.getElementById('trendBug')?.checked;
+  const showCs  = document.getElementById('trendCs')?.checked;
+
+  // Pricing events per month (selected client or aggregate)
+  const eventsData = visMonths.map(mk => {
+    if (selectedAcct) return pd[mk]?.[selectedAcct] || 0;
+    return Object.values(pd[mk]||{}).reduce((s,v)=>s+v, 0);
+  });
+
+  // MoM % per month (null for first month)
+  const momData = visMonths.map((mk, i) => {
+    if (i === 0) return null;
+    const curr = eventsData[i], prev = eventsData[i-1];
+    return prev > 0 ? parseFloat(((curr-prev)/prev*100).toFixed(1)) : null;
+  });
+
+  // Monthly hours helper
+  function hoursData(layer) {
+    return visMonths.map(mk => {
+      if (selectedAcct) {
+        const c = _pricingMatchClient(selectedAcct);
+        return c?.[layer]?.monthly?.[mk] || 0;
+      }
+      // Aggregate across all accounts present in this month
+      return Object.keys(pd[mk]||{}).reduce((s, acct) => {
+        const c = _pricingMatchClient(acct);
+        return s + (c?.[layer]?.monthly?.[mk] || 0);
+      }, 0);
+    });
+  }
+
+  const datasets = [];
+
+  // Bars: pricing events (left axis)
+  datasets.push({
+    type: 'bar',
+    label: 'Pricing events',
+    data: eventsData,
+    backgroundColor: 'rgba(99,102,241,0.65)',
+    borderColor: '#6366f1',
+    borderWidth: 0,
+    yAxisID: 'yEvents',
+    order: 3,
+  });
+
+  // Lines on right axis
+  if (showMom) datasets.push({
+    type: 'line', label: 'MoM %',
+    data: momData,
+    borderColor: '#f59e0b', backgroundColor: 'transparent',
+    borderWidth: 2.5, borderDash: [6,3],
+    pointRadius: 4, pointBackgroundColor: '#f59e0b',
+    yAxisID: 'yRight', order: 1, spanGaps: false,
+  });
+  if (showDev) datasets.push({
+    type: 'line', label: 'Dev hours',
+    data: hoursData('dev'),
+    borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)',
+    borderWidth: 2, pointRadius: 3,
+    yAxisID: 'yRight', order: 2, fill: false,
+  });
+  if (showSa) datasets.push({
+    type: 'line', label: 'SA hours',
+    data: hoursData('sa'),
+    borderColor: '#3b82f6', backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 3,
+    yAxisID: 'yRight', order: 2, fill: false,
+  });
+  if (showBug) datasets.push({
+    type: 'line', label: 'Bug/Esc hours',
+    data: hoursData('bug'),
+    borderColor: '#ef4444', backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 3,
+    yAxisID: 'yRight', order: 2, fill: false,
+  });
+  if (showCs) datasets.push({
+    type: 'line', label: 'CS hours',
+    data: hoursData('cs'),
+    borderColor: '#8b5cf6', backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 3,
+    yAxisID: 'yRight', order: 2, fill: false,
+  });
+
+  const canvas = document.getElementById('pricingTrendChart');
+  if (!canvas) return;
+  if (_pricingTrendChartInst) { _pricingTrendChartInst.destroy(); _pricingTrendChartInst = null; }
+
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+  _pricingTrendChartInst = new Chart(canvas, {
+    type: 'bar',
+    data: { labels: visMonths.map(mk => _fmtMk(mk)), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 10, font: { size: 10 }, color: textColor },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const lbl = ctx.dataset.label, v = ctx.raw;
+              if (v == null) return null;
+              if (lbl === 'MoM %')      return ` MoM: ${v>=0?'+':''}${v}%`;
+              if (lbl.includes('hours')) return ` ${lbl}: ${v.toFixed(1)}h`;
+              return ` ${lbl}: ${_fmtEvents(v)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: textColor } },
+        yEvents: {
+          type: 'linear', position: 'left',
+          ticks: { callback: v => _fmtEvents(v), font: { size: 10 }, color: '#6366f1' },
+          beginAtZero: true,
+          title: { display: true, text: 'Events', font: { size: 9 }, color: '#6366f1' },
+        },
+        yRight: {
+          type: 'linear', position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { font: { size: 10 }, color: textColor,
+            callback: v => v % 1 === 0 ? v : v.toFixed(1) },
+          title: { display: true, text: 'Hours / MoM%', font: { size: 9 }, color: textColor },
+        },
+      },
+    },
+  });
+}
+window.renderPricingTrend = renderPricingTrend;
 
 window.editPricingLimit = function(acct) {
   let pricingLimits = {};
@@ -6241,6 +6449,7 @@ window.chartCustStack  = chartCustStack;
 window.chartByPerson   = chartByPerson;
 window.renderBudget    = renderBudget;
 window.renderPricing   = renderPricing;
+window.renderPricingTrend = renderPricingTrend;
 
 // Make init callable globally (for YTD patch + safety net)
 window._pfdInit = init;
