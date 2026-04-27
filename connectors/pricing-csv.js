@@ -17,17 +17,45 @@
 
 // ─── Internal / test accounts to skip ────────────────────────────────────────
 const PRICING_SKIP = new Set([
+  // QL internal / infra
   'qltest',
   'qltest_bulk',
   'qltest_po',
   'quicklizard',
   'techops',
   'demo account',
+  'interaction settings',
+  'pricemanager',
+  'gxadvisor',
+  'philips_da',
+  'delivery',
+  // Demo / sandbox accounts
+  'demo',
+  'new demo',
+  'cl demo',
+  'demo - retail',
+  'demo at&t',
+  'at&t demo',
+  'at&t demo ',   // trailing-space variant seen in CSV
+  'samsung global demo',
+  'smeet demo',
+  'demo-restaurants',
+  // Internal campaign / test
+  'marketing',
+  // Scraping / infra sub-accounts
+  'whirlpool us- scrapping',
+  // Irrelevant / partner accounts
+  'at&t',
+  'ust',
+  'iga supermarket',
+  'dealavo',
+  'signa sports united',
 ]);
 
 // ─── Account-name aliases (raw lowercase → canonical) ────────────────────────
 // Keys must be lowercase-trimmed.  Values are the canonical display name.
 const PRICING_ALIASES = new Map([
+  // ── Previously added ──────────────────────────────────────────────────────
   ['arcelik',                    'arçelik türkiye'],
   ['phh group',                  'pigu'],
   ['logitech',                   'logitech us'],
@@ -36,6 +64,27 @@ const PRICING_ALIASES = new Map([
   ['phoenix pharma switzerland', 'health and life'],
   ['hipercohen',                 'hippercohen'],
   ['doc morris',                 'docmorris'],
+
+  // ── US-server CSV mappings ─────────────────────────────────────────────────
+  ['atea',                       'atea a/s'],
+  ['whirlpool us',               'whirlpool mda us'],
+  ['whirlpool us sda',           'whirlpool sda us (kitchenaid)'],
+  ['kitchenaid anz',             'whirlpool sda australia (kitchenaid)'],
+  ['kitchenaidlamex',            'whirlpool sda latam (kitchenaid)'],
+  ['edg production',             'endeavor global, inc'],
+  ['samsung uk',                 'samsung'],          // merge all Samsung → one row
+  ['websundhedcom',              'sundhed.dk'],
+  ['byggmax',                    'byggmax group'],
+  ['dk hardware',                'dk hardware supply'],
+  ['feelunique',                 'sephora (feelunique)'],
+  ['ikano',                      'ikano group'],
+  ['indimade',                   'indimade brands'],
+  ['interiorshop',               'interiør a/s'],
+  ['intersport',                 'intersport digital gmbh'],
+  ['lakuda',                     'lakuda aps'],
+  ['saxo',                       'saxo.com a / s'],
+  ['bauhaus.ch',                 'bauhaus schweiz'],
+  ['jacob',                      'jacob hotels - מלונות ג\'ייקוב'],
 ]);
 
 // ─── CSV line parser (handles RFC-4180 quoted fields) ────────────────────────
