@@ -1982,7 +1982,10 @@ function mkLabel(mk) {
 let ALL_MONTHS  = computeAllMonths();
 let ALL_MLABELS = ALL_MONTHS.map(mkLabel);
 let excludedMonthKeys = [];
-let _activeYear = null;  // null = all years; '2026' = filter to that year
+// undefined = not yet initialised (auto-picks latest year on first render)
+// null      = user explicitly chose "All years"
+// string    = user chose a specific year, e.g. '2026'
+let _activeYear = undefined;
 
 function _allYears() {
   return [...new Set(ALL_MONTHS.map(mk => mk.slice(0,4)))].sort();
@@ -1997,7 +2000,8 @@ function refreshAllMonths() {
 function renderMonthToggles(){
   const years     = _allYears();
   const multiYear = years.length > 1;
-  if (multiYear && !_activeYear) _activeYear = years[years.length-1];
+  // Auto-default to latest year ONLY on first render (undefined), never override user's "All" choice (null)
+  if (_activeYear === undefined) _activeYear = multiYear ? years[years.length - 1] : null;
   if (!multiYear) _activeYear = null;
 
   const visMonths = _activeYear ? ALL_MONTHS.filter(mk => mk.startsWith(_activeYear)) : ALL_MONTHS;
@@ -2005,7 +2009,7 @@ function renderMonthToggles(){
   const yearRow = multiYear ? `<div style="display:flex;gap:4px;margin-bottom:5px;align-items:center;flex-wrap:wrap;">
     <span style="font-size:10px;font-weight:600;color:var(--text-secondary);margin-right:2px;">Year</span>
     ${years.map(yr=>`<button onclick="window._setActiveYear('${yr}')" style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:${_activeYear===yr?'var(--accent,#95D600)':'var(--surface)'};color:${_activeYear===yr?'#000':'var(--text-secondary)'};font-family:inherit;">${yr}</button>`).join('')}
-    <button onclick="window._setActiveYear(null)" style="padding:2px 9px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:${!_activeYear?'var(--accent,#95D600)':'var(--surface)'};color:${!_activeYear?'#000':'var(--text-secondary)'};font-family:inherit;">All</button>
+    <button onclick="window._setActiveYear(null)" style="padding:2px 9px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:${_activeYear===null?'var(--accent,#95D600)':'var(--surface)'};color:${_activeYear===null?'#000':'var(--text-secondary)'};font-family:inherit;">All</button>
   </div>` : '';
 
   const monthRow = visMonths.map(mk => {
