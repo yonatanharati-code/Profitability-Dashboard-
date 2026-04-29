@@ -602,7 +602,7 @@ tr.selected-row{background:var(--teal-50) !important;}
         <div class="card">
           <div class="card-head">
             <div class="card-head-text">
-              <div class="card-title" style="color:var(--ok);">✓ Retained ARR</div>
+              <div class="card-title" style="color:var(--ok);">✓ Active — not churned during window</div>
               <div class="card-sub" id="grrRetainedSub"></div>
             </div>
           </div>
@@ -612,7 +612,7 @@ tr.selected-row{background:var(--teal-50) !important;}
         <div class="card">
           <div class="card-head">
             <div class="card-head-text">
-              <div class="card-title" style="color:var(--bad);">✕ Churned ARR (tracked)</div>
+              <div class="card-title" style="color:var(--bad);">✕ Churned during window (affects GRR)</div>
               <div class="card-sub" id="grrChurnedSub"></div>
             </div>
           </div>
@@ -1835,20 +1835,51 @@ function rollup(){
   const netTotal = all.reduce((s,c)=>s+netPL(c), 0);
   const bugPctOfDev = totalDev>0 ? (totalBug/totalDev)*100 : 0;
 
-  // ── Gross Retention Rate ──────────────────────────────────────────────────
-  // GRR = retained ARR / (retained ARR + churned ARR with known value)
-  // Uses ALL DATA (not just AD()) so excluded customers don't distort it
+  // ── Gross Retention Rate (period-aware) ──────────────────────────────────
+  // Uses ALL DATA so owner/layer filters don't distort the portfolio metric.
+  // "Window start" = today minus the selected period.
+  // A customer counts as "churned during window" only if their churnDate
+  // falls within [windowStart, today].  Customers with no churnDate are treated
+  // as still active at window start.
   const _allData = DATA;
-  const churnedCustomers = _allData.filter(c => c.stage === 'Churn');
-  const churnedArr = churnedCustomers.reduce((s,c)=>s+(c.arr||0), 0);
-  const retainedArr = _allData.filter(c => c.stage !== 'Churn').reduce((s,c)=>s+(c.arr||0), 0);
-  const grrDenom = retainedArr + churnedArr;
-  const grr = grrDenom > 0 ? (retainedArr / grrDenom) * 100 : null;
-  const churnCount = churnedCustomers.length;
-  // Churned customers with known (non-zero) ARR — these drove actual revenue loss
-  const churnedWithArr = churnedCustomers.filter(c=>(c.arr||0)>0).sort((a,b)=>b.arr-a.arr);
+  const todayISO  = new Date().toISOString().slice(0, 10);
+  const windowStartISO = (function() {
+    const w = state.window, now = new Date();
+    if (w === 'month') {
+      const mk = state.monthKey || now.toISOString().slice(0, 7);
+      return mk + '-01';
+    }
+    if (w === 'ytd') return now.getFullYear() + '-01-01';
+    const d = new Date(now);
+    d.setMonth(d.getMonth() - (typeof w === 'number' ? w : 6));
+    return d.toISOString().slice(0, 10);
+  })();
 
-  return {active,all,totalARR,totalCS,totalSA,totalDev,totalBug,totalDevPaid,totalUpsell,totalPipe,totalLabor,totalDevCost,devRecap,netTotal,bugPctOfDev,grr,churnedArr,retainedArr,churnCount,churnedWithArr};
+  // Customers who were active at window start = not churned BEFORE the window
+  const activeAtWindowStart = _allData.filter(c =>
+    !c.churnDate || c.churnDate >= windowStartISO
+  );
+  // Customers who churned DURING the window
+  const churnedDuringWindow = _allData.filter(c =>
+    c.churnDate && c.churnDate >= windowStartISO && c.churnDate <= todayISO
+  );
+  // Customers churned before this window (historic, don't affect period GRR)
+  const churnedBeforeWindow = _allData.filter(c =>
+    c.stage === 'Churn' && c.churnDate && c.churnDate < windowStartISO
+  );
+  // Churned with unknown date — can't place in period, show separately
+  const churnedUnknownDate = _allData.filter(c =>
+    c.stage === 'Churn' && !c.churnDate
+  );
+
+  const startARR    = activeAtWindowStart.reduce((s, c) => s + (c.arr || 0), 0);
+  const churnedArr  = churnedDuringWindow.reduce((s, c) => s + (c.arr || 0), 0);
+  const grr         = startARR > 0 ? ((startARR - churnedArr) / startARR) * 100 : null;
+  const retainedArr = startARR - churnedArr;
+  const churnedWithArr = churnedDuringWindow.filter(c => (c.arr || 0) > 0).sort((a, b) => b.arr - a.arr);
+
+  return {active,all,totalARR,totalCS,totalSA,totalDev,totalBug,totalDevPaid,totalUpsell,totalPipe,totalLabor,totalDevCost,devRecap,netTotal,bugPctOfDev,
+    grr, startARR, retainedArr, churnedArr, churnedWithArr, churnedDuringWindow, churnedBeforeWindow, churnedUnknownDate, windowStartISO, todayISO};
 }
 
 // Trend deltas: compare last 4 months vs prior 3 months (dynamic)
@@ -1916,12 +1947,12 @@ function renderKPIs(){
   // GRR colour: ≥95% green, ≥85% amber, <85% red
   const grrVal = r.grr != null ? Math.round(r.grr*10)/10 : null;
   const grrColor = grrVal==null ? '' : grrVal>=95 ? 'color:var(--ok)' : grrVal>=85 ? 'color:var(--warn)' : 'color:var(--bad)';
-  const lostCount = r.churnedWithArr.length;
+  const lostCount = r.churnedDuringWindow.length;
 
   const cards = [
     { label:'Total ARR', value:fmt$(r.totalARR), foot:`<span class="caption">${r.all.filter(c=>c.stage!=='Churn').length} active customers</span>` },
     { label:'Gross Retention', value:grrVal!=null?grrVal+'%':'—', style:grrColor,
-      foot:`<span class="caption">${lostCount} churned · ${fmt$(r.churnedArr)} lost ARR</span>` },
+      foot:`<span class="caption">${lostCount} churned in period · ${fmt$(r.churnedArr)} lost</span>` },
     { label:'CS hours', value:fmtK(r.totalCS), unit:'h', foot:`${delta(d.cs, true)}<span class="caption">vs prior 3M</span>` },
     { label:'SA hours', value:fmtK(r.totalSA), unit:'h', foot:`${delta(d.sa, true)}<span class="caption">vs prior 3M</span>` },
     { label:'New Dev', value:fmtK(r.totalDev), unit:'h', foot:`${delta(d.dev)}<span class="caption">vs prior 3M</span>` },
@@ -1945,28 +1976,33 @@ function renderKPIs(){
 // ── Gross Retention Rate breakdown ───────────────────────────────────────────
 function renderGRR(){
   const r = rollup();
-  const grrVal = r.grr != null ? Math.round(r.grr*10)/10 : null;
-  const grrColor = grrVal==null ? '' : grrVal>=95 ? 'var(--ok)' : grrVal>=85 ? 'var(--warn)' : 'var(--bad)';
+  const grrVal = r.grr != null ? Math.round(r.grr * 10) / 10 : null;
+  const grrColor = grrVal == null ? 'var(--text-secondary)' : grrVal >= 95 ? 'var(--ok)' : grrVal >= 85 ? 'var(--warn)' : 'var(--bad)';
+
+  // Window label for context
+  const wLabel = winLabel();
 
   // Aggregate badge
   const badge = document.getElementById('grrAggrBadge');
   if (badge) {
     badge.innerHTML = `
       <div style="text-align:right;">
-        <div style="font-size:28px;font-weight:700;color:${grrColor};font-variant-numeric:tabular-nums;line-height:1;">${grrVal!=null?grrVal+'%':'—'}</div>
-        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">GRR · ${fmt$(r.retainedArr)} retained / ${fmt$(r.retainedArr+r.churnedArr)} total</div>
+        <div style="font-size:30px;font-weight:700;color:${grrColor};font-variant-numeric:tabular-nums;line-height:1;">${grrVal != null ? grrVal + '%' : '—'}</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:3px;">GRR · ${wLabel} · based on ${fmt$(r.startARR)} opening ARR</div>
+        <div style="font-size:11px;color:var(--text-secondary);">window: ${r.windowStartISO} → ${r.todayISO}</div>
       </div>`;
   }
 
-  // Retained panel — top active customers by ARR
-  const retainedSub = document.getElementById('grrRetainedSub');
+  // ── Left: retained customers (active at window start, not churned during window)
+  const retainedSub  = document.getElementById('grrRetainedSub');
   const retainedBody = document.getElementById('grrRetainedBody');
-  const activeCustomers = DATA.filter(c=>c.stage!=='Churn'&&(c.arr||0)>0).sort((a,b)=>b.arr-a.arr);
-  if (retainedSub) retainedSub.textContent = `${activeCustomers.length} active customers · ${fmt$(r.retainedArr)} ARR`;
+  // Active at window start = didn't churn before OR during window
+  const retained = DATA.filter(c => !c.churnDate || c.churnDate > r.todayISO).sort((a, b) => b.arr - a.arr);
+  if (retainedSub) retainedSub.textContent = `${retained.length} customers · ${fmt$(r.retainedArr)} ARR retained`;
   if (retainedBody) {
-    const rows = activeCustomers.map(c => {
-      const pct = r.retainedArr>0 ? (c.arr/r.retainedArr*100).toFixed(1) : 0;
-      const barW = Math.min(100, +pct).toFixed(1);
+    const rows = retained.filter(c => (c.arr || 0) > 0).map(c => {
+      const pct = r.startARR > 0 ? (c.arr / r.startARR * 100).toFixed(1) : 0;
+      const barW = Math.min(100, +pct * 5).toFixed(1);
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);">
         <div style="flex:1;min-width:0;">
           <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
@@ -1976,44 +2012,67 @@ function renderGRR(){
         </div>
         <div style="text-align:right;white-space:nowrap;flex-shrink:0;">
           <div style="font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt$(c.arr)}</div>
-          <div style="font-size:10px;color:var(--text-secondary);">${pct}% of retained</div>
+          <div style="font-size:10px;color:var(--text-secondary);">${pct}% of start ARR</div>
         </div>
       </div>`;
     }).join('');
-    retainedBody.innerHTML = rows || '<div style="padding:16px;color:var(--text-secondary);font-size:12px;">No active customers</div>';
+    retainedBody.innerHTML = rows || '<div style="padding:16px;color:var(--text-secondary);font-size:12px;">No retained customers</div>';
   }
 
-  // Churned panel — only customers with known ARR at churn
-  const churnedSub = document.getElementById('grrChurnedSub');
+  // ── Right: churned during window (with date) + before-window context + unknown
+  const churnedSub  = document.getElementById('grrChurnedSub');
   const churnedBody = document.getElementById('grrChurnedBody');
-  const churnedAll = DATA.filter(c=>c.stage==='Churn').sort((a,b)=>(b.arr||0)-(a.arr||0));
-  const churnedKnown = r.churnedWithArr; // only those with arr>0
-  const churnedZero  = churnedAll.filter(c=>!(c.arr>0));
-  if (churnedSub) churnedSub.textContent = `${churnedKnown.length} with tracked ARR · ${churnedZero.length} without · ${fmt$(r.churnedArr)} total lost`;
+  const duringKnown = r.churnedDuringWindow.filter(c => (c.arr || 0) > 0).sort((a, b) => b.arr - a.arr);
+  const duringZero  = r.churnedDuringWindow.filter(c => !(c.arr > 0));
+
+  if (churnedSub) {
+    const parts = [`${r.churnedDuringWindow.length} churned during ${wLabel}`];
+    if (r.churnedBeforeWindow.length) parts.push(`${r.churnedBeforeWindow.length} before window`);
+    if (r.churnedUnknownDate.length)  parts.push(`${r.churnedUnknownDate.length} date unknown`);
+    churnedSub.textContent = parts.join(' · ');
+  }
+
   if (churnedBody) {
-    const knownRows = churnedKnown.map(c => {
-      const pct = (r.retainedArr+r.churnedArr)>0 ? (c.arr/(r.retainedArr+r.churnedArr)*100).toFixed(1) : 0;
-      const barW = Math.min(100, +pct * 5).toFixed(1); // scale up for visibility
+    const makeRow = (c, accent) => {
+      const pct = r.startARR > 0 ? (c.arr / r.startARR * 100).toFixed(1) : 0;
+      const barW = Math.min(100, +pct * 8).toFixed(1);
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);">
         <div style="flex:1;min-width:0;">
           <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
-          <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;">
-            <div style="height:3px;width:${barW}%;background:var(--bad);border-radius:2px;"></div>
+          <div style="font-size:10px;color:var(--text-secondary);">${c.churnDate || 'date unknown'}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;margin-top:3px;">
+            <div style="height:3px;width:${barW}%;background:${accent};border-radius:2px;"></div>
           </div>
         </div>
         <div style="text-align:right;white-space:nowrap;flex-shrink:0;">
-          <div style="font-size:12.5px;font-weight:600;color:var(--bad);font-variant-numeric:tabular-nums;">${fmt$(c.arr)}</div>
-          <div style="font-size:10px;color:var(--text-secondary);">${pct}% of total ARR</div>
+          <div style="font-size:12.5px;font-weight:600;color:${accent};font-variant-numeric:tabular-nums;">${(c.arr||0)>0?fmt$(c.arr):'—'}</div>
+          <div style="font-size:10px;color:var(--text-secondary);">${(c.arr||0)>0?pct+'% of start ARR':''}</div>
         </div>
       </div>`;
-    }).join('');
-    // Also show collapsed count of zero-ARR churned
-    const zeroNote = churnedZero.length > 0
-      ? `<div style="padding:10px 16px;font-size:11.5px;color:var(--text-secondary);border-top:1px dashed var(--border);">
-           + ${churnedZero.length} additional churned customers with no tracked ARR (${churnedZero.slice(0,6).map(c=>escapeHtml(c.name)).join(', ')}${churnedZero.length>6?'…':''})
-         </div>`
-      : '';
-    churnedBody.innerHTML = (knownRows || '<div style="padding:16px;color:var(--text-secondary);font-size:12px;">No churned customers with tracked ARR</div>') + zeroNote;
+    };
+
+    // Churned during window (affects GRR)
+    let html = '';
+    if (r.churnedDuringWindow.length === 0) {
+      html += `<div style="padding:16px;color:var(--ok);font-size:12.5px;font-weight:600;">✓ No churns during ${wLabel}</div>`;
+    } else {
+      html += duringKnown.map(c => makeRow(c, 'var(--bad)')).join('');
+      html += duringZero.map(c => makeRow(c, 'var(--bad)')).join('');
+    }
+
+    // Churned before window (historical — greyed out, not in GRR calc)
+    if (r.churnedBeforeWindow.length) {
+      html += `<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;background:var(--bg);border-top:1px solid var(--border);">Before this window (not in GRR)</div>`;
+      html += r.churnedBeforeWindow.sort((a,b)=>b.churnDate.localeCompare(a.churnDate)).map(c => makeRow(c, 'var(--text-secondary)')).join('');
+    }
+
+    // Unknown date
+    if (r.churnedUnknownDate.length) {
+      html += `<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;background:var(--bg);border-top:1px solid var(--border);">Churn date unknown</div>`;
+      html += r.churnedUnknownDate.map(c => makeRow(c, 'var(--text-secondary)')).join('');
+    }
+
+    churnedBody.innerHTML = html;
   }
 }
 

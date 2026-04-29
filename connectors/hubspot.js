@@ -54,7 +54,7 @@ function hsPost(path, apiKey, payload) {
 // ─── Companies ────────────────────────────────────────────────────────────────
 const COMPANY_PROPS = [
   'name', 'arr', 'csm', 'csms', 'rank', 'health', 'onboarding_stage', 'renewal_date',
-  'hubspot_owner_id', 'lifecyclestage', 'company_status',
+  'hubspot_owner_id', 'lifecyclestage', 'company_status', 'hs_object_id',
 ];
 
 // Valid current CSM names from the csm enumeration — stale values (e.g. ex-employees) are nulled out
@@ -138,4 +138,48 @@ function toUSD(amount, currency) {
   return Math.round(amount * rate);
 }
 
-module.exports = { fetchAllCompanies, fetchDeals, toUSD, FX, PORTAL_ID, CSM_PIPELINE, VALID_CSMS };
+// ─── Churn dates — batch property history ─────────────────────────────────────
+/**
+ * For each company ID (raw HubSpot numeric ID), fetch the history of
+ * `company_status` and return the date it was first set to "Churn".
+ *
+ * Returns: { [hsId]: 'YYYY-MM-DD' }
+ */
+async function fetchChurnDates(apiKey, hsIds) {
+  if (!hsIds.length) return {};
+  const result = {};
+
+  // Batch read supports up to 100 records per request
+  for (let i = 0; i < hsIds.length; i += 100) {
+    const batch = hsIds.slice(i, i + 100);
+    const payload = {
+      properties:           ['company_status', 'name'],
+      propertiesWithHistory: ['company_status'],
+      inputs:               batch.map(id => ({ id: String(id) })),
+    };
+    let res;
+    try {
+      res = await hsPost('/crm/v3/objects/companies/batch/read', apiKey, payload);
+    } catch (e) {
+      console.warn('   ⚠  fetchChurnDates batch failed:', e.message);
+      continue;
+    }
+
+    for (const obj of (res.results || [])) {
+      const history = obj.propertiesWithHistory?.company_status || [];
+      // Find the earliest entry where value matches "Churn" (case-insensitive)
+      const churnEntries = history
+        .filter(h => /churn/i.test(h.value || ''))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      if (churnEntries.length) {
+        // YYYY-MM-DD only
+        result[obj.id] = churnEntries[0].timestamp.substring(0, 10);
+      }
+    }
+  }
+
+  console.log(`   ✓ Churn dates resolved: ${Object.keys(result).length} / ${hsIds.length} companies`);
+  return result;
+}
+
+module.exports = { fetchAllCompanies, fetchDeals, fetchChurnDates, toUSD, FX, PORTAL_ID, CSM_PIPELINE, VALID_CSMS };
