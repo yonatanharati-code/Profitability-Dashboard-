@@ -1892,14 +1892,22 @@ function rollup(){
     const startArr = arrAtDate(c, windowStartISO);
     if (startArr === 0) continue; // no ARR at window start — skip
 
+    const isChurnStatus   = c.stage === 'Churn';
     const churnedInWindow = c.churnDate && c.churnDate >= windowStartISO && c.churnDate <= todayISO;
     const churnedBefore   = c.churnDate && c.churnDate < windowStartISO;
 
     if (churnedBefore) continue; // left before this period — not in cohort
 
-    if (churnedInWindow) {
+    if (churnedInWindow || (isChurnStatus && !c.churnDate)) {
+      // Known churn in window, OR churned-status with no recorded date (unknown timing).
+      // Treat as full loss — unknownDate flag lets the UI warn about missing dates.
       grrRows.push({ c, startArr, endArr: 0, status: 'churn',
-        churnLoss: startArr, contractionLoss: 0, expansionGain: 0 });
+        churnLoss: startArr, contractionLoss: 0, expansionGain: 0,
+        unknownDate: !churnedInWindow });
+    } else if (isChurnStatus) {
+      // churnDate is set but outside window (churnedBefore already handled above)
+      // This branch means churnDate > todayISO — shouldn't happen, skip
+      continue;
     } else {
       // Still active — compare start ARR to current ARR
       const currArr = c.arr || 0;
@@ -2048,6 +2056,10 @@ function renderGRR(){
           <span style="color:var(--warn);">▼ Contraction ${fmt$(r.contractionLoss)}</span>
           <span style="color:var(--ok);">▲ Expansion ${fmt$(r.expansionGain)} <span style="opacity:.6;">(excl. from GRR)</span></span>
         </div>
+        ${r.grrRows.filter(x=>x.unknownDate).length > 0 ? `
+        <div style="margin-top:6px;font-size:10px;color:var(--warn);text-align:right;">
+          ⚠ ${r.grrRows.filter(x=>x.unknownDate).length} churn(s) counted without a recorded date in HubSpot
+        </div>` : ''}
       </div>`;
   }
 

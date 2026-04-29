@@ -540,6 +540,26 @@ async function refreshAll(onProgress = () => {}, opts = {}) {
     }
     roundHours(merged.cs); roundHours(merged.sa); roundHours(merged.dev); roundHours(merged.bug);
 
+    // ── Merge ARR history into a total-Samsung timeline ─────────────────────
+    // For each date where any entity's ARR changed, compute the group total.
+    const allArrDates = new Set();
+    for (const c of samsungGroup) (c.arrHistory || []).forEach(h => allArrDates.add(h.date));
+    const mergedArrHistory = [...allArrDates].sort().map(date => {
+      const total = samsungGroup.reduce((sum, c) => {
+        const hist = c.arrHistory || [];
+        if (!hist.length) return sum + (c.arr || 0);
+        let found = null;
+        for (const h of hist) { if (h.date <= date) found = h; else break; }
+        return sum + (found ? found.arr : (hist[0]?.arr || 0));
+      }, 0);
+      return { date, arr: Math.round(total) };
+    }).filter(h => h.arr > 0);
+    merged.arrHistory      = mergedArrHistory;
+    // Earliest churn date across entities (null if none churned)
+    merged.churnDate       = samsungGroup.map(c => c.churnDate).filter(Boolean).sort()[0] || null;
+    // Earliest "became active" date across entities
+    merged.becameActiveDate= samsungGroup.map(c => c.becameActiveDate).filter(Boolean).sort()[0] || null;
+
     // Rebuild customers array: remove individual Samsung entries, add merged
     const kept = customers.filter((c) => !/samsung/i.test(c.name));
     kept.push(merged);
