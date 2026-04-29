@@ -1752,6 +1752,24 @@ function winMonths(){
   if (w === 'month') return 1;
   return w;
 }
+
+/**
+ * Return a customer's ARR as of a given date ('YYYY-MM-DD').
+ * Uses arrHistory (sorted asc by date) to find the value in effect at that date.
+ * Falls back to c.arr (current) if no history exists.
+ */
+function arrAtDate(c, dateISO) {
+  const hist = c.arrHistory;
+  if (!hist || !hist.length) return c.arr || 0;
+  // Find last entry whose date is ≤ dateISO
+  let found = null;
+  for (const h of hist) {
+    if (h.date <= dateISO) found = h;
+    else break;
+  }
+  // If no history entry before that date, take the oldest we have
+  return found ? found.arr : hist[0].arr;
+}
 function effAnnual(c){
   const hrs=g(c,'sa')+g(c,'dev');
   if(hrs===0||c.arr===0) return null;
@@ -1872,11 +1890,16 @@ function rollup(){
     c.stage === 'Churn' && !c.churnDate
   );
 
-  const startARR    = activeAtWindowStart.reduce((s, c) => s + (c.arr || 0), 0);
-  const churnedArr  = churnedDuringWindow.reduce((s, c) => s + (c.arr || 0), 0);
+  // Use ARR at window start (from history) not today's ARR — accounts for downgrades
+  const startARR   = activeAtWindowStart.reduce((s, c) => s + arrAtDate(c, windowStartISO), 0);
+  const churnedArr = churnedDuringWindow.reduce((s, c) => {
+    // Use ARR just before they churned (their churnDate) as the lost amount
+    return s + arrAtDate(c, c.churnDate);
+  }, 0);
   const grr         = startARR > 0 ? ((startARR - churnedArr) / startARR) * 100 : null;
   const retainedArr = startARR - churnedArr;
-  const churnedWithArr = churnedDuringWindow.filter(c => (c.arr || 0) > 0).sort((a, b) => b.arr - a.arr);
+  const churnedWithArr = churnedDuringWindow.filter(c => arrAtDate(c, c.churnDate) > 0)
+    .sort((a, b) => arrAtDate(b, b.churnDate) - arrAtDate(a, a.churnDate));
 
   return {active,all,totalARR,totalCS,totalSA,totalDev,totalBug,totalDevPaid,totalUpsell,totalPipe,totalLabor,totalDevCost,devRecap,netTotal,bugPctOfDev,
     grr, startARR, retainedArr, churnedArr, churnedWithArr, churnedDuringWindow, churnedBeforeWindow, churnedUnknownDate, windowStartISO, todayISO};
@@ -1996,13 +2019,21 @@ function renderGRR(){
   // ── Left: retained customers (active at window start, not churned during window)
   const retainedSub  = document.getElementById('grrRetainedSub');
   const retainedBody = document.getElementById('grrRetainedBody');
-  // Active at window start = didn't churn before OR during window
-  const retained = DATA.filter(c => !c.churnDate || c.churnDate > r.todayISO).sort((a, b) => b.arr - a.arr);
-  if (retainedSub) retainedSub.textContent = `${retained.length} customers · ${fmt$(r.retainedArr)} ARR retained`;
+  const retained = DATA.filter(c => !c.churnDate || c.churnDate > r.todayISO)
+    .map(c => ({ c, startArr: arrAtDate(c, r.windowStartISO), currArr: c.arr || 0 }))
+    .filter(x => x.startArr > 0 || x.currArr > 0)
+    .sort((a, b) => b.startArr - a.startArr);
+  if (retainedSub) retainedSub.textContent = `${retained.length} customers · ${fmt$(r.retainedArr)} ARR at window start`;
   if (retainedBody) {
-    const rows = retained.filter(c => (c.arr || 0) > 0).map(c => {
-      const pct = r.startARR > 0 ? (c.arr / r.startARR * 100).toFixed(1) : 0;
+    const rows = retained.map(({ c, startArr, currArr }) => {
+      const pct  = r.startARR > 0 ? (startArr / r.startARR * 100).toFixed(1) : 0;
       const barW = Math.min(100, +pct * 5).toFixed(1);
+      const changed = startArr !== currArr && startArr > 0;
+      const changeDir = currArr > startArr ? '▲' : '▼';
+      const changeClr = currArr > startArr ? 'var(--ok)' : 'var(--bad)';
+      const changeTxt = changed
+        ? `<span style="color:${changeClr};font-size:10px;margin-left:4px;">${changeDir} ${fmt$(currArr)} now</span>`
+        : '';
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);">
         <div style="flex:1;min-width:0;">
           <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
@@ -2011,7 +2042,7 @@ function renderGRR(){
           </div>
         </div>
         <div style="text-align:right;white-space:nowrap;flex-shrink:0;">
-          <div style="font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt$(c.arr)}</div>
+          <div style="font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt$(startArr)}${changeTxt}</div>
           <div style="font-size:10px;color:var(--text-secondary);">${pct}% of start ARR</div>
         </div>
       </div>`;
@@ -2022,8 +2053,8 @@ function renderGRR(){
   // ── Right: churned during window (with date) + before-window context + unknown
   const churnedSub  = document.getElementById('grrChurnedSub');
   const churnedBody = document.getElementById('grrChurnedBody');
-  const duringKnown = r.churnedDuringWindow.filter(c => (c.arr || 0) > 0).sort((a, b) => b.arr - a.arr);
-  const duringZero  = r.churnedDuringWindow.filter(c => !(c.arr > 0));
+  const duringKnown = r.churnedWithArr;
+  const duringZero  = r.churnedDuringWindow.filter(c => arrAtDate(c, c.churnDate) === 0);
 
   if (churnedSub) {
     const parts = [`${r.churnedDuringWindow.length} churned during ${wLabel}`];
@@ -2034,19 +2065,22 @@ function renderGRR(){
 
   if (churnedBody) {
     const makeRow = (c, accent) => {
-      const pct = r.startARR > 0 ? (c.arr / r.startARR * 100).toFixed(1) : 0;
+      // Use ARR at churn date (or window start for pre-window churns)
+      const refDate = c.churnDate || r.windowStartISO;
+      const histArr = arrAtDate(c, refDate);
+      const pct  = r.startARR > 0 ? (histArr / r.startARR * 100).toFixed(1) : 0;
       const barW = Math.min(100, +pct * 8).toFixed(1);
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);">
         <div style="flex:1;min-width:0;">
           <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
-          <div style="font-size:10px;color:var(--text-secondary);">${c.churnDate || 'date unknown'}</div>
+          <div style="font-size:10px;color:var(--text-secondary);">${c.churnDate ? 'churned ' + c.churnDate : 'date unknown'}</div>
           <div style="height:3px;background:var(--border);border-radius:2px;margin-top:3px;">
             <div style="height:3px;width:${barW}%;background:${accent};border-radius:2px;"></div>
           </div>
         </div>
         <div style="text-align:right;white-space:nowrap;flex-shrink:0;">
-          <div style="font-size:12.5px;font-weight:600;color:${accent};font-variant-numeric:tabular-nums;">${(c.arr||0)>0?fmt$(c.arr):'—'}</div>
-          <div style="font-size:10px;color:var(--text-secondary);">${(c.arr||0)>0?pct+'% of start ARR':''}</div>
+          <div style="font-size:12.5px;font-weight:600;color:${accent};font-variant-numeric:tabular-nums;">${histArr>0?fmt$(histArr):'—'}</div>
+          <div style="font-size:10px;color:var(--text-secondary);">${histArr>0?pct+'% of start ARR':''}</div>
         </div>
       </div>`;
     };

@@ -138,48 +138,65 @@ function toUSD(amount, currency) {
   return Math.round(amount * rate);
 }
 
-// ─── Churn dates — batch property history ─────────────────────────────────────
+// ─── Property histories — batch fetch for ALL companies ───────────────────────
 /**
- * For each company ID (raw HubSpot numeric ID), fetch the history of
- * `company_status` and return the date it was first set to "Churn".
+ * Fetches `company_status` and `arr` property history for every company ID
+ * passed in. One batch of up to 100 companies per API call.
  *
- * Returns: { [hsId]: 'YYYY-MM-DD' }
+ * Returns:
+ * {
+ *   [hsId]: {
+ *     churnDate:  'YYYY-MM-DD' | null,   // earliest date status → 'Churn'
+ *     arrHistory: [{ date: 'YYYY-MM-DD', arr: number }, ...]   // sorted asc
+ *   }
+ * }
  */
-async function fetchChurnDates(apiKey, hsIds) {
+async function fetchPropertyHistories(apiKey, hsIds) {
   if (!hsIds.length) return {};
   const result = {};
 
-  // Batch read supports up to 100 records per request
   for (let i = 0; i < hsIds.length; i += 100) {
     const batch = hsIds.slice(i, i + 100);
     const payload = {
-      properties:           ['company_status', 'name'],
-      propertiesWithHistory: ['company_status'],
-      inputs:               batch.map(id => ({ id: String(id) })),
+      properties:            ['company_status', 'arr', 'name'],
+      propertiesWithHistory: ['company_status', 'arr'],
+      inputs:                batch.map(id => ({ id: String(id) })),
     };
     let res;
     try {
       res = await hsPost('/crm/v3/objects/companies/batch/read', apiKey, payload);
     } catch (e) {
-      console.warn('   ⚠  fetchChurnDates batch failed:', e.message);
+      console.warn(`   ⚠  fetchPropertyHistories batch ${i}–${i+100} failed:`, e.message);
       continue;
     }
 
     for (const obj of (res.results || [])) {
-      const history = obj.propertiesWithHistory?.company_status || [];
-      // Find the earliest entry where value matches "Churn" (case-insensitive)
-      const churnEntries = history
+      // ── Churn date: earliest timestamp where status contains "churn" ─────
+      const statusHist = obj.propertiesWithHistory?.company_status || [];
+      const churnEntries = statusHist
         .filter(h => /churn/i.test(h.value || ''))
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-      if (churnEntries.length) {
-        // YYYY-MM-DD only
-        result[obj.id] = churnEntries[0].timestamp.substring(0, 10);
-      }
+      const churnDate = churnEntries.length
+        ? churnEntries[0].timestamp.substring(0, 10)
+        : null;
+
+      // ── ARR history: all recorded values, sorted oldest → newest ─────────
+      const arrHist = (obj.propertiesWithHistory?.arr || [])
+        .map(h => ({
+          date: h.timestamp.substring(0, 10),
+          arr:  Math.round(parseFloat(h.value) || 0),
+        }))
+        .filter(h => h.arr > 0)          // skip zero/null entries
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      result[obj.id] = { churnDate, arrHistory: arrHist };
     }
   }
 
-  console.log(`   ✓ Churn dates resolved: ${Object.keys(result).length} / ${hsIds.length} companies`);
+  const resolved = Object.keys(result).length;
+  const withArr  = Object.values(result).filter(r => r.arrHistory.length > 0).length;
+  console.log(`   ✓ Property histories: ${resolved}/${hsIds.length} companies · ${withArr} have ARR history`);
   return result;
 }
 
-module.exports = { fetchAllCompanies, fetchDeals, fetchChurnDates, toUSD, FX, PORTAL_ID, CSM_PIPELINE, VALID_CSMS };
+module.exports = { fetchAllCompanies, fetchDeals, fetchPropertyHistories, toUSD, FX, PORTAL_ID, CSM_PIPELINE, VALID_CSMS };

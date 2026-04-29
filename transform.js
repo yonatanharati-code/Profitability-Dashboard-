@@ -1,6 +1,6 @@
 'use strict';
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
-const { fetchAllCompanies, fetchDeals, fetchChurnDates, toUSD, VALID_CSMS } = require('./connectors/hubspot');
+const { fetchAllCompanies, fetchDeals, fetchPropertyHistories, toUSD, VALID_CSMS } = require('./connectors/hubspot');
 const { streamAllTimeEntries, USER_TYPES, BUG_TASK_RE, BUG_LIST_RE } = require('./connectors/clickup');
 
 // ─── Bug detection helpers ────────────────────────────────────────────────────
@@ -300,32 +300,30 @@ async function refreshAll(onProgress = () => {}, opts = {}) {
     fetchDeals(hsKey).then((r)         => { console.log(`   ✓ ${r.length} deals`);     return r; }),
   ]);
 
-  // ── Fetch churn dates for churned companies (property history) ──────────────
-  onProgress({ step: 'Fetching churn dates…' });
-  const churnedRaw = companies.filter(c => /churn/i.test(c.properties.company_status || ''));
-  const churnHsIds = churnedRaw.map(c => c.id);  // raw HubSpot numeric IDs
-  const churnDates = await fetchChurnDates(hsKey, churnHsIds);
-  // Build lookup: hsId → churnDate
-  // churnDates keys are already HubSpot numeric IDs
+  // ── Fetch property histories for ALL companies (churn date + ARR timeline) ──
+  onProgress({ step: 'Fetching ARR & churn history…' });
+  const allHsIds = companies.map(c => c.id);  // raw HubSpot numeric IDs
+  const propHistories = await fetchPropertyHistories(hsKey, allHsIds);
 
   // ── Build customer records from HubSpot companies ───────────────────────────
   const customers = companies
     .map((c) => {
       const p = c.properties;
       const isChurn = (p.company_status || '').toLowerCase().includes('churn');
-      const churnDate = isChurn ? (churnDates[c.id] || null) : null;
+      const hist = propHistories[c.id] || { churnDate: null, arrHistory: [] };
       return {
-        id:        slugify(p.name),
-        hsId:      c.id,               // raw HubSpot numeric ID — needed for links & lookups
-        name:      p.name   || '',
-        arr:       parseInt(p.arr)  || 0,
-        rd:        p.renewal_date   || null,
-        stage:     isChurn ? 'Churn' : mapStage(p.onboarding_stage),
-        rank:      p.rank           || null,
-        owner:     VALID_CSMS.has(p.csm) ? p.csm : ((p.csms || '').split(';')[0].trim() || null),
-        flag:      isChurn ? 'red' : mapHealth(p.health),
-        churnDate, // 'YYYY-MM-DD' or null
-        devPipe:   0,
+        id:         slugify(p.name),
+        hsId:       c.id,               // raw HubSpot numeric ID
+        name:       p.name   || '',
+        arr:        parseInt(p.arr)  || 0,
+        arrHistory: hist.arrHistory,    // [{ date, arr }] sorted asc — for period GRR
+        rd:         p.renewal_date   || null,
+        stage:      isChurn ? 'Churn' : mapStage(p.onboarding_stage),
+        rank:       p.rank           || null,
+        owner:      VALID_CSMS.has(p.csm) ? p.csm : ((p.csms || '').split(';')[0].trim() || null),
+        flag:       isChurn ? 'red' : mapHealth(p.health),
+        churnDate:  hist.churnDate,     // 'YYYY-MM-DD' or null
+        devPipe:    0,
         cs:  emptyHours(),
         sa:  emptyHours(),
         dev: emptyHours(),
