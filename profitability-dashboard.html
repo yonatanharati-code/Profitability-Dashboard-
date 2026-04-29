@@ -132,7 +132,7 @@ body{min-height:100vh;transition:background .2s,color .2s;}
 .card-body{padding:4px var(--card-pad) var(--card-pad);}
 
 /* ── KPIs ── */
-.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gap);}
+.kpi-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--gap);}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:14px 16px 12px;display:flex;flex-direction:column;gap:3px;position:relative;overflow:hidden;transition:border-color .12s;}
 .kpi:hover{border-color:var(--border-strong);}
 .kpi-label{font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.1px;}
@@ -398,6 +398,9 @@ tr.selected-row{background:var(--teal-50) !important;}
 [data-theme="dark"] tr.selected-row{background:rgba(33,158,188,.08) !important;}
 
 /* ── Responsive ── */
+@media (max-width:1600px){
+  .kpi-grid{grid-template-columns:repeat(4,1fr);}
+}
 @media (max-width:1400px){
   .kpi-grid{grid-template-columns:repeat(3,1fr);}
   .stat-row{grid-template-columns:repeat(3,1fr);}
@@ -582,6 +585,39 @@ tr.selected-row{background:var(--teal-50) !important;}
       <div class="grid g-2">
         <div class="card phase prelive" id="worstCard"></div>
         <div class="card phase live" id="bestCard"></div>
+      </div>
+    </div>
+
+    <!-- ── Gross Retention Breakdown ─────────────────────────────────────── -->
+    <div class="section" id="grrSection">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Gross Retention Rate — Per Customer</div>
+          <div class="section-desc">Retained ARR vs churned ARR · customers with known ARR at churn time</div>
+        </div>
+        <div id="grrAggrBadge" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;"></div>
+      </div>
+      <div class="grid g-2">
+        <!-- Active customers summary -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-head-text">
+              <div class="card-title" style="color:var(--ok);">✓ Retained ARR</div>
+              <div class="card-sub" id="grrRetainedSub"></div>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;overflow:auto;max-height:340px;" id="grrRetainedBody"></div>
+        </div>
+        <!-- Churned customers -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-head-text">
+              <div class="card-title" style="color:var(--bad);">✕ Churned ARR (tracked)</div>
+              <div class="card-sub" id="grrChurnedSub"></div>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;overflow:auto;max-height:340px;" id="grrChurnedBody"></div>
+        </div>
       </div>
     </div>
 
@@ -1798,7 +1834,21 @@ function rollup(){
   const devRecap = totalDevCost>0 ? (totalDevPaid/totalDevCost)*100 : 0;
   const netTotal = all.reduce((s,c)=>s+netPL(c), 0);
   const bugPctOfDev = totalDev>0 ? (totalBug/totalDev)*100 : 0;
-  return {active,all,totalARR,totalCS,totalSA,totalDev,totalBug,totalDevPaid,totalUpsell,totalPipe,totalLabor,totalDevCost,devRecap,netTotal,bugPctOfDev};
+
+  // ── Gross Retention Rate ──────────────────────────────────────────────────
+  // GRR = retained ARR / (retained ARR + churned ARR with known value)
+  // Uses ALL DATA (not just AD()) so excluded customers don't distort it
+  const _allData = DATA;
+  const churnedCustomers = _allData.filter(c => c.stage === 'Churn');
+  const churnedArr = churnedCustomers.reduce((s,c)=>s+(c.arr||0), 0);
+  const retainedArr = _allData.filter(c => c.stage !== 'Churn').reduce((s,c)=>s+(c.arr||0), 0);
+  const grrDenom = retainedArr + churnedArr;
+  const grr = grrDenom > 0 ? (retainedArr / grrDenom) * 100 : null;
+  const churnCount = churnedCustomers.length;
+  // Churned customers with known (non-zero) ARR — these drove actual revenue loss
+  const churnedWithArr = churnedCustomers.filter(c=>(c.arr||0)>0).sort((a,b)=>b.arr-a.arr);
+
+  return {active,all,totalARR,totalCS,totalSA,totalDev,totalBug,totalDevPaid,totalUpsell,totalPipe,totalLabor,totalDevCost,devRecap,netTotal,bugPctOfDev,grr,churnedArr,retainedArr,churnCount,churnedWithArr};
 }
 
 // Trend deltas: compare last 4 months vs prior 3 months (dynamic)
@@ -1863,18 +1913,25 @@ function renderKPIs(){
     return `<span class="delta ${cls}">${arr}${Math.abs(Math.round(v))}%</span>`;
   };
 
+  // GRR colour: ≥95% green, ≥85% amber, <85% red
+  const grrVal = r.grr != null ? Math.round(r.grr*10)/10 : null;
+  const grrColor = grrVal==null ? '' : grrVal>=95 ? 'color:var(--ok)' : grrVal>=85 ? 'color:var(--warn)' : 'color:var(--bad)';
+  const lostCount = r.churnedWithArr.length;
+
   const cards = [
-    { label:'Total ARR', value:fmt$(r.totalARR), foot:`<span class="caption">${r.all.length} customers</span>` },
+    { label:'Total ARR', value:fmt$(r.totalARR), foot:`<span class="caption">${r.all.filter(c=>c.stage!=='Churn').length} active customers</span>` },
+    { label:'Gross Retention', value:grrVal!=null?grrVal+'%':'—', style:grrColor,
+      foot:`<span class="caption">${lostCount} churned · ${fmt$(r.churnedArr)} lost ARR</span>` },
     { label:'CS hours', value:fmtK(r.totalCS), unit:'h', foot:`${delta(d.cs, true)}<span class="caption">vs prior 3M</span>` },
     { label:'SA hours', value:fmtK(r.totalSA), unit:'h', foot:`${delta(d.sa, true)}<span class="caption">vs prior 3M</span>` },
     { label:'New Dev', value:fmtK(r.totalDev), unit:'h', foot:`${delta(d.dev)}<span class="caption">vs prior 3M</span>` },
     { label:'Bug/Esc', value:fmtK(r.totalBug), unit:'h', foot:`${delta(d.bug, true)}<span class="caption">${Math.round(r.bugPctOfDev)}% of dev</span>` },
-    { label:'HS Deals (6M)', value:fmt$(r.totalDevPaid+r.totalUpsell), foot:`<span class="caption">Dev ${fmt$(r.totalDevPaid)} · Upsell ${fmt$(r.totalUpsell)}</span>` },
+    { label:'HS Deals', value:fmt$(r.totalDevPaid+r.totalUpsell), foot:`<span class="caption">Dev ${fmt$(r.totalDevPaid)} · Upsell ${fmt$(r.totalUpsell)}</span>` },
   ];
   grid.innerHTML = cards.map(c => `
     <div class="kpi">
       <div class="kpi-label">${c.label}</div>
-      <div class="kpi-value num">${c.value}${c.unit?`<span class="unit">${c.unit}</span>`:''}</div>
+      <div class="kpi-value num"${c.style?` style="${c.style}"`:''}>${c.value}${c.unit?`<span class="unit">${c.unit}</span>`:''}</div>
       <div class="kpi-foot">${c.foot}</div>
     </div>
   `).join('');
@@ -1883,6 +1940,81 @@ function renderKPIs(){
   if (el) el.innerHTML = `${r.all.length} customers · ${fmt$(r.totalARR)} ARR · ${fmtK(r.totalCS+r.totalSA+r.totalDev+r.totalBug)}h invested · ${fmt$(r.totalDevPaid)} dev billed`;
   const wl = document.getElementById('winLabel'); if (wl) wl.textContent = winLabel();
   const cc = document.getElementById('custCount'); if (cc) cc.textContent = r.all.length;
+}
+
+// ── Gross Retention Rate breakdown ───────────────────────────────────────────
+function renderGRR(){
+  const r = rollup();
+  const grrVal = r.grr != null ? Math.round(r.grr*10)/10 : null;
+  const grrColor = grrVal==null ? '' : grrVal>=95 ? 'var(--ok)' : grrVal>=85 ? 'var(--warn)' : 'var(--bad)';
+
+  // Aggregate badge
+  const badge = document.getElementById('grrAggrBadge');
+  if (badge) {
+    badge.innerHTML = `
+      <div style="text-align:right;">
+        <div style="font-size:28px;font-weight:700;color:${grrColor};font-variant-numeric:tabular-nums;line-height:1;">${grrVal!=null?grrVal+'%':'—'}</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">GRR · ${fmt$(r.retainedArr)} retained / ${fmt$(r.retainedArr+r.churnedArr)} total</div>
+      </div>`;
+  }
+
+  // Retained panel — top active customers by ARR
+  const retainedSub = document.getElementById('grrRetainedSub');
+  const retainedBody = document.getElementById('grrRetainedBody');
+  const activeCustomers = DATA.filter(c=>c.stage!=='Churn'&&(c.arr||0)>0).sort((a,b)=>b.arr-a.arr);
+  if (retainedSub) retainedSub.textContent = `${activeCustomers.length} active customers · ${fmt$(r.retainedArr)} ARR`;
+  if (retainedBody) {
+    const rows = activeCustomers.map(c => {
+      const pct = r.retainedArr>0 ? (c.arr/r.retainedArr*100).toFixed(1) : 0;
+      const barW = Math.min(100, +pct).toFixed(1);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;">
+            <div style="height:3px;width:${barW}%;background:var(--ok);border-radius:2px;"></div>
+          </div>
+        </div>
+        <div style="text-align:right;white-space:nowrap;flex-shrink:0;">
+          <div style="font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt$(c.arr)}</div>
+          <div style="font-size:10px;color:var(--text-secondary);">${pct}% of retained</div>
+        </div>
+      </div>`;
+    }).join('');
+    retainedBody.innerHTML = rows || '<div style="padding:16px;color:var(--text-secondary);font-size:12px;">No active customers</div>';
+  }
+
+  // Churned panel — only customers with known ARR at churn
+  const churnedSub = document.getElementById('grrChurnedSub');
+  const churnedBody = document.getElementById('grrChurnedBody');
+  const churnedAll = DATA.filter(c=>c.stage==='Churn').sort((a,b)=>(b.arr||0)-(a.arr||0));
+  const churnedKnown = r.churnedWithArr; // only those with arr>0
+  const churnedZero  = churnedAll.filter(c=>!(c.arr>0));
+  if (churnedSub) churnedSub.textContent = `${churnedKnown.length} with tracked ARR · ${churnedZero.length} without · ${fmt$(r.churnedArr)} total lost`;
+  if (churnedBody) {
+    const knownRows = churnedKnown.map(c => {
+      const pct = (r.retainedArr+r.churnedArr)>0 ? (c.arr/(r.retainedArr+r.churnedArr)*100).toFixed(1) : 0;
+      const barW = Math.min(100, +pct * 5).toFixed(1); // scale up for visibility
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;">
+            <div style="height:3px;width:${barW}%;background:var(--bad);border-radius:2px;"></div>
+          </div>
+        </div>
+        <div style="text-align:right;white-space:nowrap;flex-shrink:0;">
+          <div style="font-size:12.5px;font-weight:600;color:var(--bad);font-variant-numeric:tabular-nums;">${fmt$(c.arr)}</div>
+          <div style="font-size:10px;color:var(--text-secondary);">${pct}% of total ARR</div>
+        </div>
+      </div>`;
+    }).join('');
+    // Also show collapsed count of zero-ARR churned
+    const zeroNote = churnedZero.length > 0
+      ? `<div style="padding:10px 16px;font-size:11.5px;color:var(--text-secondary);border-top:1px dashed var(--border);">
+           + ${churnedZero.length} additional churned customers with no tracked ARR (${churnedZero.slice(0,6).map(c=>escapeHtml(c.name)).join(', ')}${churnedZero.length>6?'…':''})
+         </div>`
+      : '';
+    churnedBody.innerHTML = (knownRows || '<div style="padding:16px;color:var(--text-secondary);font-size:12px;">No churned customers with tracked ARR</div>') + zeroNote;
+  }
 }
 
 // ── Best/worst hero cards ─────────────────────────────────
@@ -5222,6 +5354,7 @@ function init(){
 function renderAll(){
   renderInsight();
   renderKPIs();
+  renderGRR();
   renderHeroCards();
   renderStagePhases();
   renderStageAvg();
