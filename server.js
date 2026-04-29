@@ -441,16 +441,27 @@ function injectData(html, cache, csvHours) {
 <script>
 // ── YTD support ───────────────────────────────────────────────────────────────
 (function() {
-  // 1. Pre-compute per-customer YTD totals from monthly buckets
+  // 1. Pre-compute per-customer YTD + m12 totals from monthly buckets
   const thisYear = new Date().getFullYear();
+  // m12 cutoff: YYYY-MM of the month 12 months ago
+  const _m12d = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const _m12cutoff = _m12d.getFullYear() + '-' + String(_m12d.getMonth() + 1).padStart(2, '0');
   DATA.forEach(c => {
-    ['cs','sa','dev'].forEach(t => {
+    ['cs','sa','dev','bug'].forEach(t => {
       const monthly = (c[t] && c[t].monthly) || {};
       c[t].ytd = Math.round(
         Object.entries(monthly)
           .filter(([mk]) => mk.startsWith(thisYear + '-'))
           .reduce((sum, [, h]) => sum + h, 0)
         * 10) / 10;
+      // m12: sum all months >= cutoff (covers CSV-imported hours which lack m12)
+      if (!c[t].m12) {
+        c[t].m12 = Math.round(
+          Object.entries(monthly)
+            .filter(([mk]) => mk >= _m12cutoff)
+            .reduce((sum, [, h]) => sum + h, 0)
+          * 10) / 10;
+      }
     });
   });
 
