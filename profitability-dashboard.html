@@ -454,6 +454,7 @@ tr.selected-row{background:var(--teal-50) !important;}
         <button class="seg-btn" data-w="1">1M</button>
         <button class="seg-btn" data-w="3">3M</button>
         <button class="seg-btn active" data-w="6">6M</button>
+        <button class="seg-btn" data-w="12">1Y</button>
         <button class="seg-btn" data-w="ytd">YTD</button>
         <button class="seg-btn" data-w="month">Month</button>
       </div>
@@ -1831,7 +1832,7 @@ function winLabel(){
   if (w === 'month') {
     try { const [y,m]=state.monthKey.split('-').map(Number); return new Date(y,m-1,1).toLocaleString('en-US',{month:'long',year:'numeric'}); } catch(e){ return 'selected month'; }
   }
-  return w===1?'last 1 month':w===3?'last 3 months':'last 6 months';
+  return w===1?'last 1 month':w===3?'last 3 months':w===12?'last 12 months':'last 6 months';
 }
 function escapeHtml(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 
