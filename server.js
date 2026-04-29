@@ -397,6 +397,12 @@ function injectData(html, cache, csvHours) {
     style="background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.3);color:#818cf8;margin-left:6px;">
     ⟳ Sync HubSpot
   </button>` +
+      // ── Full ClickUp sync button (fetches 12 months of hours from ClickUp API) ──
+      `\n  <button class="import-btn" id="cuSyncBtn" onclick="_syncClickUp()"
+    style="background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.3);color:#fb923c;margin-left:6px;"
+    title="Fetch 12 months of time entries from ClickUp API (takes ~2 min)">
+    ⟳ Sync ClickUp 12M
+  </button>` +
       // ── Import CSV Hours — use <label for="input"> so the file picker opens
       //    natively without JS .click() (which gets blocked by some browsers) ──
       `\n  <input type="file" id="csvHoursInput" accept=".csv" style="display:none"
@@ -557,6 +563,41 @@ async function _syncFromApis() {
   }
   try {
     await fetch('/api/refresh', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ hubspotOnly: true }) });
+    startPolling();
+  } catch (e) {
+    alert('Sync error: ' + e.message);
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+// ── Full ClickUp sync (fetches 12 months of hours from ClickUp API) ──────────
+async function _syncClickUp() {
+  const btn = document.getElementById('cuSyncBtn');
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⟳ Starting…';
+  let pollTimer = null;
+  function startPolling() {
+    pollTimer = setInterval(async () => {
+      try {
+        const s = await fetch('/api/sync-status').then(r => r.json());
+        if (s.running) {
+          const pct = s.total > 0 ? ' ' + Math.round(s.done / s.total * 100) + '%' : '';
+          btn.textContent = '⟳ ' + s.step + pct;
+        } else if (s.step === 'complete') {
+          clearInterval(pollTimer);
+          btn.textContent = '✓ Done — reloading…';
+          setTimeout(() => location.reload(), 800);
+        } else if (s.error) {
+          clearInterval(pollTimer);
+          alert('ClickUp sync failed: ' + s.error);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      } catch (_) {}
+    }, 1500);
+  }
+  try {
+    await fetch('/api/refresh', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ hubspotOnly: false }) });
     startPolling();
   } catch (e) {
     alert('Sync error: ' + e.message);
