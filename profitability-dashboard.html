@@ -1722,6 +1722,8 @@ function devROIpct(c){
   if(dc===0) return null;
   return ((c.devDealsAmt||0)/dc)*100;
 }
+// Dev deals billed ($K) — used when dev hours aren't tracked per-customer
+function devBilledK(c){ return +((c.devDealsAmt||0)/1000).toFixed(1); }
 function fullROIpct(c){
   const lc = laborCost(c);
   if(lc===0) return null;
@@ -1832,8 +1834,8 @@ function renderInsight(){
     <div class="insight-text">
       <div class="insight-kicker">Executive read · ${winLabel()}</div>
       <div class="insight-body">
-        Dev recapture sits at <strong>${Math.round(r.devRecap)}%</strong> of cost — ${r.devRecap>=80?'on target':r.devRecap>=40?'below target, closing':'leaking heavily'}.
-        ${over ? `Biggest single gap: <strong>${escapeHtml(over.c.name)}</strong> — ${fmtH(g(over.c,'sa')+g(over.c,'dev'))} of SA+Dev, zero billed${ovPct?`, consuming ${Math.round(ovPct)}% of ARR in labor.`:'.'}` : ''}
+        Dev revenue billed: <strong>${fmt$(r.totalDevPaid)}</strong> across ${r.all.filter(c=>(c.devDealsAmt||0)>0).length} accounts — ${r.totalDevPaid>50000?'strong dev pipeline':'growing dev pipeline'}.
+        ${over ? `Biggest labor gap: <strong>${escapeHtml(over.c.name)}</strong> — ${fmtH(g(over.c,'sa')+g(over.c,'dev'))} of SA+Dev invested${ovPct?`, consuming ${Math.round(ovPct)}% of ARR in labor.`:'.'}` : ''}
       </div>
     </div>
     <button class="insight-cta" onclick="document.querySelector('[data-pane=profit]').click()">
@@ -1874,7 +1876,7 @@ function renderKPIs(){
   `).join('');
 
   const el = document.getElementById('pageMeta');
-  if (el) el.innerHTML = `${r.all.length} customers · ${fmt$(r.totalARR)} ARR · ${fmtK(r.totalCS+r.totalSA+r.totalDev+r.totalBug)}h invested · ${Math.round(r.devRecap)}% dev recapture`;
+  if (el) el.innerHTML = `${r.all.length} customers · ${fmt$(r.totalARR)} ARR · ${fmtK(r.totalCS+r.totalSA+r.totalDev+r.totalBug)}h invested · ${fmt$(r.totalDevPaid)} dev billed`;
   const wl = document.getElementById('winLabel'); if (wl) wl.textContent = winLabel();
   const cc = document.getElementById('custCount'); if (cc) cc.textContent = r.all.length;
 }
@@ -2699,24 +2701,37 @@ function chartProfit(){
     title = 'ARR efficiency — labor cost as % of annual revenue';
     sub = "How much of each customer's ARR we're consuming in labor — lower is better";
   } else if (state.profMode==='dev'){
-    items = AD().map(c=>({c, v:devROIpct(c)})).filter(x=>x.v!=null && x.v<5000);
-    benchmark = 100;
-    title = 'Dev recapture — $ billed / $ invested';
-    sub = 'Dev deals as % of dev labor cost — 100% means we break even';
+    // Use $ billed directly — dev hours aren't tracked per-customer in ClickUp
+    // so the ratio metric (billed/invested) is always 0. Show absolute deal revenue instead.
+    items = AD().filter(c=>(c.devDealsAmt||0)>0).map(c=>({c, v:devBilledK(c)})).filter(x=>x.v>0);
+    benchmark = null;
+    title = 'Dev revenue billed — closed-won dev deals per customer';
+    sub = 'Total dev / setup-fee deals (Closed Won + Commit) in $K — shows which accounts generate dev income';
   } else {
     items = AD().filter(c=>laborCost(c)>0).map(c=>({c, v:fullROIpct(c)})).filter(x=>x.v!=null && x.v<5000);
     benchmark = 0;
     title = 'Full ROI — (ARR window + deals − labor) / labor';
     sub = 'Complete P&L per customer — above 0% is profitable';
   }
-  items.sort((a,b) => state.profMode==='arr' ? b.v - a.v : a.v - b.v);
+  // Dev mode: sort desc by amount; ARR mode: desc; Full ROI: asc then reverse
+  if (state.profMode==='dev'){
+    items.sort((a,b)=>b.v-a.v);
+  } else if (state.profMode==='arr'){
+    items.sort((a,b)=>b.v-a.v);
+  } else {
+    items.sort((a,b)=>a.v-b.v);
+  }
   items = items.slice(0, 30);
-  if (state.profMode!=='arr') items.reverse();
+  if (state.profMode==='full') items.reverse();
 
   const colors = items.map(x => {
     const v = x.v;
     if (state.profMode==='arr'){
       return v < benchmark ? '#15803D' : v < benchmark*2 ? '#B45309' : '#B42318';
+    } else if (state.profMode==='dev'){
+      // Colour by size: top deals = green, mid = amber, small = slate
+      const max = items[0]?.v || 1;
+      return v >= max*0.5 ? '#15803D' : v >= max*0.2 ? '#B45309' : '#6B7280';
     } else {
       return v >= benchmark ? '#15803D' : v >= benchmark/2 ? '#B45309' : '#B42318';
     }
@@ -2727,13 +2742,22 @@ function chartProfit(){
   const benchLabel = document.getElementById('benchLabel');
   if (profTitle) profTitle.textContent = title;
   if (profSub) profSub.textContent = sub;
-  if (benchLabel) benchLabel.textContent = state.benchPct+'%';
+  if (benchLabel) {
+    if (state.profMode==='dev') benchLabel.textContent = '—';
+    else benchLabel.textContent = (state.profMode==='arr' ? state.benchPct : benchmark)+'%';
+  }
 
+  const isDevMode = state.profMode==='dev';
   const opts=baseOpts();
   opts.indexAxis='y';
-  opts.scales.x.ticks.callback=v=>v+'%';
-  opts.plugins.tooltip.callbacks={label:c=>Math.round(c.raw)+'%'};
+  opts.scales.x.ticks.callback = isDevMode ? v=>'$'+v+'K' : v=>v+'%';
+  opts.plugins.tooltip.callbacks = {
+    label: c => isDevMode
+      ? '$'+c.raw.toFixed(1)+'K  ('+fmt$(c.raw*1000)+')'
+      : Math.round(c.raw)+'%'
+  };
   const benchPlug = { id:'bench', afterDatasetsDraw(ch){
+    if (benchmark==null) return;
     const {ctx,chartArea:ca,scales:{x}}=ch;
     const px=x.getPixelForValue(benchmark);
     if (!isFinite(px)) return;
@@ -2748,7 +2772,10 @@ function chartProfit(){
   charts.profit = new Chart(document.getElementById('cProfit'),{
     type:'bar', data:{
       labels: items.map(x=>x.c.name.length>18?x.c.name.slice(0,17)+'…':x.c.name),
-      datasets:[{data:items.map(x=>Math.round(x.v)), backgroundColor:colors, borderRadius:2, maxBarThickness:14}]
+      datasets:[{
+        data: items.map(x => isDevMode ? x.v : Math.round(x.v)),
+        backgroundColor:colors, borderRadius:2, maxBarThickness:14
+      }]
     }, options:opts, plugins:[benchPlug]
   });
 }
