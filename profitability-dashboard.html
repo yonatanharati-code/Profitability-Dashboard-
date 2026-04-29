@@ -1700,7 +1700,7 @@ function g(c, layer){
   if (w === 'month') {
     return (c[layer]?.monthly?.[state.monthKey] || 0);
   }
-  const k = w===1?'m1':w===3?'m3':'m6';
+  const k = w===1?'m1':w===3?'m3':w===12?'m12':'m6';
   return (c[layer]&&c[layer][k])||0;
 }
 // g() variant that only sums months >= fromMk (for Dev Budget start-date filter)

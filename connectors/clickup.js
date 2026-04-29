@@ -200,7 +200,7 @@ async function streamSpaceEntries(apiKey, spaceId, startMs, endMs, onEntry, assi
  */
 async function streamAllTimeEntries(apiKey, onEntry, onProgress = () => {}) {
   const now          = Date.now();
-  const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
+  const sixMonthsAgo = now - 365 * 24 * 60 * 60 * 1000; // fetch 12 months so 1Y window has real data
 
   // ── FAST PATH ────────────────────────────────────────────────────────────────
   onProgress({ step: 'Fetching entries (admin mode)…', done: 0, total: 1 });

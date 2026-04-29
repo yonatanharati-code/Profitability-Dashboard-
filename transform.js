@@ -94,30 +94,33 @@ function mapHealth(h) {
 }
 
 // ─── Hours accumulator ────────────────────────────────────────────────────────
-const MS1 = 30  * 24 * 60 * 60 * 1000;
-const MS3 = 90  * 24 * 60 * 60 * 1000;
-const MS6 = 180 * 24 * 60 * 60 * 1000;
+const MS1  = 30  * 24 * 60 * 60 * 1000;
+const MS3  = 90  * 24 * 60 * 60 * 1000;
+const MS6  = 180 * 24 * 60 * 60 * 1000;
+const MS12 = 365 * 24 * 60 * 60 * 1000;
 
 function rnd(v) { return Math.round(v * 10) / 10; }
 
 function emptyHours() {
-  return { m1: 0, m3: 0, m6: 0, monthly: {} };
+  return { m1: 0, m3: 0, m6: 0, m12: 0, monthly: {} };
 }
 
 function addHours(bucket, durationMs, startMs, now) {
   const hours = durationMs / 3600_000;
-  bucket.m6 += hours;
-  if (startMs >= now - MS3) bucket.m3 += hours;
-  if (startMs >= now - MS1) bucket.m1 += hours;
+  bucket.m12 += hours;                           // all entries within the 12M fetch window
+  if (startMs >= now - MS6)  bucket.m6  += hours;
+  if (startMs >= now - MS3)  bucket.m3  += hours;
+  if (startMs >= now - MS1)  bucket.m1  += hours;
   const d  = new Date(startMs);
   const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   bucket.monthly[mk] = (bucket.monthly[mk] || 0) + hours;
 }
 
 function roundHours(bucket) {
-  bucket.m1 = rnd(bucket.m1);
-  bucket.m3 = rnd(bucket.m3);
-  bucket.m6 = rnd(bucket.m6);
+  bucket.m1  = rnd(bucket.m1);
+  bucket.m3  = rnd(bucket.m3);
+  bucket.m6  = rnd(bucket.m6);
+  bucket.m12 = rnd(bucket.m12);
   for (const k of Object.keys(bucket.monthly)) {
     bucket.monthly[k] = rnd(bucket.monthly[k]);
   }
@@ -525,9 +528,10 @@ async function refreshAll(onProgress = () => {}, opts = {}) {
     // Sum already-rounded hours (they were rounded per entity above)
     for (const c of samsungGroup) {
       for (const type of ['cs', 'sa', 'dev', 'bug']) {
-        merged[type].m1 += c[type].m1;
-        merged[type].m3 += c[type].m3;
-        merged[type].m6 += c[type].m6;
+        merged[type].m1  += c[type].m1;
+        merged[type].m3  += c[type].m3;
+        merged[type].m6  += c[type].m6;
+        merged[type].m12 += c[type].m12 || 0;
         for (const [mk, hrs] of Object.entries(c[type].monthly || {})) {
           merged[type].monthly[mk] = (merged[type].monthly[mk] || 0) + hrs;
         }
