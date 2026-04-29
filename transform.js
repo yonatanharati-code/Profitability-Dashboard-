@@ -319,7 +319,8 @@ async function refreshAll(onProgress = () => {}, opts = {}) {
         hsId:       c.id,               // raw HubSpot numeric ID
         name:       p.name   || '',
         arr:        parseInt(p.arr)  || 0,
-        arrHistory: hist.arrHistory,    // [{ date, arr }] sorted asc — for period GRR
+        arrHistory:       hist.arrHistory,       // [{ date, arr }] sorted asc — for period GRR
+        becameActiveDate: hist.becameActiveDate || null, // first date status = 'Active Customer'
         rd:         p.renewal_date   || null,
         stage:      isChurn ? 'Churn' : mapStage(p.onboarding_stage),
         rank:       p.rank           || null,

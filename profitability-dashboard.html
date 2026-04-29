@@ -1884,8 +1884,13 @@ function rollup(){
   const grrRows = []; // { c, startArr, endArr (capped), status, churnLoss, contractionLoss, expansionGain }
 
   for (const c of _allData) {
+    // Exclude customers who joined AFTER the window start — they are not part
+    // of the opening cohort. becameActiveDate = first time status → 'Active Customer'.
+    // If no becameActiveDate recorded (data gap) we assume long-standing → include.
+    if (c.becameActiveDate && c.becameActiveDate > windowStartISO) continue;
+
     const startArr = arrAtDate(c, windowStartISO);
-    if (startArr === 0) continue; // not a customer at window start — skip
+    if (startArr === 0) continue; // no ARR at window start — skip
 
     const churnedInWindow = c.churnDate && c.churnDate >= windowStartISO && c.churnDate <= todayISO;
     const churnedBefore   = c.churnDate && c.churnDate < windowStartISO;

@@ -180,6 +180,14 @@ async function fetchPropertyHistories(apiKey, hsIds) {
         ? churnEntries[0].timestamp.substring(0, 10)
         : null;
 
+      // ── Became-active date: earliest timestamp where status = 'Active Customer'
+      const activeEntries = statusHist
+        .filter(h => /active\s*customer/i.test(h.value || ''))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const becameActiveDate = activeEntries.length
+        ? activeEntries[0].timestamp.substring(0, 10)
+        : null;
+
       // ── ARR history: all recorded values, sorted oldest → newest ─────────
       const arrHist = (obj.propertiesWithHistory?.arr || [])
         .map(h => ({
@@ -189,7 +197,7 @@ async function fetchPropertyHistories(apiKey, hsIds) {
         .filter(h => h.arr > 0)          // skip zero/null entries
         .sort((a, b) => a.date.localeCompare(b.date));
 
-      result[obj.id] = { churnDate, arrHistory: arrHist };
+      result[obj.id] = { churnDate, becameActiveDate, arrHistory: arrHist };
     }
   }
 
