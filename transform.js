@@ -286,10 +286,11 @@ function matchDealToCustomer(dealName, customerIds, idToName) {
  */
 async function refreshAll(onProgress = () => {}, opts = {}) {
   const { hubspotOnly = false } = opts;
-  const hsKey = process.env.HUBSPOT_API_KEY;
-  const cuKey = process.env.CLICKUP_API_KEY;
-  if (!hsKey) throw new Error('HUBSPOT_API_KEY is not set in .env');
-  if (!hubspotOnly && !cuKey) throw new Error('CLICKUP_API_KEY is not set in .env');
+  // Keys can be passed in directly (from server.js credentials helper) or fall back to env
+  const hsKey = opts.hsKey || process.env.HUBSPOT_API_KEY;
+  const cuKey = opts.cuKey || process.env.CLICKUP_API_KEY;
+  if (!hsKey) throw new Error('HubSpot API key is not set — add it in Settings (⚙)');
+  if (!hubspotOnly && !cuKey) throw new Error('ClickUp API key is not set — add it in Settings (⚙)');
 
   // ── Parallel fetch ──────────────────────────────────────────────────────────
   onProgress({ step: 'Fetching HubSpot data…' });

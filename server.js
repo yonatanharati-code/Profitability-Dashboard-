@@ -21,7 +21,7 @@ let HS_PORTAL_DOMAIN = process.env.HS_PORTAL_DOMAIN || '';
 
 async function fetchPortalInfo() {
   try {
-    const hsKey = process.env.HUBSPOT_API_KEY;
+    const hsKey = getHsKey();
     if (!hsKey) return;
     const https = require('https');
     await new Promise((resolve) => {
@@ -53,11 +53,30 @@ const DASHBOARD_HTML = process.env.DASHBOARD_HTML
     : path.join(__dirname, '..', 'profitability-dashboard.html');     // parent dir (local dev)
 
 // Cached data paths
-const CACHE_FILE      = path.join(__dirname, 'data', 'cache.json');
-const CSV_HOURS_FILE  = path.join(__dirname, 'data', 'csv-hours.json');
-const OVERRIDES_FILE  = path.join(__dirname, 'data', 'overrides.json');
-const NDR_FILE        = path.join(__dirname, 'data', 'ndr-snapshot.json');
-const PRICING_FILE    = path.join(__dirname, 'data', 'pricing-events.json');
+const CACHE_FILE       = path.join(__dirname, 'data', 'cache.json');
+const CSV_HOURS_FILE   = path.join(__dirname, 'data', 'csv-hours.json');
+const OVERRIDES_FILE   = path.join(__dirname, 'data', 'overrides.json');
+const NDR_FILE         = path.join(__dirname, 'data', 'ndr-snapshot.json');
+const PRICING_FILE     = path.join(__dirname, 'data', 'pricing-events.json');
+const CREDENTIALS_FILE = path.join(__dirname, 'data', 'credentials.json');
+
+// ─── Credentials helpers ──────────────────────────────────────────────────────
+// File-based credentials override env vars so they can be updated via the UI
+// without touching Railway environment variables.
+function readCredentials() {
+  try {
+    if (!fs.existsSync(CREDENTIALS_FILE)) return {};
+    return JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+  } catch { return {}; }
+}
+function getHsKey()  {
+  const creds = readCredentials();
+  return creds.hubspotApiKey || process.env.HUBSPOT_API_KEY || '';
+}
+function getCuKey()  {
+  const creds = readCredentials();
+  return creds.clickupApiKey || process.env.CLICKUP_API_KEY || '';
+}
 
 app.use(express.json({ limit: '50mb' }));      // CSV text can be large
 app.use(express.text({ limit: '50mb', type: 'text/csv' }));
@@ -803,7 +822,7 @@ app.get('/api/sync-status', (req, res) => res.json(syncState));
 app.get('/api/debug/members', async (req, res) => {
   const { fetchAllMembers } = require('./connectors/clickup');
   try {
-    const cuKey = process.env.CLICKUP_API_KEY;
+    const cuKey = getCuKey();
     if (!cuKey) return res.status(500).json({ error: 'CLICKUP_API_KEY not set' });
 
     const { cuGetRaw } = require('./connectors/clickup');
@@ -909,7 +928,7 @@ app.get('/api/debug/unmatched', (req, res) => {
  * Usage: /api/debug/clickup-names   (takes ~30s to complete)
  */
 app.get('/api/debug/clickup-names', async (req, res) => {
-  const cuKey = process.env.CLICKUP_API_KEY;
+  const cuKey = getCuKey();
   if (!cuKey) return res.status(500).json({ error: 'CLICKUP_API_KEY not set' });
 
   const { USER_TYPES } = require('./connectors/clickup');
@@ -990,7 +1009,7 @@ app.post('/api/refresh', (req, res) => {
   console.log(`\n⟳  Refresh triggered — mode: ${hubspotOnly ? 'HubSpot only' : 'HubSpot + ClickUp'}…`);
   (async () => {
     try {
-      const data = await refreshAll((update) => { Object.assign(syncState, update); }, { hubspotOnly });
+      const data = await refreshAll((update) => { Object.assign(syncState, update); }, { hubspotOnly, hsKey: getHsKey(), cuKey: getCuKey() });
       fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
       fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
       console.log(`✓  Refresh complete — ${data.meta.customerCount} customers, ${data.meta.dealCount} deals`);
@@ -1228,6 +1247,44 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// ─── Credentials endpoints ────────────────────────────────────────────────────
+/** GET /api/credentials — returns masked keys so UI can show status */
+app.get('/api/credentials', (req, res) => {
+  const creds = readCredentials();
+  const mask = (k) => k ? k.slice(0, 6) + '…' + k.slice(-4) : null;
+  res.json({
+    hubspotApiKey: mask(creds.hubspotApiKey || process.env.HUBSPOT_API_KEY),
+    clickupApiKey: mask(creds.clickupApiKey || process.env.CLICKUP_API_KEY),
+    source: {
+      hubspot: creds.hubspotApiKey ? 'file' : (process.env.HUBSPOT_API_KEY ? 'env' : 'missing'),
+      clickup: creds.clickupApiKey ? 'file' : (process.env.CLICKUP_API_KEY ? 'env' : 'missing'),
+    },
+  });
+});
+
+/** POST /api/credentials — save new keys to data/credentials.json */
+app.post('/api/credentials', (req, res) => {
+  try {
+    const { hubspotApiKey, clickupApiKey } = req.body || {};
+    if (!hubspotApiKey && !clickupApiKey) {
+      return res.status(400).json({ error: 'Provide at least one key to update' });
+    }
+    const existing = readCredentials();
+    const updated = {
+      ...existing,
+      ...(hubspotApiKey ? { hubspotApiKey: hubspotApiKey.trim() } : {}),
+      ...(clickupApiKey ? { clickupApiKey: clickupApiKey.trim() } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    fs.mkdirSync(path.dirname(CREDENTIALS_FILE), { recursive: true });
+    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(updated, null, 2));
+    console.log(`✓  Credentials updated via UI (${Object.keys(req.body).join(', ')})`);
+    res.json({ ok: true, message: 'Keys saved. Click "Sync" to apply.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n╔══════════════════════════════════════════════════════╗`);
@@ -1251,7 +1308,7 @@ app.listen(PORT, () => {
     console.log(`   CSV hours: ${csvH.meta?.parsed} rows · ${csvH.meta?.customers} customers · ${csvH.meta?.importedAt?.substring(0,10)}`);
   }
 
-  if (!process.env.HUBSPOT_API_KEY || !process.env.CLICKUP_API_KEY) {
-    console.warn('⚠  API keys missing in .env\n');
+  if (!getHsKey() || !getCuKey()) {
+    console.warn('⚠  API keys missing — set via dashboard Settings or .env\n');
   }
 });

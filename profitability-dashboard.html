@@ -466,6 +466,10 @@ tr.selected-row{background:var(--teal-50) !important;}
         <button class="seg-btn layer-tog active" data-layer="bug" style="color:#C08080;">● Bug</button>
       </div>
       <!-- CSV / Sync buttons injected here by server --><button class="import-btn" style="display:none">📤 Import ClickUp CSV</button>
+      <!-- Settings button -->
+      <button class="icon-btn" id="settingsBtn" onclick="window._openSettings()" title="API Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
       <!-- Tweaks toggle -->
       <button class="icon-btn" onclick="toggleTweaks()" title="Customize">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
@@ -7071,6 +7075,100 @@ else init();
   <div class="cust-drawer-overlay" onclick="closeCustomerDetail()"></div>
   <div class="cust-panel" id="custPanel"></div>
 </div>
+
+<!-- ── Settings Modal ─────────────────────────────────────────────────────── -->
+<div id="settingsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-xl);box-shadow:var(--sh-lg);padding:28px 32px;width:min(480px,92vw);position:relative;">
+    <button onclick="window._closeSettings()" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:18px;line-height:1;">✕</button>
+    <h3 style="margin:0 0 6px;font-size:15px;font-weight:700;color:var(--text-primary);">⚙ API Settings</h3>
+    <p style="margin:0 0 20px;font-size:12px;color:var(--text-secondary);">Keys are stored securely on the server (not in your browser). They override env variables and persist across deploys.</p>
+
+    <div id="settingsKeyStatus" style="margin-bottom:18px;padding:10px 14px;background:var(--bg);border-radius:var(--r-lg);font-size:12px;display:grid;gap:6px;"></div>
+
+    <label style="display:block;margin-bottom:14px;">
+      <span style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:5px;">HubSpot Private App Token</span>
+      <input id="settingsHsKey" type="password" placeholder="pat-eu1-…  (leave blank to keep existing)" autocomplete="off"
+        style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--r-lg);background:var(--bg);color:var(--text-primary);font-size:13px;font-family:monospace;">
+    </label>
+    <label style="display:block;margin-bottom:22px;">
+      <span style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:5px;">ClickUp API Key</span>
+      <input id="settingsCuKey" type="password" placeholder="pk_…  (leave blank to keep existing)" autocomplete="off"
+        style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--r-lg);background:var(--bg);color:var(--text-primary);font-size:13px;font-family:monospace;">
+    </label>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center;">
+      <span id="settingsSaveMsg" style="font-size:12px;color:var(--ok);display:none;"></span>
+      <button onclick="window._closeSettings()" style="padding:8px 18px;border:1px solid var(--border-strong);border-radius:var(--r-lg);background:none;color:var(--text-secondary);cursor:pointer;font-size:13px;">Cancel</button>
+      <button onclick="window._saveSettings()" id="settingsSaveBtn"
+        style="padding:8px 20px;border:none;border-radius:var(--r-lg);background:var(--brand);color:#fff;cursor:pointer;font-size:13px;font-weight:600;">Save Keys</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  async function loadKeyStatus(){
+    try{
+      const r = await fetch('/api/credentials');
+      if(!r.ok) return;
+      const d = await r.json();
+      const el = document.getElementById('settingsKeyStatus');
+      if(!el) return;
+      const row = (label, masked, src) => {
+        const colour = src==='missing' ? 'var(--bad)' : 'var(--ok)';
+        const srcTxt = src==='file' ? '(saved in dashboard)' : src==='env' ? '(from env variable)' : '⚠ not set';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:var(--text-primary);font-weight:600;">${label}</span>
+          <span style="font-family:monospace;color:${colour};">${masked || '—'} <span style="font-size:10px;color:var(--text-secondary);">${srcTxt}</span></span>
+        </div>`;
+      };
+      el.innerHTML = row('HubSpot', d.hubspotApiKey, d.source.hubspot)
+                   + row('ClickUp', d.clickupApiKey,  d.source.clickup);
+    } catch(e){}
+  }
+
+  window._openSettings = function(){
+    document.getElementById('settingsOverlay').style.display='flex';
+    document.getElementById('settingsHsKey').value='';
+    document.getElementById('settingsCuKey').value='';
+    document.getElementById('settingsSaveMsg').style.display='none';
+    loadKeyStatus();
+  };
+  window._closeSettings = function(){
+    document.getElementById('settingsOverlay').style.display='none';
+  };
+  window._saveSettings = async function(){
+    const btn = document.getElementById('settingsSaveBtn');
+    const msg = document.getElementById('settingsSaveMsg');
+    const hs  = document.getElementById('settingsHsKey').value.trim();
+    const cu  = document.getElementById('settingsCuKey').value.trim();
+    if(!hs && !cu){ msg.style.display='inline'; msg.style.color='var(--bad)'; msg.textContent='Enter at least one key.'; return; }
+    btn.disabled=true; btn.textContent='Saving…';
+    try{
+      const body = {};
+      if(hs) body.hubspotApiKey = hs;
+      if(cu) body.clickupApiKey = cu;
+      const r = await fetch('/api/credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const d = await r.json();
+      if(d.ok){
+        msg.style.display='inline'; msg.style.color='var(--ok)'; msg.textContent='✓ Saved! Click Sync to apply.';
+        document.getElementById('settingsHsKey').value='';
+        document.getElementById('settingsCuKey').value='';
+        loadKeyStatus();
+      } else {
+        msg.style.display='inline'; msg.style.color='var(--bad)'; msg.textContent=d.error||'Save failed';
+      }
+    } catch(e){
+      msg.style.display='inline'; msg.style.color='var(--bad)'; msg.textContent='Network error';
+    }
+    btn.disabled=false; btn.textContent='Save Keys';
+  };
+  // Close on overlay click
+  document.getElementById('settingsOverlay').addEventListener('click', function(e){
+    if(e.target===this) window._closeSettings();
+  });
+})();
+</script>
 
 <!-- ═══════════════════ SECTION COLLAPSE + DRAG-AND-DROP ═══════════════════ -->
 <script>
