@@ -97,6 +97,8 @@ async function fetchAllCompanies(apiKey) {
 const DEAL_PROPS = [
   'dealname', 'amount', 'deal_currency_code', 'closedate',
   'dealstage', 'hs_is_closed_won', 'amount_in_home_currency',
+  'how_many_dev_hours', // custom: explicit dev hours purchased
+  'service_period',     // custom: date from which to compare hours vs budget
 ];
 
 async function fetchDeals(apiKey) {

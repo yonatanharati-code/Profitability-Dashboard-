@@ -598,6 +598,19 @@ async function refreshAll(onProgress = () => {}, opts = {}) {
     if (currency !== 'USD') {
       record.orig = `${currency} ${Math.round(amount).toLocaleString()}`;
     }
+
+    // ── New HubSpot fields ───────────────────────────────────────────────────
+    // hrs: explicit dev hours purchased (overrides name-parsing)
+    const rawHrs = parseFloat(p.how_many_dev_hours);
+    if (!isNaN(rawHrs) && rawHrs > 0) record.hrs = rawHrs;
+
+    // sp: service period start → stored as 'YYYY-MM' for monthly bucket matching
+    // HubSpot date properties come as 'YYYY-MM-DDTHH:MM:SSZ' or 'YYYY-MM-DD'
+    if (p.service_period) {
+      const sp = p.service_period.substring(0, 7); // 'YYYY-MM'
+      if (/^\d{4}-\d{2}$/.test(sp)) record.sp = sp;
+    }
+
     deals[customerId].push(record);
   }
 

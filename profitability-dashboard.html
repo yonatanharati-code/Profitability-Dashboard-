@@ -1516,12 +1516,18 @@ DATA.forEach(c => {
   c.upsellAmt = Math.round(c.hsDeals.filter(d=>d.t==='upsell').reduce((s,d)=>s+d.a,0));
   if (c.hsDeals.length > 0) c.devPaid = c.devDealsAmt + c.upsellAmt;
 
-  // Auto-parse dev budget from deal names (sum all dev deals that have explicit hours)
-  const parsedHours = c.hsDeals
-    .filter(d => d.t === 'dev')
-    .map(d => parseHoursFromDeal(d.n || d.name || ''))
-    .filter(h => h !== null && h > 0);
+  // Dev budget: prefer explicit HubSpot "How many Dev hours?" field (d.hrs),
+  // fall back to parsing hours from the deal name string.
+  const devDeals = c.hsDeals.filter(d => d.t === 'dev');
+  const parsedHours = devDeals.map(d =>
+    (d.hrs != null && d.hrs > 0) ? d.hrs : parseHoursFromDeal(d.n || d.name || '')
+  ).filter(h => h !== null && h > 0);
   c.devBudgetFromDeals = parsedHours.length > 0 ? parsedHours.reduce((s,h)=>s+h, 0) : null;
+
+  // Service period: earliest d.sp across dev deals (the "start comparing hours" date)
+  const spDates = devDeals.map(d => d.sp).filter(Boolean).sort();
+  c.servicePeriodMk = spDates[0] || null; // 'YYYY-MM' or null
+
   // devBudget = auto-parsed (will be overridden by localBudgets at render time)
   if (c.devBudget == null && c.devBudgetFromDeals != null) c.devBudget = c.devBudgetFromDeals;
 });
@@ -1719,8 +1725,16 @@ function autoBudgetFrom(c, fromMk) {
   let deals = (c.hsDeals || []).filter(d => d.t === 'dev' && !excluded.has(d.id));
   if (!deals.length) return null;
   if (fromMk) deals = deals.filter(d => d.d && d.d >= fromMk + '-01');
-  const hours = deals.map(d => parseHoursFromDeal(d.n || '')).filter(h => h !== null && h > 0);
+  // Prefer explicit HubSpot hours field; fall back to name-parsing
+  const hours = deals.map(d =>
+    (d.hrs != null && d.hrs > 0) ? d.hrs : parseHoursFromDeal(d.n || '')
+  ).filter(h => h !== null && h > 0);
   return hours.length > 0 ? hours.reduce((s, h) => s + h, 0) : null;
+}
+// Return the effective "start comparing hours" date for a customer:
+// service period from HubSpot → fallback to manual override → null
+function effectiveServicePeriod(c) {
+  return c.servicePeriodMk || null;
 }
 function gBug(c){ return g(c,'bug'); }
 function totalEffort(c){ return g(c,'cs')+g(c,'sa')+g(c,'dev')+gBug(c); }
@@ -3601,7 +3615,8 @@ function renderCustomerDetail(c){
     const inner = `
       <div style="min-width:0;flex:1;">
         <div class="deal-name">${escapeHtml(d.n||d.name||'Deal')}${url?` <svg style="width:11px;height:11px;opacity:.5;vertical-align:middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`:''}</div>
-        <div class="deal-meta">${d.s||'—'} · ${d.d||'—'}${d.orig?` · <em>${d.orig}</em>`:''}</div>
+        <div class="deal-meta">${d.s||'—'} · ${d.d||'—'}${d.orig?` · <em>${d.orig}</em>`:''}${d.hrs!=null?` · <strong>${d.hrs}h</strong>`:''}${d.sp?` · from ${d.sp}`:''}
+        </div>
       </div>
       <div class="deal-amount">${d.a?fmt$(d.a):'—'}</div>`;
     return url
@@ -4284,8 +4299,8 @@ function renderBudget(){
   }
 
   const rows = AD().map(c => {
-    // Per-client "count hours from" takes precedence over the global picker
-    const clientFromMk = state.localBudgetFrom[String(c.id)] || fromMk;
+    // Priority: manual per-client override → HubSpot Service Period → global picker
+    const clientFromMk = state.localBudgetFrom[String(c.id)] || effectiveServicePeriod(c) || fromMk;
     const used = gFrom(c, 'dev', clientFromMk);
     const isContract = hasContractDev(c);
     const manualBudget = state.localBudgets[String(c.id)] ?? null;
