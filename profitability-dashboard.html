@@ -1201,6 +1201,11 @@ tr.selected-row{background:var(--teal-50) !important;}
           </select>
           <button onclick="['pricingSearch','pricingFromMk','pricingToMk','pricingSinceMk','pricingOwner'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('pricingTopN').value='20';renderPricing();"
             style="font-size:10px;padding:3px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;">✕ Reset</button>
+          <!-- Daily avg toggle -->
+          <div class="seg" style="margin-left:8px;">
+            <button id="pricingModeTotal" class="seg-btn active" onclick="setPricingDisplay('total')" style="font-size:10px;padding:3px 9px;">Monthly</button>
+            <button id="pricingModeDaily" class="seg-btn" onclick="setPricingDisplay('daily')" style="font-size:10px;padding:3px 9px;">Daily avg</button>
+          </div>
           <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);" id="pricingCount"></span>
         </div>
 
@@ -1529,7 +1534,8 @@ const state = {
   localBudgetFrom: {},     // {customerId: 'YYYY-MM'} — per-client "count hours from" date
   localChurnDates: {},     // {customerId: 'YYYY-MM-DD'} — custom effective churn date override
   localExcludedDeals: {},  // {customerId: [dealId, ...]} — deals excluded from budget
-  pricingRegion: 'combined', // 'EU' | 'US' | 'combined'
+  pricingRegion: 'combined',  // 'EU' | 'US' | 'combined'
+  pricingDisplay: 'total',    // 'total' | 'daily'
   tableFilters: [],      // [{field, op, value}] active filters for customer table
   budgetFilters: [],     // [{field, op, value}] active filters for budget table
   budgetSortKey: 'util',
@@ -3964,6 +3970,35 @@ function renderChartsForPane(pane){
 
 // ── Pricing Usage tab ──────────────────────────────────
 function _pricingKey(name) { return (name||'').toLowerCase().trim(); }
+
+// ── Daily-avg helpers ─────────────────────────────────
+function _daysInMonth(mk) {
+  // mk = 'YYYY-MM' → actual days in that calendar month
+  const [y, m] = mk.split('-').map(Number);
+  return new Date(y, m, 0).getDate(); // day 0 of next month = last day of mk
+}
+function _pdVal(rawVal, mk) {
+  // Return raw total OR daily average depending on display mode
+  if (state.pricingDisplay !== 'daily') return rawVal;
+  const days = _daysInMonth(mk);
+  return Math.round(rawVal / days * 10) / 10;
+}
+function _fmtDisplay(v) {
+  // Format a value for the current display mode
+  if (state.pricingDisplay === 'daily') {
+    if (v == null || v === 0) return '0';
+    if (v >= 1000) return (v / 1000).toFixed(1) + 'K';
+    return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  }
+  return _fmtEvents(v);
+}
+window.setPricingDisplay = function(mode) {
+  state.pricingDisplay = mode;
+  document.getElementById('pricingModeTotal')?.classList.toggle('active', mode === 'total');
+  document.getElementById('pricingModeDaily')?.classList.toggle('active', mode === 'daily');
+  renderPricing();
+  renderPricingTrend();
+};
 function _fmtEvents(n) {
   if (!n && n !== 0) return '—';
   if (n >= 1e9) return (n/1e9).toFixed(2)+'B';
@@ -4085,17 +4120,19 @@ function renderPricing() {
   // Build rows
   const search = (document.getElementById('pricingSearch')?.value||'').toLowerCase();
   let rows = [...allAccounts].map(acct => {
-    const thisMonth = lastMk ? (pd[lastMk]?.[acct]||0) : 0;
-    const limit     = pricingLimits[acct] ?? null;
-    const util      = limit ? thisMonth/limit*100 : null;
-    const client    = _pricingMatchClient(acct);
-    const history   = visMonths.map(mk => pd[mk]?.[acct]||0);
-    const total     = history.reduce((s,v)=>s+v,0);
-    // Growth since sinceMk (pct vs last visible month)
-    const sinceVal  = sinceMk ? (pd[sinceMk]?.[acct]||0) : null;
-    const sinceGrowth = showSinceCol && sinceVal != null && sinceVal > 0
-      ? (thisMonth - sinceVal) / sinceVal * 100 : null;
-    return { acct, thisMonth, limit, util, client, history, total, sinceVal, sinceGrowth };
+    const thisMonthRaw = lastMk ? (pd[lastMk]?.[acct]||0) : 0;
+    const thisMonth    = lastMk ? _pdVal(thisMonthRaw, lastMk) : 0; // display value
+    const limit        = pricingLimits[acct] ?? null;
+    const util         = limit ? thisMonthRaw/limit*100 : null;     // util always vs monthly total
+    const client       = _pricingMatchClient(acct);
+    const historyRaw   = visMonths.map(mk => pd[mk]?.[acct]||0);
+    const history      = visMonths.map((mk,i) => _pdVal(historyRaw[i], mk)); // display values
+    const total        = historyRaw.reduce((s,v)=>s+v,0);
+    // Growth since sinceMk — always raw totals for pct comparison
+    const sinceVal     = sinceMk ? (pd[sinceMk]?.[acct]||0) : null;
+    const sinceGrowth  = showSinceCol && sinceVal != null && sinceVal > 0
+      ? (thisMonthRaw - sinceVal) / sinceVal * 100 : null;
+    return { acct, thisMonth, thisMonthRaw, limit, util, client, history, historyRaw, total, sinceVal, sinceGrowth };
   }).filter(r => r.total > 0 || r.limit);
 
   if (search) rows = rows.filter(r => r.acct.includes(search) || (r.client?.name||'').toLowerCase().includes(search));
@@ -4130,12 +4167,13 @@ function renderPricing() {
   // Show/hide empty state
   document.getElementById('pricingEmpty').style.display = allMonths.length === 0 ? '' : 'none';
 
-  // Stats (use latest visible month)
-  const totalLastMonth  = rows.reduce((s,r)=>s+r.thisMonth, 0);
-  const prevMk2         = visMonths.length >= 2 ? visMonths[visMonths.length - 2] : null;
-  const totalPrevMonth  = prevMk2 ? rows.reduce((s,r)=>s+(pd[prevMk2]?.[r.acct]||0), 0) : null;
-  const overallMoM      = totalPrevMonth != null && totalPrevMonth > 0
-    ? (totalLastMonth - totalPrevMonth) / totalPrevMonth * 100 : null;
+  // Stats (use latest visible month — MoM always from raw totals)
+  const totalLastMonthRaw = rows.reduce((s,r)=>s+r.thisMonthRaw, 0);
+  const totalLastMonth    = lastMk ? _pdVal(totalLastMonthRaw, lastMk) : 0;
+  const prevMk2           = visMonths.length >= 2 ? visMonths[visMonths.length - 2] : null;
+  const totalPrevMonthRaw = prevMk2 ? rows.reduce((s,r)=>s+(pd[prevMk2]?.[r.acct]||0), 0) : null;
+  const overallMoM        = totalPrevMonthRaw != null && totalPrevMonthRaw > 0
+    ? (totalLastMonthRaw - totalPrevMonthRaw) / totalPrevMonthRaw * 100 : null;
   const momColor        = overallMoM == null ? '' : overallMoM > 5 ? 'var(--ok)' : overallMoM < -5 ? 'var(--bad)' : 'var(--text-secondary)';
   const momStr          = overallMoM != null ? `${overallMoM>0?'+':''}${overallMoM.toFixed(0)}% MoM` : '';
   const overLimit       = rows.filter(r=>r.util!=null&&r.util>=100).length;
@@ -4152,10 +4190,13 @@ function renderPricing() {
     </div>`;
   }
 
+  const isDaily = state.pricingDisplay === 'daily';
   document.getElementById('pricingStats').innerHTML =
-    _kpiCard('Total events', _fmtEvents(totalLastMonth),
+    _kpiCard(isDaily ? 'Daily avg (last mo.)' : 'Total events', _fmtDisplay(totalLastMonth),
       lastMk ? `${_fmtMk(lastMk)}${momStr ? ` · <span style="color:${momColor};">${momStr}</span>` : ''}` : '—', null, null) +
-    _kpiCard('Period total', _fmtEvents(periodTotal),
+    _kpiCard(isDaily ? 'Period daily avg' : 'Period total', _fmtDisplay(isDaily
+      ? (visMonths.length ? Math.round(rows.reduce((s,r)=>s+r.total,0) / visMonths.reduce((s,mk)=>s+_daysInMonth(mk),0) * 10)/10 : 0)
+      : periodTotal),
       visMonths.length ? `${_fmtMk(visMonths[0])} → ${_fmtMk(lastMk)}` : '—', null, null) +
     _kpiCard('Active clients', activeLastMonth,
       `${withLimit} with limit`, null, null) +
@@ -4179,7 +4220,7 @@ function renderPricing() {
     if (_pricingChartInst) { _pricingChartInst.destroy(); _pricingChartInst = null; }
     const datasets = chartRows.map((r, i) => ({
       label: r.client?.name || r.acct,
-      data: r.history,
+      data: r.history,   // already _pdVal-transformed
       backgroundColor: PALETTE[i % PALETTE.length] + (_pricingChartType==='bar' ? 'cc' : '20'),
       borderColor: PALETTE[i % PALETTE.length],
       borderWidth: _pricingChartType==='line' ? 2 : 0,
@@ -4195,11 +4236,12 @@ function renderPricing() {
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: getComputedStyle(document.documentElement).getPropertyValue('--text') } },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${_fmtEvents(ctx.raw)}` } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${_fmtDisplay(ctx.raw)}${isDaily?' /day':''}` } },
         },
         scales: {
           x: { stacked: _pricingChartType==='bar', ticks: { font:{size:10} } },
-          y: { stacked: _pricingChartType==='bar', ticks: { callback: v => _fmtEvents(v), font:{size:10} }, beginAtZero: true },
+          y: { stacked: _pricingChartType==='bar', ticks: { callback: v => _fmtDisplay(v), font:{size:10} }, beginAtZero: true,
+               title: { display: isDaily, text: 'events / day', color: 'var(--text-secondary)', font:{size:10} } },
         },
       },
     });
@@ -4234,13 +4276,13 @@ function renderPricing() {
   document.getElementById('pricingTheadRow').innerHTML =
     thSort('__name__','Client','left') +
     `<th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border);font-weight:700;">Owner</th>` +
-    visMonths.map(mk => thSort(mk, _fmtMk(mk))).join('') +
+    visMonths.map(mk => thSort(mk, _fmtMk(mk) + (isDaily ? '<span style="font-size:8px;color:var(--text-secondary);font-weight:400;"> /day</span>' : ''))).join('') +
     thSort('__limit__','Contract limit') +
     thSort('__util__','Util %') +
     sinceHeader;
 
   // ── TOTAL row values (sum per month across displayed rows) ──
-  const totalPerMonth = visMonths.map(mk => rows.reduce((s,r) => s+(pd[mk]?.[r.acct]||0), 0));
+  const totalPerMonth = visMonths.map(mk => _pdVal(rows.reduce((s,r) => s+(pd[mk]?.[r.acct]||0), 0), mk));
   const totalSinceVal = showSinceCol ? rows.reduce((s,r) => s+(r.sinceVal||0), 0) : null;
   const totalLastVal  = totalPerMonth[totalPerMonth.length-1] || 0;
   const totalSinceGrowth = showSinceCol && totalSinceVal != null && totalSinceVal > 0
@@ -4250,7 +4292,7 @@ function renderPricing() {
     const v    = totalPerMonth[i];
     const prev = i > 0 ? totalPerMonth[i-1] : null;
     const badge = momBadge(v, prev);
-    return `<td style="text-align:right;padding:5px 10px;border-top:2px solid var(--border);font-weight:700;background:var(--surface-subtle);white-space:nowrap;"><div>${_fmtEvents(v)}</div>${badge}</td>`;
+    return `<td style="text-align:right;padding:5px 10px;border-top:2px solid var(--border);font-weight:700;background:var(--surface-subtle);white-space:nowrap;"><div>${_fmtDisplay(v)}</div>${badge}</td>`;
   }).join('');
 
   const totalLimitCell = `<td style="padding:6px 10px;border-top:2px solid var(--border);background:var(--surface-subtle);"></td>`;
@@ -4271,11 +4313,12 @@ function renderPricing() {
       : '<span class="muted">—</span>';
 
     const monthCells = visMonths.map((mk, i) => {
-      const v    = pd[mk]?.[r.acct]||0;
-      const prevV = i > 0 ? (pd[visMonths[i-1]]?.[r.acct]||0) : null;
-      const badge = momBadge(v, prevV);
+      const v     = r.history[i];        // already _pdVal-transformed
+      const rawV  = r.historyRaw[i];     // raw for MoM% (ratio same either way, but use raw)
+      const prevRaw = i > 0 ? r.historyRaw[i-1] : null;
+      const badge = momBadge(rawV, prevRaw);
       const isLast = mk === lastMk;
-      return `<td style="text-align:right;padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap;${isLast?'font-weight:600;':''}"><div>${_fmtEvents(v)}</div>${badge}</td>`;
+      return `<td style="text-align:right;padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap;${isLast?'font-weight:600;':''}"><div>${_fmtDisplay(v)}</div>${badge}</td>`;
     }).join('');
 
     const limitCell = `<td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);">
@@ -4350,15 +4393,17 @@ function renderPricingTrend() {
   const showCs  = document.getElementById('trendCs')?.checked;
 
   // Pricing events per month (selected client or aggregate)
-  const eventsData = visMonths.map(mk => {
+  const eventsRaw = visMonths.map(mk => {
     if (selectedAcct) return pd[mk]?.[selectedAcct] || 0;
     return Object.values(pd[mk]||{}).reduce((s,v)=>s+v, 0);
   });
+  // Apply daily-avg transform for display
+  const eventsData = visMonths.map((mk, i) => _pdVal(eventsRaw[i], mk));
 
-  // MoM % per month (null for first month)
+  // MoM % — always from raw totals (ratio same regardless of mode)
   const momData = visMonths.map((mk, i) => {
     if (i === 0) return null;
-    const curr = eventsData[i], prev = eventsData[i-1];
+    const curr = eventsRaw[i], prev = eventsRaw[i-1];
     return prev > 0 ? parseFloat(((curr-prev)/prev*100).toFixed(1)) : null;
   });
 
@@ -4452,7 +4497,7 @@ function renderPricingTrend() {
               if (v == null) return null;
               if (lbl === 'MoM %')      return ` MoM: ${v>=0?'+':''}${v}%`;
               if (lbl.includes('hours')) return ` ${lbl}: ${v.toFixed(1)}h`;
-              return ` ${lbl}: ${_fmtEvents(v)}`;
+              return ` ${lbl}: ${_fmtDisplay(v)}${state.pricingDisplay==='daily'?' /day':''}`;
             }
           }
         }
@@ -4461,9 +4506,9 @@ function renderPricingTrend() {
         x: { ticks: { font: { size: 10 }, color: textColor } },
         yEvents: {
           type: 'linear', position: 'left',
-          ticks: { callback: v => _fmtEvents(v), font: { size: 10 }, color: '#6366f1' },
+          ticks: { callback: v => _fmtDisplay(v), font: { size: 10 }, color: '#6366f1' },
           beginAtZero: true,
-          title: { display: true, text: 'Events', font: { size: 9 }, color: '#6366f1' },
+          title: { display: true, text: state.pricingDisplay==='daily' ? 'Events / day' : 'Events', font: { size: 9 }, color: '#6366f1' },
         },
         yRight: {
           type: 'linear', position: 'right',
