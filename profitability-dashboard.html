@@ -1548,7 +1548,11 @@ function applyEdits(){
   const edits = loadEdits();
   for (const [id, fields] of Object.entries(edits)){
     const c = DATA.find(x => x.id === id || String(x.id) === String(id));
-    if (c) Object.assign(c, fields);
+    if (c) {
+      // Stash original HubSpot ARR before any override is applied
+      if (fields.arr != null && c._hsArr == null) c._hsArr = c.arr;
+      Object.assign(c, fields);
+    }
   }
 }
 
@@ -3761,6 +3765,22 @@ function renderCustomerDetail(c){
     </div>
 
     <div class="cust-section">
+      <div class="cust-section-title">ARR Override</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">
+        HubSpot value: <strong>${fmt$(c._hsArr ?? c.arr)}</strong>${(loadEdits()[String(c.id)]?.arr != null) ? ' <span style="color:var(--warn);font-size:10px;">· override active</span>' : ''}
+      </div>
+      <div class="edit-field">
+        <input id="editArrInput" type="number" min="0" step="1" class="edit-input"
+          value="${(loadEdits()[String(c.id)]?.arr ?? c.arr) || ''}"
+          placeholder="e.g. 120000" style="font-variant-numeric:tabular-nums;">
+        <button class="save-btn" id="editArrSave" onclick="saveArrEdit('${c.id}')">Save</button>
+        ${loadEdits()[String(c.id)]?.arr != null
+          ? `<button onclick="clearArrEdit('${c.id}')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:10px;cursor:pointer;" title="Remove override">✕</button>`
+          : ''}
+      </div>
+    </div>
+
+    <div class="cust-section">
       <div class="cust-section-title">Contract Settings</div>
       ${(()=>{
         const isContract = hasContractDev(c);
@@ -3817,9 +3837,11 @@ function renderCustomerDetail(c){
     </div>
   `;
 
-  // Focus events for edit input
+  // Focus events for edit inputs
   const inp = document.getElementById('editOwnerInput');
   inp.addEventListener('keydown', e => { if (e.key==='Enter') saveOwnerEdit(c.id); });
+  const arrInp = document.getElementById('editArrInput');
+  if (arrInp) arrInp.addEventListener('keydown', e => { if (e.key==='Enter') saveArrEdit(c.id); });
 
   document.getElementById('custDrawer').classList.add('open');
 }
@@ -3843,6 +3865,43 @@ window.saveOwnerEdit = function(id){
   const c = DATA.find(x=>String(x.id)===String(id));
   const sub = document.querySelector('.cust-panel-head .caption.muted');
   if (sub && c) sub.textContent = c.owner||'No owner';
+};
+
+window.saveArrEdit = function(id){
+  const inp = document.getElementById('editArrInput');
+  if (!inp) return;
+  const raw = inp.value.trim();
+  const val = raw === '' ? null : Math.round(parseFloat(raw));
+  if (val !== null && isNaN(val)) { alert('Please enter a valid number.'); return; }
+  const c = DATA.find(x => String(x.id) === String(id));
+  if (!c) return;
+  // Store the original HubSpot ARR before first override
+  if (c._hsArr == null) c._hsArr = c.arr;
+  if (val === null) {
+    // Restore HubSpot value
+    const edits = loadEdits();
+    if (edits[String(id)]) { delete edits[String(id)].arr; if (!Object.keys(edits[String(id)]).length) delete edits[String(id)]; }
+    localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
+    c.arr = c._hsArr;
+  } else {
+    saveEdit(id, 'arr', val);
+  }
+  const btn = document.getElementById('editArrSave');
+  if (btn){ btn.textContent='Saved ✓'; btn.classList.add('saved'); setTimeout(()=>{ btn.textContent='Save'; btn.classList.remove('saved'); },1500); }
+  renderKPIs(); renderTable(); renderBudget(); renderGRR();
+  // Refresh the drawer to reflect new value
+  if (c) renderCustomerDetail(c);
+};
+
+window.clearArrEdit = function(id){
+  const c = DATA.find(x => String(x.id) === String(id));
+  if (!c) return;
+  const edits = loadEdits();
+  if (edits[String(id)]) { delete edits[String(id)].arr; if (!Object.keys(edits[String(id)]).length) delete edits[String(id)]; }
+  localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
+  if (c._hsArr != null) c.arr = c._hsArr;
+  renderKPIs(); renderTable(); renderBudget(); renderGRR();
+  if (c) renderCustomerDetail(c);
 };
 
 function renderChartsForPane(pane){
