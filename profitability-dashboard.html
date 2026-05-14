@@ -40,6 +40,8 @@
   --ok-bg:rgba(21,128,61,.15); --warn-bg:rgba(180,83,9,.15);
   --bad-bg:rgba(180,35,24,.15); --info-bg:rgba(23,92,211,.15);
 }
+/* Dev layer toggle is hardcoded #08173C (near-black) — lighten in dark mode */
+[data-theme="dark"] .layer-tog[data-layer="dev"]{ color:#7BA7E0 !important; }
 [data-density="compact"]{ --pad:16px; --gap:12px; --card-pad:16px; }
 
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -52,7 +54,7 @@ body{min-height:100vh;transition:background .2s,color .2s;}
 
 /* ── Topbar ── */
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40;box-shadow:var(--sh-xs);}
-#dataSyncPanel{position:fixed;z-index:9000;width:440px;max-width:94vw;background:var(--surface);border:1.5px solid var(--border-strong,var(--border));border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.15);padding:16px;}
+#dataSyncPanel{position:fixed;z-index:9000;width:440px;max-width:94vw;background:var(--bg);border:1.5px solid var(--border-strong,var(--border));border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.15);padding:16px;}
 #dataSyncPanel .panel-btn{display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit;text-decoration:none;width:100%;text-align:left;transition:background .12s;box-sizing:border-box;}
 #dataSyncPanel .panel-btn:hover{background:var(--surface-hover,var(--surface-subtle));}
 #dataSyncPanel .panel-btn .pbl{font-size:10px;color:var(--text-secondary);display:block;margin-top:1px;font-weight:400;}
