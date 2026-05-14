@@ -742,24 +742,17 @@ app.get('/', (req, res) => {
     if (cache) {
       html = injectData(html, cache, csvHrs);
     } else {
-      // No cache yet — inject buttons so user can sync / import CSV
+      // No cache yet — inject panel buttons (same markup as the with-cache path)
       const IMPORT_BTN = '>📤 Import ClickUp CSV</button>';
       if (html.includes(IMPORT_BTN)) {
         html = html.replace(IMPORT_BTN, IMPORT_BTN +
-          `\n  <button class="import-btn" id="apiSyncBtn" onclick="_syncFromApis()"
-    style="background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.3);color:#818cf8;margin-left:6px;">
-    ⟳ Sync HubSpot
-  </button>` +
-          `\n  <input type="file" id="csvHoursInput" accept=".csv" style="display:none" onchange="_importCsvHours(this)">` +
-          `\n  <label for="csvHoursInput" id="csvHoursBtn" class="import-btn"
-    style="background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.3);color:#34d399;margin-left:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
-    📂 Import Hours CSV
-  </label>` +
-          `\n  <button class="import-btn" id="ndrSyncBtn" onclick="_syncNdr()"
-    style="background:rgba(250,204,21,.10);border-color:rgba(250,204,21,.3);color:#facc15;margin-left:6px;">
-    ↻ Sync NDR
-  </button>` +
-          `\n  <span id="ndrSyncedAtBadge" style="margin-left:6px;"></span>`
+          `\n<div class="panel-row">` +
+          `\n  <button class="panel-btn" id="apiSyncBtn" onclick="_syncFromApis()">⟳ Sync HubSpot</button>` +
+          `\n  <button class="panel-btn" id="ndrSyncBtn" onclick="_syncNdr()">↻ Sync NDR<span id="ndrSyncedAtBadge"></span></button>` +
+          `\n</div>` +
+          `\n<div class="panel-sep"></div>` +
+          `\n<input type="file" id="csvHoursInput" accept=".csv" style="display:none" onchange="_importCsvHours(this)">` +
+          `\n<label for="csvHoursInput" class="panel-btn">📂 Hours CSV</label>`
         );
       }
       // Inject the _syncFromApis function so the button actually works
