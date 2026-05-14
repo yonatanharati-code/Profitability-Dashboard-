@@ -1486,6 +1486,7 @@ const state = {
   selectedRows: [],   // customer IDs currently checked for bulk ops
   localBudgets: {},        // {customerId: hours} — manual budget override (takes precedence over deals)
   localBudgetFrom: {},     // {customerId: 'YYYY-MM'} — per-client "count hours from" date
+  localChurnDates: {},     // {customerId: 'YYYY-MM-DD'} — custom effective churn date override
   localExcludedDeals: {},  // {customerId: [dealId, ...]} — deals excluded from budget
   tableFilters: [],      // [{field, op, value}] active filters for customer table
   budgetFilters: [],     // [{field, op, value}] active filters for budget table
@@ -1907,17 +1908,20 @@ function rollup(){
     if (startArr === 0) continue; // no ARR at window start — skip
 
     const isChurnStatus   = c.stage === 'Churn';
-    const churnedInWindow = c.churnDate && c.churnDate >= windowStartISO && c.churnDate <= todayISO;
-    const churnedBefore   = c.churnDate && c.churnDate < windowStartISO;
+    // Custom date override takes priority over HubSpot churnDate
+    const effectiveChurnDate = state.localChurnDates[String(c.id)] || c.churnDate || null;
+    const churnedInWindow = effectiveChurnDate && effectiveChurnDate >= windowStartISO && effectiveChurnDate <= todayISO;
+    const churnedBefore   = effectiveChurnDate && effectiveChurnDate < windowStartISO;
 
     if (churnedBefore) continue; // left before this period — not in cohort
 
-    if (churnedInWindow || (isChurnStatus && !c.churnDate)) {
+    if (churnedInWindow || (isChurnStatus && !effectiveChurnDate)) {
       // Known churn in window, OR churned-status with no recorded date (unknown timing).
-      // Treat as full loss — unknownDate flag lets the UI warn about missing dates.
+      const isCustomDate = !!state.localChurnDates[String(c.id)];
+      const unknownDate  = !churnedInWindow;  // true = no date at all or outside window
       grrRows.push({ c, startArr, endArr: 0, status: 'churn',
         churnLoss: startArr, contractionLoss: 0, expansionGain: 0,
-        unknownDate: !churnedInWindow });
+        effectiveChurnDate, unknownDate, customDate: isCustomDate });
     } else if (isChurnStatus) {
       // churnDate is set but outside window (churnedBefore already handled above)
       // This branch means churnDate > todayISO — shouldn't happen, skip
@@ -2103,7 +2107,14 @@ function renderGRR(){
       let changeNote = '';
       if (status === 'contraction') changeNote = `<span style="color:var(--warn);"> ▼ ${fmt$(contractionLoss)}</span>`;
       if (status === 'expansion')   changeNote = `<span style="color:var(--ok);">  ▲ ${fmt$(expansionGain)} (capped)</span>`;
-      if (status === 'churn')       changeNote = `<span style="color:var(--bad);"> churned ${c.churnDate||'?'}</span>`;
+      if (status === 'churn') {
+        const row = sortedRows.find(x=>x.c===c);
+        const dateLabel = row?.effectiveChurnDate || null;
+        const isCustom  = row?.customDate;
+        const isUnknown = row?.unknownDate;
+        changeNote = `<span style="color:var(--bad);">churned ${dateLabel ? dateLabel + (isCustom?' <em style="opacity:.6">(custom)</em>':'') : ''}</span>`
+          + (isUnknown ? ` <button onclick="_editChurnDate('${c.id}','${escapeHtml(c.name)}')" style="border:none;background:rgba(251,146,60,.15);color:#fb923c;border-radius:3px;padding:1px 6px;font-size:10px;cursor:pointer;margin-left:4px;">📅 Set date</button>` : '');
+      }
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);opacity:${status==='churn'?.7:1};">
         <div style="width:14px;text-align:center;font-size:11px;font-weight:700;color:${color};flex-shrink:0;">${badge2}</div>
         <div style="flex:1;min-width:0;">
@@ -2159,6 +2170,28 @@ function renderGRR(){
       <div style="font-size:24px;font-weight:700;color:${grrVal2!=null?(grrVal2>=95?'var(--ok)':grrVal2>=85?'var(--warn)':'var(--bad)'):'var(--text-secondary)'};">${grrVal2!=null?Math.round(grrVal2*10)/10+'%':'—'}</div>
     </div>`;
 
+    // Churn detail — every churned customer with date + ARR + set-date button
+    const churnRows = r.grrRows.filter(x => x.status === 'churn')
+      .sort((a,b) => b.startArr - a.startArr);
+    if (churnRows.length) {
+      html += `<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;background:var(--bg);">Churn detail (${churnRows.length})</div>`;
+      html += churnRows.map(({c, startArr, effectiveChurnDate, unknownDate, customDate}) => {
+        const dateStr = effectiveChurnDate
+          ? effectiveChurnDate + (customDate ? ' <em style="opacity:.5;font-size:10px">(custom)</em>' : '')
+          : `<span style="color:var(--warn);">⚠ no date</span>`;
+        const editBtn = `<button onclick="_editChurnDate('${c.id}','${escapeHtml(c.name)}')" style="border:none;background:rgba(251,146,60,.12);color:#fb923c;border-radius:3px;padding:1px 7px;font-size:10px;cursor:pointer;margin-left:6px;">${unknownDate?'📅 Set date':'✏ Edit'}</button>`;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 20px;border-bottom:1px solid var(--border);font-size:12.5px;gap:8px;">
+          <div style="min-width:0;flex:1;">
+            <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.name)}</div>
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:1px;">${dateStr}${editBtn}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="color:var(--bad);font-variant-numeric:tabular-nums;font-weight:600;">−${fmt$(startArr)}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
     // Contraction detail
     if (r.contractedCustomers.length) {
       html += `<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;background:var(--bg);">Contraction detail</div>`;
@@ -2183,6 +2216,44 @@ function renderGRR(){
 
     churnedBody.innerHTML = html;
   }
+}
+
+// ── Custom churn date editor ───────────────────────────────
+function _editChurnDate(customerId, customerName) {
+  // Build a small modal with a date picker
+  const existing = state.localChurnDates[String(customerId)] || '';
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:12px;padding:24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4);border:1px solid var(--border);">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Set effective churn date</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;">${customerName}</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">When did this customer churn? (used for GRR window assignment)</div>
+      <input type="date" id="_churnDateInput" value="${existing}"
+        style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text-primary);font-size:14px;box-sizing:border-box;margin-bottom:16px;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        ${existing ? `<button onclick="document.body.removeChild(document.getElementById('_churnModal'));_clearChurnDate('${customerId}')" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--bad);cursor:pointer;font-size:13px;">Clear</button>` : ''}
+        <button onclick="document.body.removeChild(document.getElementById('_churnModal'))" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:13px;">Cancel</button>
+        <button onclick="_saveChurnDate('${customerId}')" style="padding:7px 16px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600;">Save</button>
+      </div>
+    </div>`;
+  overlay.id = '_churnModal';
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('_churnDateInput')?.focus(), 50);
+}
+function _saveChurnDate(customerId) {
+  const val = document.getElementById('_churnDateInput')?.value;
+  if (!val) return;
+  state.localChurnDates[String(customerId)] = val;
+  try { localStorage.setItem('pfd2_churn_dates', JSON.stringify(state.localChurnDates)); } catch(e){}
+  const modal = document.getElementById('_churnModal');
+  if (modal) document.body.removeChild(modal);
+  renderGRR();
+}
+function _clearChurnDate(customerId) {
+  delete state.localChurnDates[String(customerId)];
+  try { localStorage.setItem('pfd2_churn_dates', JSON.stringify(state.localChurnDates)); } catch(e){}
+  renderGRR();
 }
 
 // ── Best/worst hero cards ─────────────────────────────────
@@ -5482,6 +5553,11 @@ function init(){
   try {
     const savedExcluded = JSON.parse(localStorage.getItem('pfd2_excluded_deals')||'{}');
     Object.assign(state.localExcludedDeals, savedExcluded);
+  } catch(e){}
+  // Custom churn dates — restore from localStorage
+  try {
+    const savedChurnDates = JSON.parse(localStorage.getItem('pfd2_churn_dates')||'{}');
+    Object.assign(state.localChurnDates, savedChurnDates);
   } catch(e){}
 
   // Search inputs
