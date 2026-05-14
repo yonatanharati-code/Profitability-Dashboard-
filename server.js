@@ -413,19 +413,20 @@ function injectData(html, cache, csvHours) {
       // ── Row 1: HubSpot Sync + NDR Sync ───────────────────────────────────
       `\n<div class="panel-row">` +
       `\n  <button class="panel-btn" id="apiSyncBtn" onclick="_syncFromApis()">` +
-      `\n    <span style="font-size:16px;">⟳</span>` +
-      `\n    <span><span style="color:#818cf8;">Sync HubSpot</span><span class="pbl">Pull latest customers &amp; deals</span></span>` +
+      `\n    <span style="font-size:13px;">⟳</span>` +
+      `\n    <span><span style="color:#818cf8;">Sync HubSpot</span><span class="pbl">Customers &amp; deals</span></span>` +
       `\n  </button>` +
       `\n  <button class="panel-btn" id="ndrSyncBtn" onclick="_syncNdr()">` +
-      `\n    <span style="font-size:16px;">↻</span>` +
-      `\n    <span><span style="color:#facc15;">Sync NDR</span><span class="pbl" id="ndrSyncedAtBadge">Pull NDR data</span></span>` +
+      `\n    <span style="font-size:13px;">↻</span>` +
+      `\n    <span><span style="color:#facc15;">Sync NDR</span><span class="pbl" id="ndrSyncedAtBadge">NDR data</span></span>` +
       `\n  </button>` +
       `\n</div>` +
+      `\n<div class="panel-sep"></div>` +
 
       // ── Row 2: Import Hours CSV ───────────────────────────────────────────
       `\n<input type="file" id="csvHoursInput" accept=".csv" style="display:none" onchange="_importCsvHours(this)">` +
       `\n<label for="csvHoursInput" class="panel-btn" style="cursor:pointer;">` +
-      `\n  <span style="font-size:16px;">📂</span>` +
+      `\n  <span style="font-size:13px;">📂</span>` +
       `\n  <span><span style="color:#34d399;">Import Hours CSV${csvHours ? ' ✓' : ''}</span><span class="pbl">${csvHoursStatus}</span></span>` +
       `\n</label>` +
 
@@ -433,20 +434,21 @@ function injectData(html, cache, csvHours) {
       `\n<div class="panel-row">` +
       `\n  <input type="file" id="pricingEuInput" accept=".csv" multiple style="display:none" onchange="_importPricingCsv(this,'EU')">` +
       `\n  <label for="pricingEuInput" class="panel-btn" style="cursor:pointer;">` +
-      `\n    <span style="font-size:16px;">🇪🇺</span>` +
-      `\n    <span><span style="color:#a78bfa;">EU Pricing CSV${pricingMonths.length ? ' ✓' : ''}</span><span class="pbl">${pricingStatus}</span></span>` +
+      `\n    <span style="font-size:13px;">🇪🇺</span>` +
+      `\n    <span><span style="color:#a78bfa;">EU Pricing${pricingMonths.length ? ' ✓' : ''}</span><span class="pbl">${pricingStatus}</span></span>` +
       `\n  </label>` +
       `\n  <input type="file" id="pricingUsInput" accept=".csv" multiple style="display:none" onchange="_importPricingCsv(this,'US')">` +
       `\n  <label for="pricingUsInput" class="panel-btn" style="cursor:pointer;">` +
-      `\n    <span style="font-size:16px;">🇺🇸</span>` +
-      `\n    <span><span style="color:#a78bfa;">US Pricing CSV</span><span class="pbl">Import US server events</span></span>` +
+      `\n    <span style="font-size:13px;">🇺🇸</span>` +
+      `\n    <span><span style="color:#a78bfa;">US Pricing</span><span class="pbl">US server events</span></span>` +
       `\n  </label>` +
       `\n</div>` +
+      `\n<div class="panel-sep"></div>` +
 
       // ── Row 4: Backup ─────────────────────────────────────────────────────
       `\n<a href="/api/export-pricing" class="panel-btn" style="text-decoration:none;">` +
-      `\n  <span style="font-size:16px;">⬇</span>` +
-      `\n  <span><span style="color:#34d399;">Backup pricing data</span><span class="pbl">Download JSON to commit to git</span></span>` +
+      `\n  <span style="font-size:13px;">⬇</span>` +
+      `\n  <span><span style="color:#34d399;">Backup pricing data</span><span class="pbl">Download JSON for git</span></span>` +
       `\n</a>`
     );
   }
