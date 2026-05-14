@@ -2286,12 +2286,14 @@ window._saveChurnDate = function(customerId, overlay) {
   try { localStorage.setItem('pfd2_churn_dates', JSON.stringify(state.localChurnDates)); } catch(e){}
   (overlay || document.getElementById('_churnModal'))?.remove();
   renderGRR();
+  renderKPIs();
 };
 
 window._clearChurnDate = function(customerId) {
   delete state.localChurnDates[String(customerId)];
   try { localStorage.setItem('pfd2_churn_dates', JSON.stringify(state.localChurnDates)); } catch(e){}
   renderGRR();
+  renderKPIs();
 };
 
 // ── Best/worst hero cards ─────────────────────────────────
