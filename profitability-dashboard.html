@@ -51,7 +51,12 @@ body{min-height:100vh;transition:background .2s,color .2s;}
 .muted{color:var(--text-secondary);}
 
 /* ── Topbar ── */
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40;box-shadow:var(--sh-xs);}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40;box-shadow:var(--sh-xs);position:relative;}
+#dataSyncPanel .panel-btn{display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit;text-decoration:none;width:100%;text-align:left;transition:background .1s;}
+#dataSyncPanel .panel-btn:hover{background:var(--surface-hover,var(--surface-subtle));}
+#dataSyncPanel .panel-btn .pbl{font-size:10px;color:var(--text-secondary);display:block;margin-top:1px;font-weight:400;}
+#dataSyncPanel .panel-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+#dataSyncToggle.active{background:var(--surface-hover,var(--surface-subtle));color:var(--accent);}
 .topbar-row1{padding:10px var(--pad);display:flex;align-items:center;gap:16px;}
 .brand{display:flex;align-items:center;gap:12px;}
 .brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--ink-950),var(--ink-800));display:flex;align-items:center;justify-content:center;color:var(--lime-500);font-weight:700;font-size:13px;box-shadow:inset 0 0 0 1px rgba(149,214,0,.3);flex-shrink:0;}
@@ -469,7 +474,10 @@ tr.selected-row{background:var(--teal-50) !important;}
         <button class="seg-btn layer-tog active" data-layer="dev" style="color:#08173C;">● Dev</button>
         <button class="seg-btn layer-tog active" data-layer="bug" style="color:#C08080;">● Bug</button>
       </div>
-      <!-- CSV / Sync buttons injected here by server --><button class="import-btn" style="display:none">📤 Import ClickUp CSV</button>
+      <!-- Data sync panel toggle -->
+      <button class="icon-btn" id="dataSyncToggle" onclick="window._toggleDataPanel()" title="Data sync &amp; import">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+      </button>
       <!-- Settings button -->
       <button class="icon-btn" id="settingsBtn" onclick="window._openSettings()" title="API Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -479,6 +487,17 @@ tr.selected-row{background:var(--teal-50) !important;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
       </button>
       <div class="avatar">YH</div>
+    </div>
+  </div>
+  <!-- Data sync slide-down panel -->
+  <div id="dataSyncPanel" style="display:none;position:absolute;top:100%;right:0;z-index:300;width:460px;max-width:96vw;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;box-shadow:0 12px 32px rgba(0,0,0,.25);padding:16px 18px 18px;">
+    <div style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;">Data sync &amp; import</div>
+    <div id="dataPanelContent" style="display:flex;flex-direction:column;gap:8px;">
+      <!-- server injects buttons here --><button class="import-btn" style="display:none">📤 Import ClickUp CSV</button>
+    </div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--text-tertiary,var(--text-secondary));line-height:1.5;">
+      Sync HubSpot to pull latest customers &amp; deals.<br>
+      Import CSV to update hours or pricing events.
     </div>
   </div>
   <!-- Tabs -->
@@ -5490,6 +5509,32 @@ function setInsight(v){
   renderInsight();
 }
 function toggleTweaks(){ document.getElementById('tweaks').classList.toggle('open'); }
+
+// ── Data sync slide-down panel ────────────────────────────────────────────────
+window._toggleDataPanel = function() {
+  const panel = document.getElementById('dataSyncPanel');
+  const btn   = document.getElementById('dataSyncToggle');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  if (open) {
+    panel.style.display = 'none';
+    btn?.classList.remove('active');
+  } else {
+    panel.style.display = 'block';
+    btn?.classList.add('active');
+    // Close on outside click
+    setTimeout(() => {
+      const close = e => {
+        if (!panel.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+          panel.style.display = 'none';
+          btn?.classList.remove('active');
+          document.removeEventListener('click', close);
+        }
+      };
+      document.addEventListener('click', close);
+    }, 0);
+  }
+};
 window.toggleTweaks = toggleTweaks;
 
 // ── Tabs ──────────────────────────────────────────────
