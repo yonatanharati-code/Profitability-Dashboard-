@@ -2055,6 +2055,10 @@ function renderKPIs(){
 // ── Gross Retention Rate breakdown ───────────────────────────────────────────
 function renderGRR(){
   const r = rollup();
+
+  // Populate name lookup map for churn date editor (id→name, avoids onclick escaping issues)
+  r.grrRows.forEach(row => { _churnMeta[String(row.c.id)] = row.c.name; });
+
   const grrVal   = r.grr != null ? Math.round(r.grr * 10) / 10 : null;
   const grrColor = grrVal == null ? 'var(--text-secondary)' : grrVal >= 95 ? 'var(--ok)' : grrVal >= 85 ? 'var(--warn)' : 'var(--bad)';
   const wLabel   = winLabel();
@@ -2113,7 +2117,7 @@ function renderGRR(){
         const isCustom  = row?.customDate;
         const isUnknown = row?.unknownDate;
         changeNote = `<span style="color:var(--bad);">churned ${dateLabel ? dateLabel + (isCustom?' <em style="opacity:.6">(custom)</em>':'') : ''}</span>`
-          + (isUnknown ? ` <button onclick="_editChurnDate('${c.id}','${escapeHtml(c.name)}')" style="border:none;background:rgba(251,146,60,.15);color:#fb923c;border-radius:3px;padding:1px 6px;font-size:10px;cursor:pointer;margin-left:4px;">📅 Set date</button>` : '');
+          + (isUnknown ? ` <button onclick="window._editChurnDate('${c.id}')" style="border:none;background:rgba(251,146,60,.15);color:#fb923c;border-radius:3px;padding:1px 6px;font-size:10px;cursor:pointer;margin-left:4px;">📅 Set date</button>` : '');
       }
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--border);opacity:${status==='churn'?.7:1};">
         <div style="width:14px;text-align:center;font-size:11px;font-weight:700;color:${color};flex-shrink:0;">${badge2}</div>
@@ -2179,7 +2183,7 @@ function renderGRR(){
         const dateStr = effectiveChurnDate
           ? effectiveChurnDate + (customDate ? ' <em style="opacity:.5;font-size:10px">(custom)</em>' : '')
           : `<span style="color:var(--warn);">⚠ no date</span>`;
-        const editBtn = `<button onclick="_editChurnDate('${c.id}','${escapeHtml(c.name)}')" style="border:none;background:rgba(251,146,60,.12);color:#fb923c;border-radius:3px;padding:1px 7px;font-size:10px;cursor:pointer;margin-left:6px;">${unknownDate?'📅 Set date':'✏ Edit'}</button>`;
+        const editBtn = `<button onclick="window._editChurnDate('${c.id}')" style="border:none;background:rgba(251,146,60,.12);color:#fb923c;border-radius:3px;padding:1px 7px;font-size:10px;cursor:pointer;margin-left:6px;">${unknownDate?'📅 Set date':'✏ Edit'}</button>`;
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 20px;border-bottom:1px solid var(--border);font-size:12.5px;gap:8px;">
           <div style="min-width:0;flex:1;">
             <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.name)}</div>
@@ -2219,42 +2223,76 @@ function renderGRR(){
 }
 
 // ── Custom churn date editor ───────────────────────────────
-function _editChurnDate(customerId, customerName) {
-  // Build a small modal with a date picker
+// ── Churn date editor — use window.* + data-attribute pattern to avoid
+//    inline-onclick string-escaping issues with customer names.
+// A global map stores id→name so buttons only embed the id.
+const _churnMeta = {};  // populated during renderGRR
+
+window._editChurnDate = function(customerId) {
+  const customerName = _churnMeta[String(customerId)] || customerId;
   const existing = state.localChurnDates[String(customerId)] || '';
+
+  // Remove any existing modal
+  const old = document.getElementById('_churnModal');
+  if (old) old.remove();
+
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = `
-    <div style="background:var(--card);border-radius:12px;padding:24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4);border:1px solid var(--border);">
-      <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Set effective churn date</div>
-      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;">${customerName}</div>
-      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">When did this customer churn? (used for GRR window assignment)</div>
-      <input type="date" id="_churnDateInput" value="${existing}"
-        style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text-primary);font-size:14px;box-sizing:border-box;margin-bottom:16px;">
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
-        ${existing ? `<button onclick="document.body.removeChild(document.getElementById('_churnModal'));_clearChurnDate('${customerId}')" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--bad);cursor:pointer;font-size:13px;">Clear</button>` : ''}
-        <button onclick="document.body.removeChild(document.getElementById('_churnModal'))" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:13px;">Cancel</button>
-        <button onclick="_saveChurnDate('${customerId}')" style="padding:7px 16px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600;">Save</button>
-      </div>
-    </div>`;
   overlay.id = '_churnModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--card);border-radius:12px;padding:24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4);border:1px solid var(--border);';
+  modal.innerHTML = `
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Set effective churn date</div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;">${escapeHtml(customerName)}</div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">When did this customer churn? This date controls which GRR window they appear in.</div>
+    <input type="date" id="_churnDateInput" value="${escapeHtml(existing)}"
+      style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text-primary);font-size:14px;box-sizing:border-box;margin-bottom:16px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;" id="_churnModalBtns"></div>`;
+
+  overlay.appendChild(modal);
   document.body.appendChild(overlay);
+
+  // Wire buttons via JS (no inline onclick — avoids all escaping issues)
+  const btns = modal.querySelector('#_churnModalBtns');
+  if (existing) {
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = 'Clear date';
+    clearBtn.style.cssText = 'padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--bad);cursor:pointer;font-size:13px;';
+    clearBtn.onclick = () => { overlay.remove(); window._clearChurnDate(customerId); };
+    btns.appendChild(clearBtn);
+  }
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = 'padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:13px;';
+  cancelBtn.onclick = () => overlay.remove();
+  btns.appendChild(cancelBtn);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.style.cssText = 'padding:7px 16px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600;';
+  saveBtn.onclick = () => window._saveChurnDate(customerId, overlay);
+  btns.appendChild(saveBtn);
+
+  // Close on backdrop click
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   setTimeout(() => document.getElementById('_churnDateInput')?.focus(), 50);
-}
-function _saveChurnDate(customerId) {
+};
+
+window._saveChurnDate = function(customerId, overlay) {
   const val = document.getElementById('_churnDateInput')?.value;
-  if (!val) return;
+  if (!val) { alert('Please select a date.'); return; }
   state.localChurnDates[String(customerId)] = val;
   try { localStorage.setItem('pfd2_churn_dates', JSON.stringify(state.localChurnDates)); } catch(e){}
-  const modal = document.getElementById('_churnModal');
-  if (modal) document.body.removeChild(modal);
+  (overlay || document.getElementById('_churnModal'))?.remove();
   renderGRR();
-}
-function _clearChurnDate(customerId) {
+};
+
+window._clearChurnDate = function(customerId) {
   delete state.localChurnDates[String(customerId)];
   try { localStorage.setItem('pfd2_churn_dates', JSON.stringify(state.localChurnDates)); } catch(e){}
   renderGRR();
-}
+};
 
 // ── Best/worst hero cards ─────────────────────────────────
 function renderHeroCards(){
