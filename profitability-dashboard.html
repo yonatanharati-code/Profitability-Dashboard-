@@ -1127,6 +1127,24 @@ tr.selected-row{background:var(--teal-50) !important;}
     <div class="section">
       <div class="section-body">
 
+        <!-- Region tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:16px;align-items:center;">
+          <span style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-right:4px;">Server</span>
+          <button id="pricingTabCombined" onclick="setPricingRegion('combined')"
+            style="padding:5px 14px;border-radius:var(--r-md);border:1.5px solid var(--accent);background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+            🌐 Combined
+          </button>
+          <button id="pricingTabEU" onclick="setPricingRegion('EU')"
+            style="padding:5px 14px;border-radius:var(--r-md);border:1.5px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+            🇪🇺 EU
+          </button>
+          <button id="pricingTabUS" onclick="setPricingRegion('US')"
+            style="padding:5px 14px;border-radius:var(--r-md);border:1.5px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+            🇺🇸 US
+          </button>
+          <span id="pricingRegionBadge" style="font-size:11px;color:var(--text-secondary);margin-left:6px;"></span>
+        </div>
+
         <!-- Stats row -->
         <div id="pricingStats" style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-bottom:16px;"></div>
 
@@ -1446,9 +1464,10 @@ const USER_HOURS={}
 const NDR_SYNCED_AT=""
 const NDR_DATA={}
 const PRICING_DATA={}
+const PRICING_REGIONS={}
 const HS_PORTAL_ID=0
 const HS_PORTAL_DOMAIN=""
-window.DATA = DATA; window.DEALS = DEALS; window.USER_HOURS = USER_HOURS; window.NDR_DATA = NDR_DATA; window.PRICING_DATA = PRICING_DATA;
+window.DATA = DATA; window.DEALS = DEALS; window.USER_HOURS = USER_HOURS; window.NDR_DATA = NDR_DATA; window.PRICING_DATA = PRICING_DATA; window.PRICING_REGIONS = PRICING_REGIONS;
 
 /* ═══════════════════════════════════════════════════════════════
    Profitability Dashboard v2 — tabs, executive summary, restrained palette
@@ -1488,6 +1507,7 @@ const state = {
   localBudgetFrom: {},     // {customerId: 'YYYY-MM'} — per-client "count hours from" date
   localChurnDates: {},     // {customerId: 'YYYY-MM-DD'} — custom effective churn date override
   localExcludedDeals: {},  // {customerId: [dealId, ...]} — deals excluded from budget
+  pricingRegion: 'combined', // 'EU' | 'US' | 'combined'
   tableFilters: [],      // [{field, op, value}] active filters for customer table
   budgetFilters: [],     // [{field, op, value}] active filters for budget table
   budgetSortKey: 'util',
@@ -3913,7 +3933,7 @@ function renderChartsForPane(pane){
   } else if (pane==='ndr'){
     initNdrTab();
   } else if (pane==='pricing'){
-    renderPricing();
+    setPricingRegion(state.pricingRegion || 'combined');
   } else if (pane==='profit'){
     chartProfit(); chartRevVsEff(); chartNoReturn();
     renderCsmTable();
@@ -3952,8 +3972,52 @@ function _pricingMatchClient(accountKey) {
     || accountKey.includes(_pricingKey(c.name)));
 }
 
+// ── Pricing region selector ───────────────────────────────────────────────────
+function getActivePricingData() {
+  const r = state.pricingRegion;
+  if (r === 'EU') {
+    const reg = window.PRICING_REGIONS?.EU || {};
+    // PRICING_REGIONS.EU is { YYYY-MM: { account: count } } — same shape as PRICING_DATA
+    return reg;
+  }
+  if (r === 'US') {
+    return window.PRICING_REGIONS?.US || {};
+  }
+  return window.PRICING_DATA || {};
+}
+
+window.setPricingRegion = function(region) {
+  state.pricingRegion = region;
+  // Update tab button styles
+  ['combined','EU','US'].forEach(r => {
+    const btn = document.getElementById('pricingTab' + (r === 'combined' ? 'Combined' : r));
+    if (!btn) return;
+    const active = r === region;
+    btn.style.background   = active ? 'var(--accent)' : 'var(--surface)';
+    btn.style.color        = active ? '#fff' : 'var(--text-secondary)';
+    btn.style.borderColor  = active ? 'var(--accent)' : 'var(--border)';
+  });
+  // Badge
+  const badge = document.getElementById('pricingRegionBadge');
+  if (badge) {
+    const reg = window.PRICING_REGIONS || {};
+    const eu  = Object.values(reg.EU  || {}).reduce((s,m)=>s+Object.keys(m).length,0);
+    const us  = Object.values(reg.US  || {}).reduce((s,m)=>s+Object.keys(m).length,0);
+    if (region === 'combined') badge.textContent = `EU + US combined`;
+    else if (region === 'EU')  badge.textContent = `EU server · ${eu} account-months`;
+    else                       badge.textContent = `US server · ${us} account-months`;
+  }
+  // Reset month pickers so they repopulate for the new region
+  const fromSel = document.getElementById('pricingFromMk');
+  const toSel   = document.getElementById('pricingToMk');
+  if (fromSel) fromSel.innerHTML = '<option value="">All months</option>';
+  if (toSel)   toSel.innerHTML   = '<option value="">All months</option>';
+  renderPricing();
+  renderPricingTrend();
+};
+
 function renderPricing() {
-  const pd = window.PRICING_DATA || {};
+  const pd = getActivePricingData();
   const allMonths = Object.keys(pd).sort();
 
   // Populate From/To pickers once (only when they have just the default option)
@@ -4227,7 +4291,7 @@ window._pricingSort = function(key) {
 
 // ── Pricing trend combo chart ──────────────────────────────────────────────
 function renderPricingTrend() {
-  const pd = window.PRICING_DATA || {};
+  const pd = getActivePricingData();
   const allMonths = Object.keys(pd).sort();
   if (!allMonths.length) return;
 

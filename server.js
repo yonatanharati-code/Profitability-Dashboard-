@@ -348,7 +348,7 @@ function injectData(html, cache, csvHours) {
     );
   }
 
-  // ── Replace PRICING_DATA object ───────────────────────────────────────────────
+  // ── Replace PRICING_DATA and PRICING_REGIONS objects ─────────────────────────
   const pricingRaw = readPricing();
   const PRICING_MARKER = 'const PRICING_DATA={';
   const pricingStart = html.indexOf(PRICING_MARKER);
@@ -359,6 +359,17 @@ function injectData(html, cache, csvHours) {
       html = html.slice(0, pricingStart) +
              `const PRICING_DATA=${JSON.stringify(pricingRaw.months || {})}` +
              html.slice(pricingEnd + 1);
+    }
+  }
+  const REGIONS_MARKER = 'const PRICING_REGIONS={';
+  const regionsStart = html.indexOf(REGIONS_MARKER);
+  if (regionsStart !== -1) {
+    const regionsOpen = regionsStart + REGIONS_MARKER.length - 1;
+    const regionsEnd  = findBlockEnd(html, regionsOpen, '{', '}');
+    if (regionsEnd !== -1) {
+      html = html.slice(0, regionsStart) +
+             `const PRICING_REGIONS=${JSON.stringify(pricingRaw.regions || {})}` +
+             html.slice(regionsEnd + 1);
     }
   }
 
