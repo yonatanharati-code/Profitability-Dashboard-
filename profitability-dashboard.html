@@ -668,6 +668,10 @@ tr.selected-row{background:var(--teal-50) !important;}
               <div class="card-title">Monthly Hours by Division</div>
               <div class="card-sub" id="monthlyStackSub">All customers</div>
             </div>
+            <div class="seg" id="monthlyStackModeSeg" style="margin-left:auto;">
+              <button class="seg-btn active" onclick="window._setMonthlyStackMode('total',this)">Total</button>
+              <button class="seg-btn" onclick="window._setMonthlyStackMode('perHC',this)" title="Average hours per active team member in that division">Per HC</button>
+            </div>
           </div>
           <div class="month-toggles" style="display:flex;flex-wrap:wrap;gap:4px;padding:0 16px 10px;"></div>
           <div class="card-body" style="padding-top:0;">
@@ -2961,20 +2965,66 @@ function chartStageDonut(){
 }
 
 // Effort: monthly stacked (full)
+let _monthlyStackMode = 'total'; // 'total' | 'perHC'
+window._setMonthlyStackMode = function(mode, btn) {
+  _monthlyStackMode = mode;
+  document.querySelectorAll('#monthlyStackModeSeg .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+  if (charts.monthlyStack) { charts.monthlyStack.destroy(); delete charts.monthlyStack; }
+  chartMonthlyStack();
+};
+
 function chartMonthlyStack(){
   const monthIdxs = ALL_MONTHS.map((_,i)=>i).filter(i=>!excludedMonthKeys.includes(ALL_MONTHS[i])&&(!_activeYear||ALL_MONTHS[i].startsWith(_activeYear)));
   const months = monthIdxs.map(i=>ALL_MONTHS[i]);
   const labels  = monthIdxs.map(i=>ALL_MLABELS[i]);
-  const sum = l => state.hiddenLayers.includes(l) ? months.map(()=>0) : months.map(m => AD().reduce((s,c)=>s+(c[l]?.monthly?.[m]||0),0));
+  const perHC = _monthlyStackMode === 'perHC';
+
+  // Active headcount per division per month (from USER_HOURS — only people who logged >0h that month)
+  const uh = window.USER_HOURS || {};
+  function activeHC(layer, mk) {
+    if (!perHC) return 1;
+    // layer 'bug' shares headcount with dev+sa (it's a reclassification)
+    const types = layer === 'bug' ? ['dev','sa'] : [layer];
+    const count = Object.values(uh).filter(p => types.includes(p.type) && (p.customers
+      ? Object.values(p.customers).some(cu => (cu.monthly?.[mk] || 0) > 0)
+      : false
+    )).length;
+    return count || 1; // avoid divide-by-zero
+  }
+
+  const sum = l => state.hiddenLayers.includes(l) ? months.map(()=>0) : months.map((m,i) => {
+    const total = AD().reduce((s,c)=>s+(c[l]?.monthly?.[m]||0),0);
+    return perHC ? Math.round(total / activeHC(l, m) * 10) / 10 : total;
+  });
+
   const opts = baseOpts();
-  opts.scales.x.stacked = true; opts.scales.y.stacked = true;
+  opts.scales.x.stacked = true;
+  opts.scales.y.stacked = true;
   opts.scales.y.ticks.callback = v => v+'h';
-  opts.plugins.tooltip.callbacks = { label:c => c.dataset.label+': '+Math.round(c.raw)+'h' };
+  opts.plugins.legend = {
+    display: true,
+    position: 'top',
+    labels: { font: { family:'Poppins', size:11 }, boxWidth:12, padding:14, usePointStyle:true, pointStyleWidth:10 },
+  };
+  opts.plugins.tooltip.callbacks = {
+    label: c => {
+      const v = Math.round(c.raw * 10) / 10;
+      return ` ${c.dataset.label}: ${v}h${perHC ? ' / person' : ''}`;
+    },
+    footer: items => {
+      const total = Math.round(items.reduce((s,i)=>s+i.raw,0)*10)/10;
+      return `Total: ${total}h${perHC?' (avg per HC)':''}`;
+    },
+  };
+
+  const sub = document.getElementById('monthlyStackSub');
+  if (sub) sub.textContent = perHC ? 'Avg hours per active team member · by division' : 'All customers · total hours by division';
+
   charts.monthlyStack = new Chart(document.getElementById('cMonthlyStack'),{
     type:'bar', data:{labels, datasets:[
-      {label:'CS', data:sum('cs'), backgroundColor:'#95D600', borderRadius:2, maxBarThickness:60},
-      {label:'SA', data:sum('sa'), backgroundColor:'#219EBC', borderRadius:2, maxBarThickness:60},
-      {label:'Dev', data:sum('dev'), backgroundColor:'#08173C', borderRadius:2, maxBarThickness:60},
+      {label:'CS',      data:sum('cs'),  backgroundColor:'#95D600', borderRadius:2, maxBarThickness:60},
+      {label:'SA',      data:sum('sa'),  backgroundColor:'#219EBC', borderRadius:2, maxBarThickness:60},
+      {label:'Dev',     data:sum('dev'), backgroundColor:'#08173C', borderRadius:2, maxBarThickness:60},
       {label:'Bug/Esc', data:sum('bug'), backgroundColor:'#E4A8A0', borderRadius:2, maxBarThickness:60},
     ]}, options:opts
   });
