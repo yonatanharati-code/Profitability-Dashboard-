@@ -12,6 +12,15 @@
 
 const https = require('https');
 
+// ─── Clients to exclude from NDR output ──────────────────────────────────────
+const NDR_SKIP = new Set([
+  'dealavo sp. z o.o.',
+  'dealavo',
+  'web sundhed (apo it)',
+  'web sundhed',
+  'apo it',
+]);
+
 // ─── Month → published CSV URL mapping ───────────────────────────────────────
 // Each gid corresponds to a monthly tab in the Google Sheet.
 const MONTH_TABS = [
@@ -116,6 +125,7 @@ function parseCsvMonth(csvText) {
     const cols = parseLine(lines[i]);
     const client = COL.client >= 0 ? (cols[COL.client] || '').trim() : '';
     if (!client || client.toLowerCase() === 'total' || client.toLowerCase() === 'grand total') continue;
+    if (NDR_SKIP.has(client.toLowerCase())) continue;
 
     rows.push({
       client,
