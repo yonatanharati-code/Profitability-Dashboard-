@@ -718,6 +718,7 @@ tr.selected-row{background:var(--teal-50) !important;}
             <div id="investedDropdown" style="display:none;position:absolute;top:100%;left:0;width:240px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-lg);z-index:100;max-height:260px;overflow-y:auto;margin-top:4px;"></div>
           </div>
           <button id="investedClearBtn" onclick="window.clearInvestedCustomers()" style="display:none;padding:4px 8px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface-subtle);color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap;">✕ Reset</button>
+          <button id="investedContractToggle" onclick="window.toggleInvestedContract()" style="padding:4px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface-subtle);color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap;" title="Toggle whether contract customers (dev included in ARR) are shown in the chart">📋 Incl. contract</button>
         </div>
       </div>
       <div id="investedPills" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
@@ -3419,6 +3420,7 @@ window.sortCsmTable = function(k){
 
 // ── Invested vs Billed Hours chart ────────────────────────
 let investedFilterIds = []; // [] = top 20 by invested hours
+let investedExcludeContract = false; // when true, hide contract-dev customers from chart
 
 const MAX_INVESTED_CUSTS = 20;
 const INVESTED_COLORS = ['#219EBC','#95D600','#F59E0B','#8B5CF6','#EC4899','#10B981','#F97316','#3B82F6','#EF4444','#14B8A6'];
@@ -3454,6 +3456,19 @@ function renderInvestedPills(){
 window.removeInvestedCust = function(id){
   investedFilterIds = investedFilterIds.filter(x => String(x) !== String(id));
   renderInvestedPills();
+  if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; }
+  chartInvestedVsBilled();
+};
+
+window.toggleInvestedContract = function(){
+  investedExcludeContract = !investedExcludeContract;
+  const btn = document.getElementById('investedContractToggle');
+  if (btn) {
+    btn.textContent = investedExcludeContract ? '📋 Excl. contract' : '📋 Incl. contract';
+    btn.style.background    = investedExcludeContract ? 'var(--warn-bg)' : 'var(--surface-subtle)';
+    btn.style.color         = investedExcludeContract ? 'var(--warn)'    : 'var(--text-secondary)';
+    btn.style.borderColor   = investedExcludeContract ? 'var(--warn)'    : 'var(--border)';
+  }
   if (charts.investedVsBilled){ charts.investedVsBilled.destroy(); delete charts.investedVsBilled; }
   chartInvestedVsBilled();
 };
@@ -3539,6 +3554,8 @@ function chartInvestedVsBilled(){
   } else {
     pool = AD().filter(c => totalEffort(c) > 0);
   }
+  // Optionally exclude contract-dev customers (those whose dev hours are included in ARR)
+  if (investedExcludeContract) pool = pool.filter(c => !hasContractDev(c));
 
   // Monthly invested hours — split Dev and Bug separately for stacking
   const devHrs = months.map(mk =>
