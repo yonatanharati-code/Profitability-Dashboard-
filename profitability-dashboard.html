@@ -7151,23 +7151,23 @@ function renderNdrEffortVsIncome(data, months) {
     .sort((a,b) => b[1].latestIncome - a[1].latestIncome)
     .slice(0, _ndrEffortTopNVal);
 
-  // incomeArrow: up = good (green), down = bad (pink)
+  // incomeArrow: up = good (green), down = bad (red)
   function incomeArrow(curr, prev) {
     if (!prev || prev === 0) return '';
     const pct = Math.round((curr - prev) / prev * 100);
-    if (pct === 0) return ` <span style="color:#aaa;font-size:9px;">—0%</span>`;
-    const col   = pct > 0 ? '#95D600' : '#E4A8A0';
+    if (pct === 0) return ` <span style="color:var(--text-secondary);font-size:10px;font-weight:600;">—0%</span>`;
+    const col   = pct > 0 ? 'var(--ok)' : 'var(--bad)';
     const arrow = pct > 0 ? '▲' : '▼';
-    return ` <span style="color:${col};font-size:9px;">${arrow}${Math.abs(pct)}%</span>`;
+    return ` <span style="color:${col};font-size:10px;font-weight:700;">${arrow}${Math.abs(pct)}%</span>`;
   }
-  // costArrow: up = bad (pink), down = good (green) — inverted intent vs income
+  // costArrow: up = bad (red), down = good (green) — inverted intent vs income
   function costArrow(curr, prev) {
     if (!prev || prev === 0) return '';
     const pct = Math.round((curr - prev) / prev * 100);
-    if (pct === 0) return ` <span style="color:#aaa;font-size:9px;">—0%</span>`;
-    const col   = pct > 0 ? '#E4A8A0' : '#95D600';   // cost up = bad = pink
+    if (pct === 0) return ` <span style="color:var(--text-secondary);font-size:10px;font-weight:600;">—0%</span>`;
+    const col   = pct > 0 ? 'var(--bad)' : 'var(--ok)';   // cost up = bad = red
     const arrow = pct > 0 ? '▲' : '▼';
-    return ` <span style="color:${col};font-size:9px;">${arrow}${Math.abs(pct)}%</span>`;
+    return ` <span style="color:${col};font-size:10px;font-weight:700;">${arrow}${Math.abs(pct)}%</span>`;
   }
 
   // Use NDR_OWNER_MAP_RAW via getNdrOwner() for consistency across all tabs
@@ -7186,7 +7186,7 @@ function renderNdrEffortVsIncome(data, months) {
 
   sorted.forEach(([name, d], idx) => {
     const margin = d.income > 0 ? ((d.profit / d.income) * 100).toFixed(1) + '%' : '—';
-    const mColor = d.profit >= 0 ? '#95D600' : '#E4A8A0';
+    const mColor = d.profit >= 0 ? 'var(--ok)' : 'var(--bad)';
     const iArrow = incomeArrow(d.latestIncome, d.prevIncome);
     const cArrow = costArrow(d.latestCost,   d.prevCost);
     const bg = idx % 2 === 0 ? '' : 'background:var(--surface-2,#f9f9f9);';
