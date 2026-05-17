@@ -959,11 +959,11 @@ tr.selected-row{background:var(--teal-50) !important;}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div class="card"><div class="card-body">
-        <div style="font-size:11px;font-weight:700;color:#95D600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">▲ Top 10</div>
+        <div style="font-size:11px;font-weight:700;color:var(--ok);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">▲ Top 10</div>
         <div id="ndrTop10Table"></div>
       </div></div>
       <div class="card"><div class="card-body">
-        <div style="font-size:11px;font-weight:700;color:#E4A8A0;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">▼ Bottom 10</div>
+        <div style="font-size:11px;font-weight:700;color:var(--bad);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">▼ Bottom 10</div>
         <div id="ndrBot10Table"></div>
       </div></div>
     </div>
@@ -6477,9 +6477,24 @@ window.renderNdrTopBottom = function(btnEl, metric, dataArg, monthsArg) {
     { key:'profit_pct', label:'Margin %'},
   ];
   const fmtV = (k, v) => k==='profit_pct' ? v.toFixed(1)+'%' : k==='client'||k==='owner' ? escapeHtml(v||'—') : fmtMoney(v);
-  const colr = (k, v) => (k==='profit_pct'||k==='profit') ? (v>=0?'#95D600':'#E4A8A0') : 'var(--text)';
+  const colr = (k, v) => {
+    if (k !== 'profit_pct' && k !== 'profit') return null;
+    return v >= 0 ? 'var(--ok)' : 'var(--bad)';
+  };
+  const bgColr = (k, v) => {
+    if (k !== 'profit_pct' && k !== 'profit') return null;
+    return v >= 0 ? 'var(--ok-bg)' : 'var(--bad-bg)';
+  };
   const rowFn = (r) => `<tr style="border-bottom:1px solid var(--border);">` +
-    cols.map(c => `<td style="padding:6px 10px;font-size:12px;text-align:${c.al||'right'};${c.key!=='client'&&c.key!=='owner'?'font-weight:600;color:'+colr(c.key,r[c.key])+';':''}">${fmtV(c.key,r[c.key])}</td>`).join('') +
+    cols.map(c => {
+      const clr = colr(c.key, r[c.key]);
+      const bg  = bgColr(c.key, r[c.key]);
+      const isNum = c.key !== 'client' && c.key !== 'owner';
+      const style = isNum && clr
+        ? `padding:5px 10px;font-size:12px;text-align:right;font-weight:700;color:${clr};background:${bg};border-radius:4px;`
+        : `padding:6px 10px;font-size:12px;text-align:${c.al||'right'};${isNum?'font-weight:600;':''}`;
+      return `<td style="${style}">${fmtV(c.key,r[c.key])}</td>`;
+    }).join('') +
     `</tr>`;
 
   _registerTable('ndrTop10Table', top10, cols, rowFn, _ndrTopMetric, -1);
