@@ -12,7 +12,7 @@
  *    "No - Performance / Bug" in the Billable label also counts as bug.
  */
 
-const { USER_TYPES, BUG_TASK_RE, BUG_LIST_RE } = require('./clickup');
+const { USER_TYPES, USER_CUSTOMER_OVERRIDE, BUG_TASK_RE, BUG_LIST_RE } = require('./clickup');
 
 // ─── Bug detection helpers ────────────────────────────────────────────────────
 const BUG_BILLABLE_RE  = /performance|\/\s*bug/i;  // "No - Performance / Bug"
@@ -143,10 +143,11 @@ function parseCsvHours(csvText) {
     const baseType = USER_TYPES[userId];
     if (!baseType) { skippedUser++; continue; }
 
-    // Get customer name from the dedicated Customer custom field
-    const customer = COL.customer >= 0
-      ? (cols[COL.customer] || '').trim()
-      : (cols[COL.listName] || cols[COL.taskName] || '').trim(); // fallback
+    // Get customer name — user-level override takes priority over the CSV field
+    const customer = USER_CUSTOMER_OVERRIDE[userId]
+      || (COL.customer >= 0
+          ? (cols[COL.customer] || '').trim()
+          : (cols[COL.listName] || cols[COL.taskName] || '').trim()); // fallback
 
     if (!customer || SKIP_CUSTOMERS.has(customer.toLowerCase())) { skipped++; continue; }
 

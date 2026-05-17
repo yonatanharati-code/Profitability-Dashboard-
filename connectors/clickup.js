@@ -27,7 +27,7 @@ const USER_TYPES = {
   94768495: 'sa',  // Aleksandra Ziomka
   94768277: 'sa',  // Ron Koval
   88670709: 'sa',  // Maher Kassis
-  88660063: 'sa',  // Shuki Shmuely
+  88660063: 'cs',  // Shuki Shmuely
 
   // ── Dev ──────────────────────────────────────────────────────────────────
   48983630: 'dev', // Michal Drori
@@ -49,6 +49,13 @@ const USER_TYPES = {
   94634286:  'dev', // Yair Mor
   88702998:  'dev', // Lena Lissin
   38206185:  'dev', // Quicklizard Support
+};
+
+// ─── Per-user customer override ──────────────────────────────────────────────
+// When a user ID appears here, ALL their time entries are attributed to the
+// specified customer name, regardless of the Customer field in the CSV.
+const USER_CUSTOMER_OVERRIDE = {
+  88660063: 'Israir',  // Shuki Shmuely → all hours go to Israir
 };
 
 // ─── Classification ───────────────────────────────────────────────────────────
@@ -283,4 +290,4 @@ async function fetchAllTimeEntries(apiKey, onProgress = () => {}) {
   return entries;
 }
 
-module.exports = { streamAllTimeEntries, fetchAllTimeEntries, USER_TYPES, BUG_TASK_RE, BUG_LIST_RE, SPACES };
+module.exports = { streamAllTimeEntries, fetchAllTimeEntries, USER_TYPES, USER_CUSTOMER_OVERRIDE, BUG_TASK_RE, BUG_LIST_RE, SPACES };
