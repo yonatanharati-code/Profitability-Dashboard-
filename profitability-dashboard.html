@@ -1753,10 +1753,11 @@ function g(c, layer){
     }
     return total;
   }
-  if (w === 'month') {
+  if (w === 'month' || w === 1) {
+    // 1M = previous complete calendar month (same as 'month' mode)
     return (c[layer]?.monthly?.[state.monthKey] || 0);
   }
-  const k = w===1?'m1':w===3?'m3':w===12?'m12':'m6';
+  const k = w===3?'m3':w===12?'m12':'m6';
   return (c[layer]&&c[layer][k])||0;
 }
 // g() variant that only sums months >= fromMk (for Dev Budget start-date filter)
@@ -2831,7 +2832,7 @@ function chartTop20(){
   const hasNdr    = ndrMonths.length > 0 && !!window.NDR_DATA;
 
   const winLbl = state.window === 'ytd'  ? 'YTD'
-               : state.window === 'month' ? '1-mo'
+               : (state.window === 'month' || state.window === 1) ? '1-mo'
                : `${state.window}-mo`;
 
   const items = AD().map(c => {
