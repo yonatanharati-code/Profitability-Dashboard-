@@ -3583,13 +3583,26 @@ function chartInvestedVsBilled(){
 
   // (ARR line lives on the Top 20 chart, not here)
 
-  // ── YTD column (Jan 2026 → current month) ──────────────
-  const ytdMonths = months.filter(m => m.startsWith('2026-'));
-  const ytdDev     = devHrs.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
-  const ytdBug     = bugHrs.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
-  const ytdBilled  = billedHrs.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
-  const ytdRevenue = devRevenue.slice(-ytdMonths.length).reduce((s,v)=>s+v,0);
-  labels.push("YTD '26");
+  // ── Summary column — scope and label depend on the active year filter ──────
+  // • Year selected (e.g. 2026) → sum only that year's visible months → label "YTD '26"
+  // • "All" selected             → sum all visible months              → label "Total"
+  let summaryMonths, summaryLabel;
+  if (_activeYear) {
+    summaryMonths = months.filter(m => m.startsWith(_activeYear));
+    const shortYr = String(_activeYear).slice(2);
+    summaryLabel  = `YTD '${shortYr}`;
+  } else {
+    summaryMonths = months; // all visible months
+    const first = months[0] ? months[0].slice(0,7) : '';
+    const last  = months[months.length-1] ? months[months.length-1].slice(0,7) : '';
+    summaryLabel = months.length > 1 ? `Total` : last;
+  }
+  const sumIndices = months.map((m,i) => summaryMonths.includes(m) ? i : -1).filter(i => i >= 0);
+  const ytdDev     = sumIndices.reduce((s,i) => s + devHrs[i],    0);
+  const ytdBug     = sumIndices.reduce((s,i) => s + bugHrs[i],    0);
+  const ytdBilled  = sumIndices.reduce((s,i) => s + billedHrs[i], 0);
+  const ytdRevenue = sumIndices.reduce((s,i) => s + devRevenue[i], 0);
+  labels.push(summaryLabel);
   devHrs.push(ytdDev);
   bugHrs.push(ytdBug);
   billedHrs.push(ytdBilled);
