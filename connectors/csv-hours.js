@@ -48,17 +48,18 @@ function parseLine(line) {
 }
 
 // ─── Hours bucket helpers ─────────────────────────────────────────────────────
-const MS1 = 30  * 24 * 60 * 60 * 1000;
-const MS3 = 90  * 24 * 60 * 60 * 1000;
-const MS6 = 180 * 24 * 60 * 60 * 1000;
+const MS1  = 30  * 24 * 60 * 60 * 1000;
+const MS3  = 90  * 24 * 60 * 60 * 1000;
+const MS6  = 180 * 24 * 60 * 60 * 1000;
+const MS12 = 365 * 24 * 60 * 60 * 1000;
 
 function emptyBucket() { return { m1: 0, m3: 0, m6: 0, monthly: {} }; }
 
 function addToBucket(bucket, durationMs, startMs, now) {
   const hours = durationMs / 3_600_000;
-  bucket.m6 += hours;
-  if (startMs >= now - MS3) bucket.m3 += hours;
-  if (startMs >= now - MS1) bucket.m1 += hours;
+  if (startMs >= now - MS6)  bucket.m6 += hours;
+  if (startMs >= now - MS3)  bucket.m3 += hours;
+  if (startMs >= now - MS1)  bucket.m1 += hours;
   const d  = new Date(startMs);
   const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   bucket.monthly[mk] = (bucket.monthly[mk] || 0) + hours;
@@ -135,8 +136,8 @@ function parseCsvHours(csvText) {
 
     if (durationMs <= 0) { skipped++; continue; }
 
-    // Filter to last 6 months
-    if (startMs > 0 && startMs < now - MS6) { skipped++; continue; }
+    // Filter to last 12 months
+    if (startMs > 0 && startMs < now - MS12) { skipped++; continue; }
 
     // Classify by user ID
     const baseType = USER_TYPES[userId];
