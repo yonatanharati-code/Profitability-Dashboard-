@@ -3,6 +3,12 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { fetchAllCompanies, fetchDeals, fetchPropertyHistories, toUSD, VALID_CSMS } = require('./connectors/hubspot');
 const { streamAllTimeEntries, USER_TYPES, BUG_TASK_RE, BUG_LIST_RE } = require('./connectors/clickup');
 
+// ─── HubSpot company IDs to exclude from sync (duplicate / wrong records) ────
+const HS_EXCLUDE_IDS = new Set([
+  '9501287647',  // "Horze International" (horze.com) — duplicate; correct record is
+                 // "horze international gmbh" (9366594769, horze.de)
+]);
+
 // ─── Bug detection helpers ────────────────────────────────────────────────────
 // Matches "No - Performance / Bug" in ClickUp's Billable custom field
 const BUG_BILLABLE_RE = /performance|\/\s*bug/i;
@@ -299,7 +305,12 @@ async function refreshAll(onProgress = () => {}, opts = {}) {
   onProgress({ step: 'Fetching HubSpot data…' });
   console.log(`⟳  Fetching HubSpot companies + deals${hubspotOnly ? ' (HubSpot only — hours from CSV)' : ' + ClickUp time entries'}...`);
   const [companies, rawDeals] = await Promise.all([
-    fetchAllCompanies(hsKey).then((r) => { console.log(`   ✓ ${r.length} companies`); return r; }),
+    fetchAllCompanies(hsKey).then((r) => {
+      const filtered = r.filter(c => !HS_EXCLUDE_IDS.has(String(c.id)));
+      if (filtered.length < r.length) console.log(`   ⚠  Excluded ${r.length - filtered.length} duplicate HubSpot company record(s)`);
+      console.log(`   ✓ ${filtered.length} companies`);
+      return filtered;
+    }),
     fetchDeals(hsKey).then((r)         => { console.log(`   ✓ ${r.length} deals`);     return r; }),
   ]);
 

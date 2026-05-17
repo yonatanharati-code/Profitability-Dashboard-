@@ -147,7 +147,7 @@ const CSV_CUSTOMER_ALIASES = {
   'hiper':        'hipercohen',        // "Hiper Cohen" → Hiper Cohen
   'ikano':        'ikano',             // "Ikano" → Ikano
   'istore':       'istore',            // "iStore" (Israel)
-  'horze':        'horze',             // "Horze"
+  'horze':        'horzeinternationalgmbh', // "Horze" → horze international gmbh (not the .com duplicate)
   'ducatillon':   'ducatillon',        // "Ducatillon"
   'andlight':     'andlight',          // "Andlight"
   'dehner':       'dehner',            // "Dehner"
