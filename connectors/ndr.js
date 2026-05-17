@@ -22,6 +22,7 @@ const MONTH_TABS = [
   { month: '2026-01', gid: '2135359581' },
   { month: '2026-02', gid: '2145898483' },
   { month: '2026-03', gid: '354741632'  },
+  { month: '2026-04', gid: '274033607'  },
 ];
 
 const BASE_URL =
