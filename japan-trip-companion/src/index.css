@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@400;600&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-sumi-50 text-sumi-700 font-sans antialiased;
+    /* Respect the iPhone home indicator and notch. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Everything scrolls in one column; the nav is fixed over it. */
+  #root {
+    min-height: 100dvh;
+  }
+
+  button {
+    @apply select-none;
+  }
+}
+
+@layer components {
+  /* ---------------------------------------------------------------- cards */
+  .card {
+    @apply bg-surface rounded-card shadow-card border border-sumi-100/70;
+  }
+
+  .card-flat {
+    @apply bg-surface rounded-card border border-sumi-100;
+  }
+
+  /* --------------------------------------------------------------- labels */
+  /* Small, wide-tracked uppercase label — the backbone of the type system. */
+  .eyebrow {
+    @apply text-[10px] font-semibold uppercase tracking-[0.16em] text-sumi-400;
+  }
+
+  .eyebrow-lg {
+    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-sumi-400;
+  }
+
+  /* ----------------------------------------------------------------- pill */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-pill px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.1em];
+  }
+
+  /* --------------------------------------------------------------- button */
+  .btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold transition active:scale-[0.985];
+  }
+
+  .btn-primary {
+    @apply btn bg-sumi-700 text-paper hover:bg-sumi-600;
+  }
+
+  .btn-secondary {
+    @apply btn border border-sumi-200 bg-surface text-sumi-600 hover:border-sumi-300 hover:bg-sumi-50;
+  }
+
+  .btn-accent {
+    @apply btn bg-shu-500 text-white hover:bg-shu-600;
+  }
+
+  /* Tap targets in dense rows still need to clear 44px. */
+  .icon-btn {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-xl text-sumi-400 transition hover:bg-sumi-50 hover:text-sumi-600 active:scale-95;
+  }
+
+  .hairline {
+    @apply border-t border-sumi-100;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Horizontal chip rails bleed to the screen edge on mobile. */
+  .edge-bleed {
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
