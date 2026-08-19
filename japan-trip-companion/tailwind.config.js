@@ -3,6 +3,10 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        // Narrow phones (iPhone SE / mini) get the tighter display size.
+        xs: '400px',
+      },
       colors: {
         paper: '#FAF8F4',
         surface: '#FFFFFF',

@@ -81,6 +81,12 @@ export function adviceFor(
   code: number,
   highC: number,
   rainChance: number | null,
+  /**
+   * True when this is the labelled September average rather than a forecast.
+   * Place facts still apply, but we must not reassure that conditions are
+   * good — we do not know that yet.
+   */
+  isSeasonal = false,
 ): string[] {
   const out: string[] = []
   const wet = isWet(code) || (rainChance != null && rainChance >= 50)
@@ -121,7 +127,7 @@ export function adviceFor(
     out.push('Tokyo showers are usually short and heavy. A folding umbrella from any convenience store costs about ¥600.')
   }
 
-  if (!wet && highC < 30 && out.length === 0) {
+  if (!isSeasonal && !wet && highC < 30 && out.length === 0) {
     out.push('Good conditions — no changes needed to the plan.')
   }
 
@@ -138,7 +144,7 @@ export function seasonalFallback(city: City, date: string): DayWeather {
     rainChance: null,
     kind: 'seasonal',
     summary: city.septemberNormal.note,
-    advice: adviceFor(city, 2, city.septemberNormal.highC, null),
+    advice: adviceFor(city, 2, city.septemberNormal.highC, null, true),
   }
 }
 

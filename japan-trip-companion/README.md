@@ -14,6 +14,28 @@ npm run build      # validates the data model, typechecks, then builds
 npm run validate   # data-integrity check on its own
 ```
 
+### Tests
+
+`npm run validate` runs on every build and checks the data model: that every id
+referenced from `days.ts` resolves, that ids are unique, that all 17 dates are
+present and in order, that no transport leg falls outside the trip, and that no
+URL is a shortener.
+
+`npm run test:e2e` drives the real app in a browser. Because every interesting
+state here is time-dependent — "today", the countdown to the next train, the
+Silver Week warnings — each block freezes the clock to a specific moment in the
+trip and asserts what the screen actually says: that 18 September resolves to
+day 10 with a 9 h 10 min countdown to the 17:55 train, that 15 September at
+06:00 shows *in 15 min* against the Azusa departure, that marking, skipping,
+reordering, notes and favourites all survive a reload. Playwright is
+deliberately not a dependency of the app:
+
+```bash
+npm run dev                        # one terminal
+npm install --no-save playwright   # another
+npm run test:e2e                   # E2E_URL= if not on :5173
+```
+
 ## Screens
 
 | Tab | What it does |

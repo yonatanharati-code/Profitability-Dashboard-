@@ -38,7 +38,7 @@ export function TodayView({
             <p className="eyebrow-lg">
               {live ? `${day.dow} · Day ${days.indexOf(day) + 1} of ${days.length}` : 'Up next'}
             </p>
-            <h1 className="mt-1.5 font-display text-[34px] font-medium leading-[0.95] tracking-tight text-sumi-800">
+            <h1 className="mt-1.5 font-display text-[29px] font-medium leading-[1] tracking-tight text-sumi-800 xs:text-[32px] sm:text-[34px]">
               {bigDateLabel(day.date)}
             </h1>
             <p className="mt-2 font-display text-[19px] font-medium leading-tight text-shu-500">
