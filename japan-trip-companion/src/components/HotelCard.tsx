@@ -1,7 +1,7 @@
-import { BedDouble, MapPin, Navigation, Train } from 'lucide-react'
+import { BedDouble, Footprints, MapPin, Navigation, Train } from 'lucide-react'
 import type { Hotel } from '../data/types'
 import { LinkButton, Pill, ReviewFlag } from './ui'
-import { mapsDirections, mapsSearch } from '../utils/maps'
+import { mapsDirections, mapsSearch, walkTo } from '../utils/maps'
 import { shortDateLabel } from '../utils/date'
 
 export function HotelCard({ hotel, compact = false }: { hotel: Hotel; compact?: boolean }) {
@@ -55,6 +55,19 @@ export function HotelCard({ hotel, compact = false }: { hotel: Hotel; compact?: 
             <Train size={13} className="text-sumi-300" />
             {hotel.nearestStation}
           </p>
+        )}
+
+        {/* Three mornings run off a fixed departure. Rather than assert a
+            walking time we have not measured, make it one tap to check. */}
+        {hotel.nearestStation && (
+          <a
+            href={walkTo(hotel.nearestStation, hotel.mapsQuery)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex min-h-[36px] items-center gap-1.5 text-[12.5px] font-semibold text-sumi-600 hover:text-shu-500"
+          >
+            <Footprints size={13} /> Walking time to the station
+          </a>
         )}
 
         <p className="mt-3 text-[12.5px] leading-relaxed text-sumi-500">{hotel.locationNote}</p>

@@ -11,6 +11,11 @@ type NoteMap = Record<string, string>
 /** Per-day ordering: dayDate -> ordered activity ids. Missing = data order. */
 type OrderMap = Record<string, string[]>
 type BookingStatusMap = Record<string, 'done' | 'skipped'>
+/**
+ * Arbitrary text you type in: confirmation references, phone numbers.
+ * Keyed "conf:<entity-id>:<field>" so new fields need no migration.
+ */
+type FieldMap = Record<string, string>
 
 interface Persisted {
   completed: IdSet
@@ -20,6 +25,7 @@ interface Persisted {
   order: OrderMap
   checklist: IdSet
   bookingStatus: BookingStatusMap
+  fields: FieldMap
 }
 
 const EMPTY: Persisted = {
@@ -30,6 +36,7 @@ const EMPTY: Persisted = {
   order: {},
   checklist: {},
   bookingStatus: {},
+  fields: {},
 }
 
 function useStored<K extends keyof Persisted>(key: K, fallback: Persisted[K]) {
@@ -48,6 +55,7 @@ export function useTripState() {
   const [order, setOrder] = useStored('order', EMPTY.order)
   const [checklist, setChecklist] = useStored('checklist', EMPTY.checklist)
   const [bookingStatus, setBookingStatus] = useStored('bookingStatus', EMPTY.bookingStatus)
+  const [fields, setFields] = useStored('fields', EMPTY.fields)
 
   const toggleIn = useCallback(
     (setter: (fn: (prev: IdSet) => IdSet) => void) => (id: string) => {
@@ -77,6 +85,18 @@ export function useTripState() {
       })
     },
     [setNotes],
+  )
+
+  const setField = useCallback(
+    (key: string, value: string) => {
+      setFields((prev) => {
+        const next = { ...prev }
+        if (value.trim()) next[key] = value
+        else delete next[key]
+        return next
+      })
+    },
+    [setFields],
   )
 
   const setBooking = useCallback(
@@ -127,7 +147,11 @@ export function useTripState() {
     setOrder({})
     setChecklist({})
     setBookingStatus({})
-  }, [setCompleted, setSkipped, setFavourites, setNotes, setOrder, setChecklist, setBookingStatus])
+    setFields({})
+  }, [
+    setCompleted, setSkipped, setFavourites, setNotes, setOrder, setChecklist,
+    setBookingStatus, setFields,
+  ])
 
   return {
     completed,
@@ -137,11 +161,13 @@ export function useTripState() {
     order,
     checklist,
     bookingStatus,
+    fields,
     toggleCompleted,
     toggleSkipped,
     toggleFavourite,
     toggleChecklist,
     setNote,
+    setField,
     setBooking,
     moveActivity,
     resetOrder,

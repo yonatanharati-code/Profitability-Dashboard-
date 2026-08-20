@@ -272,9 +272,12 @@ async function open(name, iso, ctxOpts = iphone) {
     ['Hotels', 'bespoke hotel shinjuku'],
     ['All transport', 'national park liner'],
     ['Luggage plan', 'send the big cases ahead'],
+    ['Packing', 'small trolley'],
     ['Food rules', 'no pork. no seafood.'],
+    ['Japanese phrases', 'butaniku to gyokairui wa taberaremasen'],
     ['Shopping', 'shinsaibashi'],
     ['Before you fly', 'add suica to apple wallet'],
+    ['Confirmations', 'booking reference'],
     ['Saved places', 'nothing saved yet'],
     ['Your notes', 'no notes yet'],
     ['About this app', 'where the data comes from'],
@@ -288,8 +291,61 @@ async function open(name, iso, ctxOpts = iphone) {
     await page.getByRole('button', { name: '← More' }).click()
     await page.waitForTimeout(200)
   }
-  check('more: all nine panels render their own content', broken.length === 0, broken.join(','))
+  check('more: all twelve panels render their own content', broken.length === 0, broken.join(','))
   check('more: no page errors', errs.length === 0, errs.join('; '))
+  await ctx.close()
+}
+
+// ───────────────────────────────────────── 10. New offline surfaces
+{
+  const { ctx, page, errs } = await open('surfaces', '2026-09-17T23:45:00Z')
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.waitForTimeout(400)
+
+  // Packing: ticking an item must persist and move the badge.
+  await page.getByRole('button', { name: /Packing/ }).first().click()
+  await page.waitForTimeout(400)
+  let body = (await page.locator('body').innerText()).toLowerCase()
+  check('packing: four bag groups render',
+    ['small trolley', 'big cases', 'day bag', 'documents and phone'].every((g) => body.includes(g)))
+  check('packing: starts at zero packed', /0 of \d+ packed/.test(body),
+    body.match(/\d+ of \d+ packed/)?.[0] ?? 'none')
+
+  await page.locator('ul li button').first().click()
+  await page.waitForTimeout(300)
+  body = (await page.locator('body').innerText()).toLowerCase()
+  check('packing: ticking one item counts', /1 of \d+ packed/.test(body),
+    body.match(/\d+ of \d+ packed/)?.[0] ?? 'none')
+
+  // Confirmations: typing a reference must survive a reload.
+  await page.getByRole('button', { name: '← More' }).click()
+  await page.waitForTimeout(250)
+  await page.getByRole('button', { name: /Confirmations/ }).first().click()
+  await page.waitForTimeout(400)
+  const input = page.locator('input').first()
+  await input.fill('AZ-4417-XK')
+  await page.waitForTimeout(400)
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(800)
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.waitForTimeout(350)
+  await page.getByRole('button', { name: /Confirmations/ }).first().click()
+  await page.waitForTimeout(450)
+  const restored = await page.locator('input').first().inputValue()
+  check('confirmations: reference survives reload', restored === 'AZ-4417-XK', restored || 'empty')
+
+  // Phrases: the key phrase must be present, and copy must not throw.
+  await page.getByRole('button', { name: '← More' }).click()
+  await page.waitForTimeout(250)
+  await page.getByRole('button', { name: /Japanese phrases/ }).first().click()
+  await page.waitForTimeout(450)
+  body = await page.locator('body').innerText()
+  check('phrases: the food rule is present', body.includes('豚肉と魚介類は食べられません。'))
+  check('phrases: romaji is present', body.toLowerCase().includes('butaniku to gyokairui wa taberaremasen'))
+  check('phrases: a short list renders before the groups', body.toLowerCase().includes('the short list'))
+
+  check('surfaces: no page errors', errs.length === 0, errs.join('; '))
   await ctx.close()
 }
 

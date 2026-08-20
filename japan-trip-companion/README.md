@@ -56,7 +56,25 @@ a live forecast. Everything else is identical.
 | **Trip** | All 17 days as cards with `PAST` / `TODAY` status and per-day progress. Tap for the full day. |
 | **Map** | Every place for a chosen day, grouped by hotel / station / terminal / place / food, deep-linked into Google Maps, plus a one-tap multi-stop route. |
 | **Bookings** | `CONFIRMED` / `SHOULD BOOK` / `OPTIONAL` / `NO BOOKING REQUIRED`, tickable, with official links. |
-| **More** | Hotels, all transport, the luggage plan, food rules, shopping, the pre-flight checklist, saved places, your notes, and how the data is sourced. |
+| **More** | Twelve panels: hotels, all transport, the luggage plan, packing, food rules, Japanese phrases, shopping, the pre-flight checklist, confirmations, saved places, your notes, and how the data is sourced. |
+
+## Three things built for use on the ground
+
+**Japanese phrases** (`src/data/phrases.ts`) — grouped by situation, food rules
+first, with the Japanese set large because the technique is to hand someone the
+phone rather than attempt the pronunciation. A short "read this on the plane"
+list sits above the full set. Entirely offline.
+
+**Packing** (`src/data/packing.ts`) — organised by *which bag*, because that is
+the decision the PDF's luggage plan actually forces: the big cases are forwarded
+to Kyoto on 14 Sep and not seen again until the 18th, so the small trolley has
+to carry four days on its own. Each item says why it is in that bag.
+
+**Confirmations** — editable fields for booking references and phone numbers,
+stored on the device. Nothing here ships with invented phone numbers; you paste
+in what your confirmation emails say, and it is then readable in a mountain
+valley with no signal. That is the PDF's "keep the confirmations offline"
+checklist item, made actionable.
 
 ## The data model
 
@@ -74,6 +92,8 @@ src/data/
   restaurants.ts  53 places, filtered against no-pork / no-seafood
   shopping.ts     shopping areas by city
   bookings.ts     what actually needs booking, and what doesn't
+  phrases.ts      the offline phrase card, grouped by situation
+  packing.ts      packing list, split by which bag it goes in
 ```
 
 `npm run validate` checks that every id referenced from `days.ts` resolves,

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Check, Heart, Luggage, StickyNote, Utensils, BedDouble, Train, ListChecks,
-  Info, Trash2, ShoppingBag, WifiOff,
+  Info, Trash2, ShoppingBag, WifiOff, MessageSquareQuote, Backpack, KeyRound, Phone,
 } from 'lucide-react'
 import { dietRules, luggagePlan, preTripChecklist, trip, tripNotices } from '../data/trip'
 import { hotels } from '../data/hotels'
@@ -14,6 +14,9 @@ import { HotelCard } from '../components/HotelCard'
 import { TransportCard } from '../components/TransportCard'
 import { RestaurantCard } from '../components/RestaurantCard'
 import { ShoppingCard } from '../components/ShoppingCard'
+import { phraseGroups, keyPhrases } from '../data/phrases'
+import { packingGroups } from '../data/packing'
+import { PhraseCard } from '../components/PhraseCard'
 import { EmptyNote, NoticeCard, Pill, SectionHeader } from '../components/ui'
 import { shortDateLabel } from '../utils/date'
 
@@ -22,9 +25,12 @@ type Panel =
   | 'hotels'
   | 'transport'
   | 'luggage'
+  | 'packing'
   | 'food'
+  | 'phrases'
   | 'shopping'
   | 'checklist'
+  | 'confirmations'
   | 'favourites'
   | 'notes'
   | 'about'
@@ -33,9 +39,12 @@ const MENU: { id: Panel; label: string; hint: string; icon: typeof BedDouble }[]
   { id: 'hotels', label: 'Hotels', hint: 'All six stays, with dates and directions', icon: BedDouble },
   { id: 'transport', label: 'All transport', hint: 'Every leg of the trip in one list', icon: Train },
   { id: 'luggage', label: 'Luggage plan', hint: 'The forwarding strategy, day by day', icon: Luggage },
+  { id: 'packing', label: 'Packing', hint: 'Split by which bag it goes in', icon: Backpack },
   { id: 'food', label: 'Food rules', hint: 'No pork, no seafood — and where it hides', icon: Utensils },
+  { id: 'phrases', label: 'Japanese phrases', hint: 'Show the screen, do not read it aloud', icon: MessageSquareQuote },
   { id: 'shopping', label: 'Shopping', hint: 'Every area, by city', icon: ShoppingBag },
   { id: 'checklist', label: 'Before you fly', hint: 'The PDF checklist, tickable', icon: ListChecks },
+  { id: 'confirmations', label: 'Confirmations', hint: 'Your references and phone numbers, offline', icon: KeyRound },
   { id: 'favourites', label: 'Saved places', hint: 'Restaurants you hearted', icon: Heart },
   { id: 'notes', label: 'Your notes', hint: 'Everything you wrote down', icon: StickyNote },
   { id: 'about', label: 'About this app', hint: 'Data sources, offline, resetting', icon: Info },
@@ -57,9 +66,12 @@ export function MoreView({ state }: { state: TripState }) {
         {panel === 'hotels' && <HotelsPanel />}
         {panel === 'transport' && <TransportPanel />}
         {panel === 'luggage' && <LuggagePanel />}
+        {panel === 'packing' && <PackingPanel state={state} />}
         {panel === 'food' && <FoodPanel state={state} />}
+        {panel === 'phrases' && <PhrasesPanel />}
         {panel === 'shopping' && <ShoppingPanel />}
         {panel === 'checklist' && <ChecklistPanel state={state} />}
+        {panel === 'confirmations' && <ConfirmationsPanel state={state} />}
         {panel === 'favourites' && <FavouritesPanel state={state} />}
         {panel === 'notes' && <NotesPanel state={state} />}
         {panel === 'about' && <AboutPanel state={state} />}
@@ -69,7 +81,12 @@ export function MoreView({ state }: { state: TripState }) {
 
   const savedCount = Object.keys(state.favourites).length
   const noteCount = Object.keys(state.notes).length
-  const checkedCount = Object.keys(state.checklist).length
+  const checkedCount = preTripChecklist.filter((c) => state.checklist[c.id]).length
+  const packingTotal = packingGroups.reduce((n, g) => n + g.items.length, 0)
+  const packedCount = packingGroups.reduce(
+    (n, g) => n + g.items.filter((i) => state.checklist[i.id]).length,
+    0,
+  )
 
   return (
     <div className="space-y-8">
@@ -89,7 +106,9 @@ export function MoreView({ state }: { state: TripState }) {
                 ? String(noteCount)
                 : id === 'checklist'
                   ? `${checkedCount}/${preTripChecklist.length}`
-                  : null
+                  : id === 'packing'
+                    ? `${packedCount}/${packingTotal}`
+                    : null
           return (
             <button
               key={id}
@@ -352,6 +371,290 @@ function NotesPanel({ state }: { state: TripState }) {
   )
 }
 
+function PhrasesPanel() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader
+          title="Japanese phrases"
+          hint="Hand the phone over. Showing the Japanese works far better than trying to pronounce it."
+        />
+        <div className="card px-4 py-4">
+          <p className="text-[13px] leading-relaxed text-sumi-500">
+            The whole card works offline. If you only learn one line, learn the first one under{' '}
+            <span className="font-semibold text-sumi-700">Our two rules</span> — it does more work
+            than everything else here combined.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <SectionHeader
+          title="The short list"
+          hint={`${keyPhrases.length} phrases worth reading on the plane.`}
+        />
+        <div className="space-y-2.5">
+          {keyPhrases.map((p) => (
+            <PhraseCard key={p.jp} phrase={p} />
+          ))}
+        </div>
+      </div>
+
+      {phraseGroups.map((group) => (
+        <div key={group.id}>
+          <SectionHeader title={group.title} hint={group.blurb} />
+          <div className="space-y-2.5">
+            {group.phrases.map((p) => (
+              <PhraseCard key={p.jp} phrase={p} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PackingPanel({ state }: { state: TripState }) {
+  const total = packingGroups.reduce((n, g) => n + g.items.length, 0)
+  const done = packingGroups.reduce(
+    (n, g) => n + g.items.filter((i) => state.checklist[i.id]).length,
+    0,
+  )
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader
+          title="Packing"
+          hint="Organised by which bag it goes in, because that is the decision the luggage plan forces."
+        />
+        <div className="card px-4 py-4">
+          <div className="flex items-center justify-between text-[11.5px] font-semibold text-sumi-400">
+            <span>
+              {done} of {total} packed
+            </span>
+            <span className="tabular">{total ? Math.round((done / total) * 100) : 0}%</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sumi-100">
+            <div
+              className="h-full rounded-full bg-sage-400 transition-all duration-500"
+              style={{ width: `${total ? (done / total) * 100 : 0}%` }}
+            />
+          </div>
+          <p className="mt-3 text-[12.5px] leading-relaxed text-sumi-500">
+            The split matters more than the list. On 14 September the big cases go to Kyoto and you
+            keep one small trolley for four days — anything in the wrong bag stays in the wrong bag
+            until the 18th.
+          </p>
+        </div>
+      </div>
+
+      {packingGroups.map((group) => {
+        const groupDone = group.items.filter((i) => state.checklist[i.id]).length
+        return (
+          <div key={group.id}>
+            <SectionHeader title={group.title} hint={group.blurb} />
+            <div className="mb-2.5 flex flex-wrap items-center gap-2">
+              <Pill tone="ai">{group.bag}</Pill>
+              <Pill tone={groupDone === group.items.length ? 'sage' : 'neutral'}>
+                {groupDone}/{group.items.length}
+              </Pill>
+            </div>
+            <ul className="space-y-2">
+              {group.items.map((item) => {
+                const on = !!state.checklist[item.id]
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => state.toggleChecklist(item.id)}
+                      aria-pressed={on}
+                      className="card flex w-full items-start gap-3 px-4 py-3.5 text-left"
+                    >
+                      <span
+                        className={[
+                          'mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md border transition',
+                          on
+                            ? 'border-sage-400 bg-sage-400 text-white'
+                            : 'border-sumi-200 text-transparent',
+                        ].join(' ')}
+                      >
+                        <Check size={13} strokeWidth={3} />
+                      </span>
+                      <span className="min-w-0">
+                        <span
+                          className={[
+                            'block text-[13.5px] font-semibold leading-snug',
+                            on ? 'text-sumi-400 line-through decoration-sumi-200' : 'text-sumi-800',
+                          ].join(' ')}
+                        >
+                          {item.label}
+                        </span>
+                        {item.why && (
+                          <span className="mt-1 block text-[12px] leading-relaxed text-sumi-400">
+                            {item.why}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Somewhere to keep the things only you know: booking references and phone
+ * numbers. We deliberately do not ship invented phone numbers — you paste in
+ * what your confirmation emails say, and it lives on this device so it is
+ * readable with no signal. That is the PDF's "keep the confirmations offline"
+ * checklist item, made actionable.
+ */
+function ConfirmationsPanel({ state }: { state: TripState }) {
+  const bookedLegs = transport.filter((t) => t.status === 'booked')
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader
+          title="Confirmations"
+          hint="Type in your references once. They stay on this device and work offline."
+        />
+        <NoticeCard
+          notice={{
+            id: 'nt-conf-offline',
+            tone: 'info',
+            title: 'Why this exists',
+            body:
+              "The PDF's checklist asks you to keep the four booked tickets offline. Paste the references here and they are readable in a mountain valley with no signal. Stored only in this browser — nothing is sent anywhere.",
+            source: 'pdf',
+          }}
+        />
+      </div>
+
+      <div>
+        <SectionHeader title="Booked transport" hint="The four legs the PDF names." />
+        <div className="space-y-2.5">
+          {bookedLegs.map((leg) => (
+            <div key={leg.id} className="card px-4 py-3.5">
+              <p className="eyebrow">{shortDateLabel(leg.date)}</p>
+              <p className="mt-1 text-[14px] font-semibold leading-snug text-sumi-800">
+                {leg.service}
+              </p>
+              <p className="mt-0.5 text-[12px] text-sumi-400">
+                {leg.from} → {leg.to}
+                {leg.depart && leg.arrive ? ` · ${leg.depart}–${leg.arrive}` : ''}
+              </p>
+              <FieldInput
+                state={state}
+                id={`conf:${leg.id}:ref`}
+                label="Booking reference"
+                placeholder="e.g. the number on your confirmation"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionHeader title="Hotels" hint="Reference and the phone number you would actually call." />
+        <div className="space-y-2.5">
+          {hotels.map((h) => (
+            <div key={h.id} className="card px-4 py-3.5">
+              <p className="eyebrow">
+                {h.cityLabel} · {shortDateLabel(h.checkIn)}–{shortDateLabel(h.checkOut)}
+              </p>
+              <p className="mt-1 text-[14px] font-semibold leading-snug text-sumi-800">{h.name}</p>
+              <FieldInput
+                state={state}
+                id={`conf:${h.id}:ref`}
+                label="Booking reference"
+                placeholder="Reservation number"
+              />
+              <FieldInput
+                state={state}
+                id={`conf:${h.id}:phone`}
+                label="Phone"
+                placeholder="+81 …"
+                type="tel"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionHeader title="Flights" hint="The two open items in the whole plan." />
+        <div className="card space-y-1 px-4 py-3.5">
+          <FieldInput
+            state={state}
+            id="conf:flight-out:detail"
+            label="9 Sep — arrival airport, flight and landing time"
+            placeholder="e.g. NRT, LY0000, 19:40"
+          />
+          <FieldInput
+            state={state}
+            id="conf:flight-home:detail"
+            label="25 Sep — KIX departure, flight and terminal"
+            placeholder="e.g. KIX T1, LY0000, 21:20"
+          />
+          <p className="pt-2 text-[12px] leading-relaxed text-sumi-400">
+            Fill these in and tell me the times — the last day should be sized backwards from the
+            flight rather than left flexible.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FieldInput({
+  state,
+  id,
+  label,
+  placeholder,
+  type = 'text',
+}: {
+  state: TripState
+  id: string
+  label: string
+  placeholder?: string
+  type?: 'text' | 'tel'
+}) {
+  const value = state.fields[id] ?? ''
+  return (
+    <div className="mt-3">
+      <label className="eyebrow mb-1.5 block" htmlFor={id}>
+        {label}
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          id={id}
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => state.setField(id, e.target.value)}
+          className="min-h-[44px] w-full rounded-xl border border-sumi-200 bg-surface px-3 text-[13px] text-sumi-700 outline-none placeholder:text-sumi-300 focus:border-sumi-400"
+        />
+        {type === 'tel' && value.trim() && (
+          <a
+            href={`tel:${value.replace(/[^+\d]/g, '')}`}
+            aria-label={`Call ${label}`}
+            className="icon-btn shrink-0 border border-sumi-200"
+          >
+            <Phone size={15} />
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AboutPanel({ state }: { state: TripState }) {
   const [confirm, setConfirm] = useState(false)
   return (
@@ -384,10 +687,10 @@ function AboutPanel({ state }: { state: TripState }) {
           <WifiOff size={15} className="text-sumi-400" /> Offline
         </p>
         <p className="text-[12.5px] leading-relaxed text-sumi-500">
-          The whole itinerary is bundled into the app, so days, transport, hotels, food and notes
-          work with no connection at all. Only three things need the network: the weather forecast,
-          Google Maps links, and official websites. Add it to your home screen and it opens like an
-          app.
+          The whole itinerary is bundled into the app, so days, transport, hotels, food, the
+          Japanese phrases, your packing list and your confirmations all work with no connection at
+          all. Only three things need the network: the weather forecast, Google Maps links, and
+          official websites. Add it to your home screen and it opens like an app.
         </p>
       </div>
 

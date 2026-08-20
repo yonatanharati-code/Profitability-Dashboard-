@@ -8,11 +8,26 @@ export function mapsSearch(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
-export function mapsDirections(destination: string, origin?: string): string {
+export type TravelMode = 'transit' | 'walking' | 'driving'
+
+export function mapsDirections(
+  destination: string,
+  origin?: string,
+  mode: TravelMode = 'transit',
+): string {
   const params = new URLSearchParams({ api: '1', destination })
   if (origin) params.set('origin', origin)
-  params.set('travelmode', 'transit')
+  params.set('travelmode', mode)
   return `https://www.google.com/maps/dir/?${params.toString()}`
+}
+
+/**
+ * Walking directions between two places. Used for hotel-to-station on the
+ * mornings that run off a fixed departure — we deliberately do not assert a
+ * walking time we have not measured, we just make it one tap to check.
+ */
+export function walkTo(destination: string, origin: string): string {
+  return mapsDirections(destination, origin, 'walking')
 }
 
 /**
