@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "validate": "node scripts/validate-data.mjs",
-    "test:e2e": "node scripts/e2e.mjs"
+    "test:e2e": "node scripts/e2e.mjs",
+    "build:single": "npm run build && node scripts/build-single-file.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.474.0",

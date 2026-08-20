@@ -36,6 +36,18 @@ npm install --no-save playwright   # another
 npm run test:e2e                   # E2E_URL= if not on :5173
 ```
 
+## Hosting it
+
+The app is a static build — `npm run build` produces `dist/`, which any static
+host will serve (Vercel, Netlify, GitHub Pages, Cloudflare Pages). Nothing
+server-side is required.
+
+`npm run build:single` additionally produces `dist/japan-2026.html`: the whole
+app inlined into one self-contained file, for hosts that serve a single page.
+One caveat — under a strict content-security policy the Open-Meteo request is
+blocked, so the weather block shows its labelled September averages rather than
+a live forecast. Everything else is identical.
+
 ## Screens
 
 | Tab | What it does |
