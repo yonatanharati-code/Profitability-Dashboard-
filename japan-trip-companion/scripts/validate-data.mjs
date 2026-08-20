@@ -82,8 +82,14 @@ for (const d of dates) if (!expected.includes(d)) errors.push(`days.ts has unexp
 if (dates.join() !== [...dates].sort().join()) errors.push('days.ts dates are not in order')
 
 // ------------------------------------------------- transport dates are real
+// The outbound flight leaves Tel Aviv the night before day 1, and the homebound
+// connection lands the morning after day 17, so those two dates are legitimately
+// outside the 17 trip days. Anything else outside them is a mistake.
+const flightBookends = ['2026-09-08', '2026-09-26']
 for (const m of transportSrc.matchAll(/date: '(\d{4}-\d{2}-\d{2})'/g)) {
-  if (!expected.includes(m[1])) errors.push(`transport.ts leg dated ${m[1]} is outside the trip`)
+  if (!expected.includes(m[1]) && !flightBookends.includes(m[1])) {
+    errors.push(`transport.ts leg dated ${m[1]} is outside the trip`)
+  }
 }
 
 // ------------------------------------------------------ no invented URLs

@@ -118,7 +118,7 @@ export function untilLabel(targetHHMM: string, nowMinutes: number): string | nul
   return m === 0 ? `in ${h} h` : `in ${h} h ${m} min`
 }
 
-/** Days remaining until the trip begins. */
+/** Days remaining until the outbound flight leaves. */
 export function daysUntilTrip(today: string): number {
-  return daysBetween(today, trip.startDate)
+  return daysBetween(today, trip.departureDate)
 }

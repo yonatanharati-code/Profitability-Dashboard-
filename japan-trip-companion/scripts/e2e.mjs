@@ -229,6 +229,33 @@ async function open(name, iso, ctxOpts = iphone) {
   await ctx.close()
 }
 
+// ───────────────────────────────────────── 6b. The flights
+{
+  // 9 Sep 12:00 JST — mid-flight on EK 312, before the 22:20 landing.
+  const { ctx, page, errs } = await open('flights', '2026-09-09T03:00:00Z')
+  let body = (await page.locator('body').innerText()).toLowerCase()
+  check('9 Sep: headline names the real landing time', body.includes('22:20'))
+  check('9 Sep: late-arrival warning shown', body.includes('this is a late arrival'))
+  check('9 Sep: taxi advice shown', body.includes('take a taxi from haneda'))
+  check('9 Sep: outbound flight legs present',
+    body.includes('ek 2168') && body.includes('ek 312'), '')
+
+  // 25 Sep is now a full day ending at 23:45.
+  await page.getByRole('button', { name: 'Trip', exact: true }).click()
+  await page.waitForTimeout(350)
+  await page.locator('ol li button').nth(16).click()
+  await page.waitForTimeout(500)
+  body = (await page.locator('body').innerText()).toLowerCase()
+  check('25 Sep: full-day framing', body.includes('a full last day'))
+  check('25 Sep: Osaka Castle added', body.includes('osaka castle'))
+  check('25 Sep: Namba departure fixed at 19:15', body.includes('19:15'))
+  check('25 Sep: EK 317 present with its time', body.includes('ek 317') && body.includes('23:45'))
+  check('25 Sep: no leftover flight-unknown flag',
+    !body.includes('final flight time from kix is not in the pdf'))
+  check('flights: no page errors', errs.length === 0, errs.join('; '))
+  await ctx.close()
+}
+
 // ───────────────────────────────────────── 7. After the trip
 {
   const { ctx, page, errs } = await open('after', '2026-10-05T00:00:00Z')

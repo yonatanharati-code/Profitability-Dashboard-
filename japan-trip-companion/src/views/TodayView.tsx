@@ -68,7 +68,7 @@ export function TodayView({
           </p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-sumi-500">
             {countdown > 0
-              ? `Showing ${shortDateLabel(trip.startDate)}, the first day. On ${shortDateLabel(trip.startDate)} this screen switches to the real day automatically.`
+              ? `${trip.departureNote}, on ${shortDateLabel(trip.departureDate)}. Showing ${shortDateLabel(trip.startDate)}, the first day in Japan — this screen switches to the real day automatically.`
               : 'Everything you marked, noted and saved is still here.'}
           </p>
         </div>

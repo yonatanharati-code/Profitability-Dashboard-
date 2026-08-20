@@ -5,6 +5,13 @@ export const trip = {
   subtitle: 'September 2026',
   startDate: '2026-09-09',
   endDate: '2026-09-25',
+  /**
+   * The PDF's trip is 9-25 Sep and that still defines the 17 days.
+   * The flights bracket it: EK 2168 leaves Tel Aviv the night before, and
+   * EK 2120 lands home the morning after. Countdowns use this date.
+   */
+  departureDate: '2026-09-08',
+  departureNote: 'EK 2168 from Tel Aviv T3, 22:50',
   travellers: '2 adults',
   route: [
     'Tokyo',
@@ -119,9 +126,19 @@ export const preTripChecklist = [
     source: 'pdf' as const,
   },
   {
-    id: 'chk-flight',
-    label: 'Confirm the final KIX flight time and set the Namba departure from it',
-    source: 'pdf' as const,
+    id: 'chk-vjw',
+    label: 'Fill in Visit Japan Web before flying — it turns immigration into a QR scan',
+    source: 'research' as const,
+  },
+  {
+    id: 'chk-online-checkin',
+    label: 'Check in online for EK 312 and EK 317',
+    source: 'research' as const,
+  },
+  {
+    id: 'chk-haneda-taxi',
+    label: 'Have the hotel address in Japanese ready for the Haneda taxi at 23:20 on 9 Sep',
+    source: 'research' as const,
   },
   { id: 'chk-teamlab', label: 'Book teamLab Borderless for 12 Sep', source: 'research' as const },
   { id: 'chk-shibuya-sky', label: 'Decide on Shibuya Sky for 11 Sep and book if yes', source: 'research' as const },

@@ -171,13 +171,39 @@ Reordering never touches transport: booked legs render in their own section and
 stay fixed, which is exactly what the PDF asks for — the transfers are locked,
 the order of sights inside a city is not.
 
+## The flights, and what they changed
+
+The Emirates ticket arrived after the first build and moved two days materially.
+Both are now in `transport.ts` with real times.
+
+**9 Sep — EK 312 lands at 22:20, not "the evening".** The PDF was written before
+the ticket existed and left room for a Shinjuku walk and dinner. Out of Haneda
+around 23:00–23:20, you reach the hotel near midnight, so that evening is gone.
+The day now says so, and recommends a taxi: the regular Limousine Bus to
+Shinjuku has usually finished by then, the late-night one does not start until
+midnight, and Keikyu's last departure is around 00:30 with a change at
+Shinagawa — not what you want with two 30 kg cases.
+
+**25 Sep — EK 317 departs 23:45, which buys back a whole day.** The PDF sized
+this as "a quiet morning per the flight time". In fact you have Osaka until
+about 19:00. The day is now a real itinerary: Osaka Castle — the one major
+Osaka sight the PDF never reached — then last shopping in Namba, bags collected
+at 17:30, and the 19:15 Nankai for the 20:00 check-in printed on the ticket.
+
+The trip's 17 days are still 9–25 Sep as the PDF defines them; the flights
+bracket that window (out on the 8th, home on the 26th) and the countdown now
+targets the actual departure.
+
+**Booking references are deliberately not in this repo.** A reference plus a
+surname is enough to alter a booking on most airline sites, and this app gets
+published. Flight numbers, times, terminals and seats are here because they are
+useful and harmless; the reference goes in *More → Confirmations*, which stores
+it on your device only.
+
 ## Known gaps, by design
 
 These are flagged in the app rather than filled in:
 
-- **Arrival flight on 9 Sep** — the PDF says only "evening arrival".
-- **Departure flight on 25 Sep** — the PDF says to set the Namba departure from
-  the final flight time. The whole last day hangs on it.
 - **Hotel check-in / check-out times** — not in the PDF.
 - **Some opening hours and fees** — Takayama Jinya, Tenryu-ji, Todai-ji,
   Kasuga Taisha, Nanzen-ji, Ginkaku-ji, Tsutenkaku. Each card links to the

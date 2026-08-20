@@ -8,6 +8,19 @@ import type { BookingItem } from './types'
 export const bookings: BookingItem[] = [
   // ------------------------------------------------------- CONFIRMED (from the PDF)
   {
+    id: 'bk-flights',
+    title: 'Emirates flights, both directions',
+    detail:
+      'Out: EK 2168 Tel Aviv 22:50 on 8 Sep, then EK 312 Dubai 07:40 to Haneda 22:20 on 9 Sep. Home: EK 317 Kansai 23:45 on 25 Sep, then EK 2120 Dubai 06:25 to Tel Aviv 08:55 on 26 Sep. Economy Flex, 30 kg checked each.',
+    bucket: 'confirmed',
+    date: '2026-09-09',
+    why:
+      'Ticketed and confirmed. Seats 33A outbound and 62K homebound are already assigned. Keep the booking reference in More → Confirmations so it is readable offline.',
+    officialUrl: 'https://www.emirates.com/',
+    urlLabel: 'Manage the booking',
+    source: 'research',
+  },
+  {
     id: 'bk-hotels',
     title: 'All six hotels',
     detail:
@@ -101,13 +114,25 @@ export const bookings: BookingItem[] = [
   {
     id: 'bk-namba-kix',
     title: 'Nankai Rapi:t seat to Kansai Airport',
-    detail: 'For 25 Sep, once the flight time is fixed.',
-    bucket: 'should-book',
+    detail: 'For 25 Sep — the 19:15 departure from Nankai Namba, arriving Terminal 1 about 19:55.',
+    bucket: 'optional',
     date: '2026-09-25',
     why:
-      'Rapi:t is all-reserved, so a seat reservation is mandatory to ride it. If you would rather not commit, the Airport Express needs no reservation at all — it is just less comfortable with suitcases.',
+      'Now that the flight is known this is a comfort call, not a constraint. Rapi:t is all-reserved so it needs a seat reservation, and with two 30 kg cases that is worth having. The Airport Express needs nothing at all and runs constantly — either gets you there long before the 20:00 check-in.',
     officialUrl: 'https://www.nankai.co.jp/en_railway/ticket/rapit',
     urlLabel: 'Nankai Rapi:t official',
+    source: 'research',
+  },
+  {
+    id: 'bk-online-checkin',
+    title: 'Online check-in for both Emirates flights',
+    detail: 'EK 312 on 9 Sep and EK 317 on 25 Sep.',
+    bucket: 'should-book',
+    date: '2026-09-08',
+    why:
+      'Seats are already assigned, so this is about skipping a desk queue — which matters most on the 25th, when you arrive at Terminal 1 straight from a day out. Check the window on the Emirates site and do it from the hotel wifi.',
+    officialUrl: 'https://www.emirates.com/',
+    urlLabel: 'Emirates check-in',
     source: 'research',
   },
   {
