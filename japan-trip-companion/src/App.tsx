@@ -80,7 +80,7 @@ export default function App() {
           )}
           {tab === "map" && <MapView state={state} today={today} />}
           {tab === "bookings" && <BookingsView state={state} />}
-          {tab === "more" && <MoreView state={state} />}
+          {tab === "more" && <MoreView state={state} today={today} />}
         </main>
 
         <BottomNav

@@ -156,6 +156,22 @@ export const preTripChecklist = [
 /** Notices that apply to the whole trip rather than one day. */
 export const tripNotices: Notice[] = [
   {
+    id: 'nt-tokyo-night-gap',
+    tone: 'warning',
+    title: 'The night of 14-15 September may not be booked',
+    body:
+      'The Agoda confirmation for Bespoke Hotel Shinjuku runs 9 to 14 September — five nights. The itinerary says six, 9 to 15, and you leave that hotel at 06:15 on the 15th for the Azusa. Either the booking needs extending by a night or there is a second reservation nobody has sent me. Free cancellation on it ends 7 September, so this is worth settling now.',
+    source: 'research',
+  },
+  {
+    id: 'nt-takayama-hotel',
+    tone: 'warning',
+    title: 'Two different hotels for the Takayama night',
+    body:
+      'The itinerary names Takayama Ouan for 16-17 September. The Agoda confirmation is for Tokyu Stay Hida Takayama Musubinoyu on exactly those dates. Both are near the station. Tell me which is right and I will correct the itinerary throughout.',
+    source: 'research',
+  },
+  {
     id: 'nt-silver-week',
     tone: 'crowd',
     title: 'Silver Week — 19 to 23 September',

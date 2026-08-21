@@ -2,9 +2,10 @@ import { useState } from 'react'
 import {
   Check, Heart, Luggage, StickyNote, Utensils, BedDouble, Train, ListChecks,
   Info, Trash2, ShoppingBag, WifiOff, MessageSquareQuote, Backpack, KeyRound, Phone,
+  Wallet, AlertTriangle,
 } from 'lucide-react'
 import { dietRules, luggagePlan, preTripChecklist, trip, tripNotices } from '../data/trip'
-import { hotels } from '../data/hotels'
+import { hotels, hotelById } from '../data/hotels'
 import { transport } from '../data/transport'
 import { restaurants, restaurantById } from '../data/restaurants'
 import { shopping } from '../data/shopping'
@@ -17,6 +18,10 @@ import { ShoppingCard } from '../components/ShoppingCard'
 import { phraseGroups, keyPhrases } from '../data/phrases'
 import { packingGroups } from '../data/packing'
 import { PhraseCard } from '../components/PhraseCard'
+import { ReservationCard } from '../components/ReservationCard'
+import {
+  reservations, missingReservations, knownTotals, fx,
+} from '../data/reservations'
 import { EmptyNote, NoticeCard, Pill, SectionHeader } from '../components/ui'
 import { shortDateLabel } from '../utils/date'
 
@@ -26,6 +31,7 @@ type Panel =
   | 'transport'
   | 'luggage'
   | 'packing'
+  | 'costs'
   | 'food'
   | 'phrases'
   | 'shopping'
@@ -37,6 +43,7 @@ type Panel =
 
 const MENU: { id: Panel; label: string; hint: string; icon: typeof BedDouble }[] = [
   { id: 'hotels', label: 'Hotels', hint: 'All six stays, with dates and directions', icon: BedDouble },
+  { id: 'costs', label: 'Cost & cancellation', hint: 'What each night cost, and until when it is free to cancel', icon: Wallet },
   { id: 'transport', label: 'All transport', hint: 'Every leg of the trip in one list', icon: Train },
   { id: 'luggage', label: 'Luggage plan', hint: 'The forwarding strategy, day by day', icon: Luggage },
   { id: 'packing', label: 'Packing', hint: 'Split by which bag it goes in', icon: Backpack },
@@ -50,7 +57,7 @@ const MENU: { id: Panel; label: string; hint: string; icon: typeof BedDouble }[]
   { id: 'about', label: 'About this app', hint: 'Data sources, offline, resetting', icon: Info },
 ]
 
-export function MoreView({ state }: { state: TripState }) {
+export function MoreView({ state, today }: { state: TripState; today: string }) {
   const [panel, setPanel] = useState<Panel>('menu')
 
   if (panel !== 'menu') {
@@ -67,6 +74,7 @@ export function MoreView({ state }: { state: TripState }) {
         {panel === 'transport' && <TransportPanel />}
         {panel === 'luggage' && <LuggagePanel />}
         {panel === 'packing' && <PackingPanel state={state} />}
+        {panel === 'costs' && <CostsPanel today={today} />}
         {panel === 'food' && <FoodPanel state={state} />}
         {panel === 'phrases' && <PhrasesPanel />}
         {panel === 'shopping' && <ShoppingPanel />}
@@ -651,6 +659,128 @@ function FieldInput({
           </a>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Money, and the deadline that makes it actionable.
+ *
+ * The point of this screen is the cancellation window: while a stay is still
+ * free to cancel, a cheaper price for the same nights is worth having, so every
+ * card offers a dated Google search. Once the window closes the button goes
+ * away, because then looking only causes regret.
+ */
+function CostsPanel({ today }: { today: string }) {
+  const totals = knownTotals()
+  const conflicts = reservations.filter((r) => r.conflict)
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader
+          title="Cost & cancellation"
+          hint="From the confirmations. Dollar figures are approximate."
+        />
+        <div className="card px-4 py-4">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="eyebrow">Booked so far</p>
+              <p className="tabular mt-1 font-display text-[28px] font-medium leading-none text-sumi-800">
+                ${Math.round(totals.usd).toLocaleString()}
+              </p>
+              <p className="mt-1.5 text-[12px] text-sumi-400">
+                {totals.nights} nights across {totals.count} stays
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="eyebrow">Average night</p>
+              <p className="tabular mt-1 font-display text-[22px] font-medium leading-none text-sumi-600">
+                ${Math.round(totals.perNight)}
+              </p>
+            </div>
+          </div>
+          <p className="mt-3.5 border-t border-sumi-100 pt-3 text-[12px] leading-relaxed text-sumi-500">
+            Two stays are still missing a confirmation, including the five Kyoto nights — so the real
+            trip total will be meaningfully higher than this.
+          </p>
+        </div>
+      </div>
+
+      {conflicts.length > 0 && (
+        <div>
+          <SectionHeader
+            title="Needs a decision"
+            hint="Where a confirmation and the itinerary disagree."
+          />
+          <div className="space-y-2.5">
+            {conflicts.map((r) => (
+              <div
+                key={r.id}
+                className="rounded-card border border-shu-100 bg-shu-50 px-4 py-3.5 text-shu-600"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={15} />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-70">
+                    Conflict
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[13.5px] font-semibold leading-snug">
+                  {r.propertyAsBooked}
+                </p>
+                <p className="mt-1 text-[12.5px] leading-relaxed opacity-90">{r.conflict}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <SectionHeader
+          title="Confirmed stays"
+          hint="While cancellation is still free, the button checks the same nights elsewhere."
+        />
+        <div className="space-y-3">
+          {reservations
+            .slice()
+            .sort((a, b) => a.checkIn.localeCompare(b.checkIn))
+            .map((r) => (
+              <ReservationCard key={r.id} reservation={r} today={today} />
+            ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionHeader
+          title="No confirmation on file"
+          hint="Send these over and they will appear above with prices."
+        />
+        <div className="space-y-2.5">
+          {missingReservations.map((m) => {
+            const hotel = hotelById(m.hotelId)
+            if (!hotel) return null
+            return (
+              <div key={m.hotelId} className="card border-dashed px-4 py-3.5">
+                <p className="eyebrow">
+                  {hotel.cityLabel} · {shortDateLabel(hotel.checkIn)}–
+                  {shortDateLabel(hotel.checkOut)} · {hotel.nights}{' '}
+                  {hotel.nights === 1 ? 'night' : 'nights'}
+                </p>
+                <p className="mt-1 text-[14px] font-semibold leading-snug text-sumi-800">
+                  {hotel.name}
+                </p>
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-sumi-500">{m.note}</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <p className="text-[11px] leading-relaxed text-sumi-300">
+        Converted at {fx.jpyPerUsd} JPY and {(1 / fx.usdPerCny).toFixed(2)} CNY to the dollar,
+        checked {fx.asOf}. Booking references are deliberately not stored in this app — put them in
+        Confirmations, which keeps them on this device.
+      </p>
     </div>
   )
 }

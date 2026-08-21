@@ -297,6 +297,7 @@ async function open(name, iso, ctxOpts = iphone) {
   // until you save something, so a length threshold would be the wrong test.
   const panels = [
     ['Hotels', 'bespoke hotel shinjuku'],
+    ['Cost & cancellation', 'booked so far'],
     ['All transport', 'national park liner'],
     ['Luggage plan', 'send the big cases ahead'],
     ['Packing', 'small trolley'],
@@ -318,7 +319,7 @@ async function open(name, iso, ctxOpts = iphone) {
     await page.getByRole('button', { name: '← More' }).click()
     await page.waitForTimeout(200)
   }
-  check('more: all twelve panels render their own content', broken.length === 0, broken.join(','))
+  check('more: all thirteen panels render their own content', broken.length === 0, broken.join(','))
   check('more: no page errors', errs.length === 0, errs.join('; '))
   await ctx.close()
 }
@@ -373,6 +374,48 @@ async function open(name, iso, ctxOpts = iphone) {
   check('phrases: a short list renders before the groups', body.toLowerCase().includes('the short list'))
 
   check('surfaces: no page errors', errs.length === 0, errs.join('; '))
+  await ctx.close()
+}
+
+// ───────────────────────────────────────── 10b. Cost & cancellation
+{
+  const { ctx, page, errs } = await open('costs', '2026-08-21T03:00:00Z')
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: /Cost & cancellation/ }).first().click()
+  await page.waitForTimeout(500)
+  const body = (await page.locator('body').innerText()).toLowerCase()
+
+  check('costs: trip total shown', body.includes('$1,238'), body.match(/\$[\d,]+/)?.[0] ?? 'none')
+  check('costs: average night shown', body.includes('$138'))
+  check('costs: per-night for the Osaka stay', body.includes('$120'))
+  check('costs: native currency also shown', body.includes('jpy 38,133'))
+  check('costs: both conflicts surfaced',
+    body.includes('night of 14-15') || body.includes('9 to 14 september'))
+  check('costs: Takayama hotel mismatch surfaced', body.includes('tokyu stay hida takayama'))
+  check('costs: missing confirmations listed',
+    body.includes('no confirmation on file') && body.includes('hotel resol trinity kyoto'))
+  check('costs: free-cancellation countdown', /free cancellation for \d+ more days/.test(body),
+    body.match(/free cancellation[^\n]*/)?.[0] ?? 'none')
+
+  // The compare-price button must carry the property and the real dates.
+  const compare = page.getByRole('link', { name: /better price/i }).first()
+  const href = await compare.getAttribute('href')
+  // Cards sort by check-in, so the first is the Tokyo stay, 9 to 14 September.
+  const decoded = href ? decodeURIComponent(href) : ''
+  check('costs: compare button is a dated Google search',
+    href.startsWith('https://www.google.com/search?q=') &&
+      decoded.includes('"Bespoke Hotel Shinjuku"') &&
+      decoded.includes('9 September to 14 September 2026') &&
+      decoded.includes('2 adults'),
+    decoded.slice(30, 120) || 'none')
+
+  // And every card must offer one while its cancellation window is open.
+  const compareCount = await page.getByRole('link', { name: /better price/i }).count()
+  check('costs: every still-cancellable stay offers a price check', compareCount === 4,
+    String(compareCount))
+
+  check('costs: no page errors', errs.length === 0, errs.join('; '))
   await ctx.close()
 }
 

@@ -55,3 +55,31 @@ export function mapsRoute(stops: string[]): { url: string; used: number; dropped
     dropped: clean.length - used.length,
   }
 }
+
+/**
+ * A Google search for one hotel on specific nights, so you can see whether a
+ * better price exists for the dates you have already booked.
+ *
+ * A plain search rather than a constructed Google Hotels URL: for a query that
+ * names a hotel and a date range, Google surfaces its own price-comparison
+ * panel across Agoda, Booking, Expedia and the hotel's own site — and a plain
+ * search URL is a format that cannot silently break.
+ */
+export function hotelPriceSearch(
+  property: string,
+  checkIn: string,
+  checkOut: string,
+  guests = 2,
+): string {
+  const label = (iso: string) => {
+    const [, m, d] = iso.split('-').map(Number)
+    const month = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ][m - 1]
+    return `${d} ${month}`
+  }
+  const year = checkIn.slice(0, 4)
+  const q = `"${property}" hotel ${label(checkIn)} to ${label(checkOut)} ${year} price ${guests} adults`
+  return `https://www.google.com/search?q=${encodeURIComponent(q)}`
+}

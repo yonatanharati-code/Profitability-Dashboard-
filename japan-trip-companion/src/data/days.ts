@@ -633,6 +633,14 @@ export const days: Day[] = [
         source: 'pdf',
       },
       {
+        id: 'nt-0914-room',
+        tone: 'warning',
+        title: 'Is tonight actually booked?',
+        body:
+          'The Bespoke Hotel Shinjuku confirmation says check-out on 14 September — today. The itinerary has you here until the 15th, leaving at 06:15 for the Azusa. Confirm the extra night before free cancellation ends on 7 September.',
+        source: 'research',
+      },
+      {
         id: 'nt-0914-early-night',
         tone: 'warning',
         title: 'Early night — the alarm is around 05:45',

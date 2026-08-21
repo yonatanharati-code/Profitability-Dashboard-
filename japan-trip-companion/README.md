@@ -81,6 +81,24 @@ unsandboxed, sandboxed without `allow-popups`, and sandboxed with it.
 | **Bookings** | `CONFIRMED` / `SHOULD BOOK` / `OPTIONAL` / `NO BOOKING REQUIRED`, tickable, with official links. |
 | **More** | Twelve panels: hotels, all transport, the luggage plan, packing, food rules, Japanese phrases, shopping, the pre-flight checklist, confirmations, saved places, your notes, and how the data is sourced. |
 
+## Cost & cancellation
+
+`src/data/reservations.ts` holds what each stay actually cost, transcribed from
+the booking confirmations. Amounts are stored in the currency the confirmation
+quotes and converted for display, so a moving exchange rate means changing two
+constants in one place, not editing rows.
+
+The screen is organised around the **cancellation deadline**, because that is
+what makes a price actionable: while a stay is still free to cancel, a cheaper
+rate for the same nights is free money, so each card offers a dated Google
+search for that exact property and date range. Once the window closes the button
+disappears — after that, looking only causes regret.
+
+**Booking references are deliberately not in this repo**, for the same reason as
+the flight reference: a reference plus a surname is enough to alter or cancel a
+reservation on most platforms, and this app gets published. Property phone
+numbers *are* included, since those are published on the hotels' own sites.
+
 ## Three things built for use on the ground
 
 **Japanese phrases** (`src/data/phrases.ts`) — grouped by situation, food rules
@@ -117,6 +135,7 @@ src/data/
   bookings.ts     what actually needs booking, and what doesn't
   phrases.ts      the offline phrase card, grouped by situation
   packing.ts      packing list, split by which bag it goes in
+  reservations.ts what each stay cost, and the cancellation deadlines
 ```
 
 `npm run validate` checks that every id referenced from `days.ts` resolves,
@@ -222,6 +241,22 @@ surname is enough to alter a booking on most airline sites, and this app gets
 published. Flight numbers, times, terminals and seats are here because they are
 useful and harmless; the reference goes in *More → Confirmations*, which stores
 it on your device only.
+
+## Open conflicts
+
+Two confirmations disagree with the itinerary PDF. Both are surfaced in the app
+rather than silently resolved, because guessing either way could cost a night's
+sleep or a cancellation fee:
+
+- **The night of 14-15 September.** The Agoda confirmation for Bespoke Hotel
+  Shinjuku runs 9 to 14 September — five nights. The PDF says six, 9 to 15, and
+  the itinerary leaves that hotel at 06:15 on the 15th for the Azusa. As booked,
+  that night is uncovered.
+- **The Takayama hotel.** The PDF names Takayama Ouan for 16-17 September; the
+  confirmation is for Tokyu Stay Hida Takayama Musubinoyu on the same dates.
+
+Two stays have no confirmation on file at all: Miyama Ouan (15-16 Sep) and
+Hotel Resol Trinity Kyoto (18-23 Sep, five nights).
 
 ## Known gaps, by design
 
