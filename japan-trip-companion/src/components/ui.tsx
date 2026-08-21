@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { AlertTriangle, Info, Luggage, Users, ExternalLink } from 'lucide-react'
 import type { Notice, Priority, ReservationStatus, Source, DietVerdict } from '../data/types'
+import { Ext } from './ExternalLink'
 
 /* ------------------------------------------------------------------ Pill */
 
@@ -162,15 +163,10 @@ export function LinkButton({
   const cls =
     variant === 'primary' ? 'btn-primary' : variant === 'accent' ? 'btn-accent' : 'btn-secondary'
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`${cls} ${className}`}
-    >
+    <Ext href={href} className={`${cls} ${className}`}>
       {children}
       <ExternalLink size={13} className="opacity-50" />
-    </a>
+    </Ext>
   )
 }
 

@@ -39,14 +39,37 @@ npm run test:e2e                   # E2E_URL= if not on :5173
 ## Hosting it
 
 The app is a static build — `npm run build` produces `dist/`, which any static
-host will serve (Vercel, Netlify, GitHub Pages, Cloudflare Pages). Nothing
-server-side is required.
+host will serve. Nothing server-side is required. `.github/workflows/deploy-japan-app.yml`
+deploys it to GitHub Pages on push; that needs Pages switching on once, under
+Settings → Pages → Source: GitHub Actions.
 
 `npm run build:single` additionally produces `dist/japan-2026.html`: the whole
 app inlined into one self-contained file, for hosts that serve a single page.
-One caveat — under a strict content-security policy the Open-Meteo request is
-blocked, so the weather block shows its labelled September averages rather than
-a live forecast. Everything else is identical.
+
+### Where you host it changes how it behaves
+
+This matters more than it looks, because the app is largely a set of doors out
+to Google Maps and official sites.
+
+**A sandboxed iframe silently eats every external link.** A page embedded with
+`sandbox="allow-scripts"` and no `allow-popups` has all `target="_blank"`
+navigation and every `window.open` call dropped — the tap does nothing and no
+error is raised. That is the worst possible failure for a button you are relying
+on in a station, so `src/components/ExternalLink.tsx` does not trust the anchor:
+it attempts `window.open` inside the click gesture, and if the environment
+refuses, it surfaces the destination address instead of failing silently. The
+`<a href>` stays real, so long-press and copy-link still work.
+
+One trap worth recording: `window.open(url, '_blank', 'noopener')` returns
+`null` **by specification**, so using it makes every successful open look like a
+block. The opener is severed after the call instead.
+
+**A strict CSP blocks the weather fetch.** Open-Meteo is a cross-origin request,
+so under a strict policy the weather block shows its labelled September averages
+rather than a live forecast — which is the fallback it is built for.
+
+Both behaviours are pinned by `npm run test:e2e`, which drives the app
+unsandboxed, sandboxed without `allow-popups`, and sandboxed with it.
 
 ## Screens
 

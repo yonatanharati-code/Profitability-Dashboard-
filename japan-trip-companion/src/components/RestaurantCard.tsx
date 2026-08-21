@@ -3,6 +3,7 @@ import type { Restaurant } from '../data/types'
 import { DietPill, Pill } from './ui'
 import { mapsSearch } from '../utils/maps'
 import type { TripState } from '../hooks/useTripState'
+import { Ext } from './ExternalLink'
 
 const SLOT_LABEL: Record<Restaurant['slot'], string> = {
   quick: 'Quick',
@@ -75,14 +76,12 @@ export function RestaurantCard({
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-sumi-100 pt-3">
         <span className="text-[11.5px] font-medium text-sumi-400">{RES_LABEL[r.reservation]}</span>
-        <a
+        <Ext
           href={mapsSearch(r.mapsQuery)}
-          target="_blank"
-          rel="noopener noreferrer"
           className="inline-flex min-h-[36px] items-center gap-1.5 text-[12.5px] font-semibold text-sumi-600 hover:text-shu-500"
         >
           <MapPin size={13} /> Maps
-        </a>
+        </Ext>
       </div>
     </article>
   )

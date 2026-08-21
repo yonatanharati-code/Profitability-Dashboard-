@@ -3,16 +3,12 @@ import type { Hotel } from '../data/types'
 import { LinkButton, Pill, ReviewFlag } from './ui'
 import { mapsDirections, mapsSearch, walkTo } from '../utils/maps'
 import { shortDateLabel } from '../utils/date'
+import { Ext } from './ExternalLink'
 
 export function HotelCard({ hotel, compact = false }: { hotel: Hotel; compact?: boolean }) {
   if (compact) {
     return (
-      <a
-        href={mapsSearch(hotel.mapsQuery)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="card flex items-center gap-3 px-4 py-3.5"
-      >
+      <Ext href={mapsSearch(hotel.mapsQuery)} className="card flex items-center gap-3 px-4 py-3.5">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ai-50 text-ai-500">
           <BedDouble size={16} />
         </span>
@@ -26,7 +22,7 @@ export function HotelCard({ hotel, compact = false }: { hotel: Hotel; compact?: 
           </span>
         </span>
         <MapPin size={15} className="shrink-0 text-sumi-300" />
-      </a>
+      </Ext>
     )
   }
 
@@ -60,14 +56,12 @@ export function HotelCard({ hotel, compact = false }: { hotel: Hotel; compact?: 
         {/* Three mornings run off a fixed departure. Rather than assert a
             walking time we have not measured, make it one tap to check. */}
         {hotel.nearestStation && (
-          <a
+          <Ext
             href={walkTo(hotel.nearestStation, hotel.mapsQuery)}
-            target="_blank"
-            rel="noopener noreferrer"
             className="mt-2 inline-flex min-h-[36px] items-center gap-1.5 text-[12.5px] font-semibold text-sumi-600 hover:text-shu-500"
           >
             <Footprints size={13} /> Walking time to the station
-          </a>
+          </Ext>
         )}
 
         <p className="mt-3 text-[12.5px] leading-relaxed text-sumi-500">{hotel.locationNote}</p>

@@ -1,0 +1,63 @@
+# Publishes the Japan Trip Companion to GitHub Pages.
+#
+# Why: the app is largely a set of links out to Google Maps and official sites.
+# Hosts that embed it in a sandboxed iframe block those navigations, so it needs
+# a plain static host of its own to behave correctly — and on a phone the links
+# then open the native Maps app.
+#
+# ONE-TIME SETUP: in the repository, Settings -> Pages -> Build and deployment
+# -> Source: "GitHub Actions". Until that is switched on, the deploy step fails
+# with "Pages site not found" and nothing else is affected.
+name: Deploy Japan trip app
+
+on:
+  push:
+    branches: [main, claude/japan-trip-companion-app-rjb928]
+    paths:
+      - 'japan-trip-companion/**'
+      - '.github/workflows/deploy-japan-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once, and let a newer push win.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: japan-trip-companion
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: japan-trip-companion/package-lock.json
+
+      - run: npm ci
+
+      # Validates the trip data model, typechecks, then builds.
+      - run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: japan-trip-companion/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

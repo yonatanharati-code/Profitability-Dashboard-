@@ -6,6 +6,7 @@ import type { TripState } from '../hooks/useTripState'
 import { Pill, SectionHeader, type PillTone } from '../components/ui'
 import { TransportCard } from '../components/TransportCard'
 import { shortDateLabel } from '../utils/date'
+import { Ext } from '../components/ExternalLink'
 
 const BUCKET_TONE: Record<BookingItem['bucket'], PillTone> = {
   confirmed: 'sage',
@@ -96,15 +97,10 @@ export function BookingsView({ state }: { state: TripState }) {
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {b.officialUrl && (
-                        <a
-                          href={b.officialUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn-secondary flex-1"
-                        >
+                        <Ext href={b.officialUrl} className="btn-secondary flex-1">
                           {b.urlLabel ?? 'Official page'}
                           <ExternalLink size={13} className="opacity-50" />
-                        </a>
+                        </Ext>
                       )}
                       {actionable && (
                         <>

@@ -1,6 +1,7 @@
 import { MapPin, ShoppingBag } from 'lucide-react'
 import type { ShoppingSpot } from '../data/types'
 import { mapsSearch } from '../utils/maps'
+import { Ext } from './ExternalLink'
 
 export function ShoppingCard({ spot }: { spot: ShoppingSpot }) {
   return (
@@ -18,14 +19,12 @@ export function ShoppingCard({ spot }: { spot: ShoppingSpot }) {
           {spot.note && (
             <p className="mt-1.5 text-[12px] leading-relaxed text-sumi-400">{spot.note}</p>
           )}
-          <a
+          <Ext
             href={mapsSearch(spot.mapsQuery)}
-            target="_blank"
-            rel="noopener noreferrer"
             className="mt-2.5 inline-flex min-h-[36px] items-center gap-1.5 text-[12.5px] font-semibold text-sumi-600 hover:text-shu-500"
           >
             <MapPin size={13} /> Open in Maps
-          </a>
+          </Ext>
         </div>
       </div>
     </article>

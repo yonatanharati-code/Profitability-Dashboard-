@@ -376,6 +376,76 @@ async function open(name, iso, ctxOpts = iphone) {
   await ctx.close()
 }
 
+// ───────────────────────────────────────── 11. External links, per host
+//
+// This app is largely a set of doors out to Google Maps and official sites, so
+// its behaviour depends on where it is hosted. A page embedded in a sandboxed
+// iframe without 'allow-popups' has every new-window navigation silently
+// dropped — the tap does nothing and no error is raised. These checks pin all
+// three environments so that failure can never ship unnoticed again.
+{
+  const ctx = await browser.newContext(iphone)
+  const errs = []
+
+  async function linkCase(label, sandboxAttr) {
+    const page = await ctx.newPage()
+    page.on('pageerror', (e) => errs.push(`[${label}] ${e.message}`))
+    const popups = []
+    ctx.on('page', (p) => popups.push(p))
+
+    const sandbox = sandboxAttr === null ? '' : ` sandbox="${sandboxAttr}"`
+    await page.setContent(
+      `<iframe id="f" src="${url}"${sandbox} style="width:390px;height:844px;border:0"></iframe>`,
+    )
+    await page.waitForTimeout(2600)
+
+    const frame = page.frameLocator('#f')
+    await frame.locator('article button[aria-expanded]').nth(1).click()
+    await page.waitForTimeout(400)
+    const link = frame.getByRole('link', { name: /Open in Maps/i }).first()
+    await link.scrollIntoViewIfNeeded()
+
+    // The href must be a real Google Maps URL whatever the host does with it.
+    const href = await link.getAttribute('href')
+    check(
+      `links (${label}): href is a real Maps URL`,
+      !!href && href.startsWith('https://www.google.com/maps/'),
+      href ?? 'none',
+    )
+
+    const before = popups.length
+    await link.click()
+    await page.waitForTimeout(900)
+    const opened = popups.length > before
+    const fallback = (await frame.locator('[role="dialog"]').count()) > 0
+
+    await page.close()
+    return { opened, fallback }
+  }
+
+  // Unsandboxed: the link must open and no dialog may appear.
+  const normal = await linkCase('normal host', null)
+  check('links (normal host): opens a new window', normal.opened)
+  check('links (normal host): no blocked dialog', !normal.fallback)
+
+  // Sandboxed without allow-popups: nothing can open, so the address must be
+  // surfaced instead of the tap doing nothing.
+  const blocked = await linkCase('sandboxed, no popups', 'allow-scripts allow-same-origin')
+  check('links (sandboxed): nothing opens, as expected', !blocked.opened)
+  check('links (sandboxed): shows the address instead of failing silently', blocked.fallback)
+
+  // Sandboxed but permitted: behaves like a normal host.
+  const allowed = await linkCase(
+    'sandboxed + allow-popups',
+    'allow-scripts allow-same-origin allow-popups',
+  )
+  check('links (allow-popups): opens a new window', allowed.opened)
+  check('links (allow-popups): no blocked dialog', !allowed.fallback)
+
+  check('links: no page errors', errs.length === 0, errs.join('; '))
+  await ctx.close()
+}
+
 console.log(results.join('\n'))
 console.log(
   '\n' + (fails.length ? `${fails.length} FAILING:\n- ` + fails.join('\n- ') : 'All checks passed.'),

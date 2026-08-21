@@ -8,6 +8,7 @@ import { LinkButton, SectionHeader, Pill } from '../components/ui'
 import { orderedActivities, pinsForDay, routeStops } from '../utils/day'
 import { mapsDirections, mapsRoute, mapsSearch } from '../utils/maps'
 import { bigDateLabel, resolveActiveDate, shortDateLabel } from '../utils/date'
+import { Ext } from '../components/ExternalLink'
 
 const KIND: Record<
   MapPin['kind'],
@@ -124,24 +125,20 @@ export function MapView({ state, today }: { state: TripState; today: string }) {
                       {pin.label}
                     </span>
                   </span>
-                  <a
+                  <Ext
                     href={mapsSearch(pin.query)}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="icon-btn shrink-0"
-                    aria-label={`Open ${pin.label} in Google Maps`}
+                    ariaLabel={`Open ${pin.label} in Google Maps`}
                   >
                     <MapIcon size={16} />
-                  </a>
-                  <a
+                  </Ext>
+                  <Ext
                     href={mapsDirections(pin.query)}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="icon-btn shrink-0"
-                    aria-label={`Navigate to ${pin.label}`}
+                    ariaLabel={`Navigate to ${pin.label}`}
                   >
                     <Navigation size={16} />
-                  </a>
+                  </Ext>
                 </li>
               ))}
             </ul>
@@ -166,15 +163,13 @@ export function MapView({ state, today }: { state: TripState; today: string }) {
                   {h.cityLabel} · {shortDateLabel(h.checkIn)}–{shortDateLabel(h.checkOut)}
                 </span>
               </span>
-              <a
+              <Ext
                 href={mapsDirections(h.mapsQuery)}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="icon-btn shrink-0"
-                aria-label={`Navigate to ${h.name}`}
+                ariaLabel={`Navigate to ${h.name}`}
               >
                 <Navigation size={16} />
-              </a>
+              </Ext>
             </li>
           ))}
         </ul>
