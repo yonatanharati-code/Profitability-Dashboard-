@@ -701,8 +701,8 @@ function CostsPanel({ today }: { today: string }) {
             </div>
           </div>
           <p className="mt-3.5 border-t border-sumi-100 pt-3 text-[12px] leading-relaxed text-sumi-500">
-            Two stays are still missing a confirmation, including the five Kyoto nights — so the real
-            trip total will be meaningfully higher than this.
+            {totals.nights} of the trip's 16 hotel nights are accounted for. The Hirayu ryokan is
+            still missing a confirmation, and the disputed sixth Tokyo night is not counted here.
           </p>
         </div>
       </div>

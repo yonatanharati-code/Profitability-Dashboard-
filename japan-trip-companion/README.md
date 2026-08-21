@@ -255,8 +255,8 @@ sleep or a cancellation fee:
 - **The Takayama hotel.** The PDF names Takayama Ouan for 16-17 September; the
   confirmation is for Tokyu Stay Hida Takayama Musubinoyu on the same dates.
 
-Two stays have no confirmation on file at all: Miyama Ouan (15-16 Sep) and
-Hotel Resol Trinity Kyoto (18-23 Sep, five nights).
+One stay still has no confirmation on file: Miyama Ouan (15-16 Sep). Fourteen of
+the trip's sixteen hotel nights are priced, totalling about $1,838.
 
 ## Known gaps, by design
 

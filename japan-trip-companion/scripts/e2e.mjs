@@ -386,15 +386,19 @@ async function open(name, iso, ctxOpts = iphone) {
   await page.waitForTimeout(500)
   const body = (await page.locator('body').innerText()).toLowerCase()
 
-  check('costs: trip total shown', body.includes('$1,238'), body.match(/\$[\d,]+/)?.[0] ?? 'none')
-  check('costs: average night shown', body.includes('$138'))
+  check('costs: trip total shown', body.includes('$1,838'), body.match(/\$[\d,]+/)?.[0] ?? 'none')
+  check('costs: average night shown', body.includes('$131'))
   check('costs: per-night for the Osaka stay', body.includes('$120'))
   check('costs: native currency also shown', body.includes('jpy 38,133'))
   check('costs: both conflicts surfaced',
     body.includes('night of 14-15') || body.includes('9 to 14 september'))
   check('costs: Takayama hotel mismatch surfaced', body.includes('tokyu stay hida takayama'))
-  check('costs: missing confirmations listed',
-    body.includes('no confirmation on file') && body.includes('hotel resol trinity kyoto'))
+  check('costs: Kyoto stay now priced', body.includes('hotel resol trinity kyoto') &&
+    body.includes('jpy 95,453'))
+  check('costs: Kyoto lodging tax estimated', body.includes('kyoto accommodation tax'))
+  check('costs: only Hirayu still missing',
+    body.includes('no confirmation on file') && body.includes('miyama ouan') &&
+      !body.includes('five nights, 18 to 23'))
   check('costs: free-cancellation countdown', /free cancellation for \d+ more days/.test(body),
     body.match(/free cancellation[^\n]*/)?.[0] ?? 'none')
 
@@ -412,7 +416,7 @@ async function open(name, iso, ctxOpts = iphone) {
 
   // And every card must offer one while its cancellation window is open.
   const compareCount = await page.getByRole('link', { name: /better price/i }).count()
-  check('costs: every still-cancellable stay offers a price check', compareCount === 4,
+  check('costs: every still-cancellable stay offers a price check', compareCount === 5,
     String(compareCount))
 
   check('costs: no page errors', errs.length === 0, errs.join('; '))

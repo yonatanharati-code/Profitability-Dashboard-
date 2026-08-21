@@ -88,6 +88,8 @@ export const hotels: Hotel[] = [
     locationNote:
       'Central Kyoto, walking distance to Nishiki Market and the Kiyamachi / Pontocho evening streets. This is also the hotel your forwarded luggage is sent to on 14 Sep.',
     nearestStation: 'Karasuma-Oike / Kyoto Shiyakusho-mae',
+    checkInTime: '15:00 – 00:00',
+    checkOutTime: 'Until 11:00',
     mapsQuery: 'Hotel Resol Trinity Kyoto',
     source: 'pdf',
     reviewFlag:

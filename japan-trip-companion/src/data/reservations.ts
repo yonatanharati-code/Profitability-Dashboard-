@@ -131,6 +131,34 @@ export const reservations: Reservation[] = [
     ],
   },
   {
+    id: 'res-resol-kyoto',
+    hotelId: 'resol-trinity-kyoto',
+    propertyAsBooked: 'Hotel Resol Trinity Kyoto',
+    platform: 'booking',
+    checkIn: '2026-09-18',
+    checkOut: '2026-09-23',
+    nights: 5,
+    currency: 'JPY',
+    amount: 95453,
+    freeCancelUntil: '2026-09-17',
+    cancelNote:
+      'Free until 17 Sep, one day before arrival. Cancelling inside that day is 50% of the total.',
+    payment: 'pay-later',
+    roomType: 'Large Double Room · one king bed · tatami · no meals included',
+    phone: '+81 75 211 9269',
+    addressAsBooked: 'Fuyachodori Oikeagaru Kamihakusancho 249, Nakagyo-ku, Kyoto 604-0943',
+    extras: [
+      'JPY 104,998 before a JPY 9,545 Booking.com contribution',
+      // Kyoto's lodging tax was restructured on 1 March 2026 into five bands.
+      // This room is about JPY 19,100 a night, which falls in the JPY 6,000
+      // to 19,999 band at JPY 400 per person per night — so roughly JPY 4,000
+      // for two people over five nights. Worth checking at the desk: the
+      // pre-discount rate is only just under the next band up.
+      'Kyoto accommodation tax, paid at the property — around JPY 4,000 total for two of you over five nights',
+      'Public bathing areas may be closed to guests with visible tattoos',
+    ],
+  },
+  {
     id: 'res-forza',
     hotelId: 'forza-osaka-namba',
     propertyAsBooked: 'Hotel Forza Osaka Namba Dotonbori',
@@ -156,11 +184,6 @@ export const missingReservations: { hotelId: string; note: string }[] = [
     hotelId: 'miyama-ouan',
     note:
       'No confirmation received. This is the ryokan night on 15-16 September, with dinner and the onsen — and the one where the no-pork, no-seafood request has to be on record.',
-  },
-  {
-    hotelId: 'resol-trinity-kyoto',
-    note:
-      'No confirmation received. Five nights, 18 to 23 September — the longest and almost certainly the most expensive stay of the trip, and the hotel your luggage is forwarded to on 14 September.',
   },
 ]
 
